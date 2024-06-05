@@ -54,4 +54,4 @@ The following additional options are available.
 # Contact
 Masahiro FUKUDA (ISSP, Univ. of Tokyo)  
 masahiro.fukuda__at__issp.u-tokyo.ac.jp  
-Please replace __at__ by @.
+Please replace `__at__` by @.
