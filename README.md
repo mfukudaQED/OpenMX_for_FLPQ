@@ -40,10 +40,10 @@ The following additional options are available.
 
 ## Additional codes
 1. flpq_dm.h
-  - Added global parameters.
+    - Additional global parameters.
 
 1. out_openmx_lpq.c
-  - out_openmx_lpq exports the DM and parameters.
+    - out_openmx_lpq exports the DM and parameters.
 
 1. Allocate_DM_for_LPQ.c
 1. Cluster_DFT_Col_DMmu.c
