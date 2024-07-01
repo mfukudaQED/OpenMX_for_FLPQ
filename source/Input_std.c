@@ -3313,23 +3313,11 @@ void Input_std(char *file)
     DM_energy_range[1] = DM_energy_range[1]/eV2Hartree;
   }
   input_double("DM.energy.broadening",&DM_energy_broadening, 300*kB);   /* in eV */
-  //DM_tilde_Beta = 1.0/DM_energy_broadening;
-  //DM_tilde_Beta_upper = DM_tilde_Beta;
-  //DM_tilde_Beta_lower = DM_tilde_Beta;
   input_double("DM.energy.broadening.upper",&DM_energy_broadening_upper, DM_energy_broadening);   /* in eV */
   DM_tilde_Beta_upper = 1.0/DM_energy_broadening_upper;
   input_double("DM.energy.broadening.lower",&DM_energy_broadening_lower, DM_energy_broadening);   /* in eV */
   DM_tilde_Beta_lower = 1.0/DM_energy_broadening_lower;
 
-  //input_double("DM.tilde_T",&DM_tilde_T, 300);   /* in K */
-  //DM_tilde_Beta = 1.0/kB/DM_tilde_T;
-  //DM_tilde_Beta_upper = DM_tilde_Beta;
-  //DM_tilde_Beta_lower = DM_tilde_Beta;
-
-  //input_double("DM.tilde_T_upper",&DM_tilde_T_upper, 300);   /* in K */
-  //DM_tilde_Beta_upper = 1.0/kB/DM_tilde_T_upper;
-  //input_double("DM.tilde_T_lower",&DM_tilde_T_lower, 300);   /* in K */
-  //DM_tilde_Beta_lower = 1.0/kB/DM_tilde_T_lower;
 
   //printf("DM_energy_range: %lf,%lf\n",DM_energy_range[0],DM_energy_range[1]);
 
