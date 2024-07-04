@@ -92,7 +92,7 @@ void Population_Analysis_Wannier(char *argv[])
 
     if (ocupied_flag==0){
 
-      if (fp=input_find("<occupied.electrons") ) {
+      if ( (fp=input_find("<occupied.electrons")) != NULL ) {
 
 	for (n=1; n<=max_occupied_N; n++){
 	  fscanf(fp,"%d",&i);
@@ -119,7 +119,7 @@ void Population_Analysis_Wannier(char *argv[])
 
     else {
 
-      if (fp=input_find("<ocupied.electrons") ) {
+      if ( (fp=input_find("<ocupied.electrons")) != NULL ) {
 
 	for (n=1; n<=max_occupied_N; n++){
 	  fscanf(fp,"%d",&i);
@@ -147,7 +147,7 @@ void Population_Analysis_Wannier(char *argv[])
 
     input_int("number.vps",&Number_VPS,0);
 
-    if (fp=input_find("<pseudo.NandL") ) {
+    if ( (fp=input_find("<pseudo.NandL")) != NULL ) {
       for(i=0; i<Number_VPS; i++){
 	fscanf(fp,"%d %d %d %lf %lf",&j,&NVPS[i],&LVPS[i],&dum1,&dum2);
       }

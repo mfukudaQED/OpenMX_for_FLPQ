@@ -16,15 +16,16 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include "mpi.h"
 #include "openmx_common.h"
 #include "lapack_prototypes.h"
-#include "mpi.h"
 #include <omp.h>
 
 #define  measure_time   0
+#define  flag_Calc_MatrixElements_dVH_Vxc_VNA   0
 
-void Calc_MatrixElements_dVH_Vxc_VNA(int Cnt_kind);
-
+void Calc_MatrixElements_dVH_Vxc_VNA_by_AI(int Cnt_kind);
+void Calc_MatrixElements_dVH_Vxc_VNA_by_TO(int Cnt_kind);
 
 double Set_Hamiltonian(char *mode,
                        int MD_iter,
@@ -101,18 +102,28 @@ double Set_Hamiltonian(char *mode,
 
             /* Effective Hubbard Hamiltonain --- added by MJ */
 
-	    if( (Hub_U_switch==1 || 1<=Constraint_NCS_switch) && F_U_flag==1 && 2<=SCF_iter ){
+	    if (  (Hub_U_switch==1 || 1<=Constraint_NCS_switch || Zeeman_NCS_switch==1 || Zeeman_NCO_switch==1) 
+                 && F_U_flag==1 && 2<=SCF_iter
+              ){
+
 	      H[0][Mc_AN][h_AN][i][j] += H_Hub[0][Mc_AN][h_AN][i][j];
 	      H[1][Mc_AN][h_AN][i][j] += H_Hub[1][Mc_AN][h_AN][i][j];
 	      H[2][Mc_AN][h_AN][i][j] += H_Hub[2][Mc_AN][h_AN][i][j];
 	    }
 
-	    /* core hole Hamiltonain */
+	    /* core hole Hamiltonian */
 
 	    if (core_hole_state_flag==1){
 	      H[0][Mc_AN][h_AN][i][j] += HCH[0][Mc_AN][h_AN][i][j];
 	      H[1][Mc_AN][h_AN][i][j] += HCH[1][Mc_AN][h_AN][i][j];
 	      H[2][Mc_AN][h_AN][i][j] += HCH[2][Mc_AN][h_AN][i][j];
+	    }
+
+	    if (xmcd_calc==1){
+	      H[0][Mc_AN][h_AN][i][j] += H_XMCD[0][Mc_AN][h_AN][i][j];
+	      H[1][Mc_AN][h_AN][i][j] += H_XMCD[1][Mc_AN][h_AN][i][j];
+	      H[2][Mc_AN][h_AN][i][j] += H_XMCD[2][Mc_AN][h_AN][i][j];
+	      H[3][Mc_AN][h_AN][i][j] += H_XMCD[3][Mc_AN][h_AN][i][j];
 	    }
 
           }
@@ -145,16 +156,15 @@ double Set_Hamiltonian(char *mode,
 		                           + F_NL_flag*HNL[spin][Mc_AN][h_AN][i][j];
               }
 
-	      /* Effective Hubbard Hamiltonain --- added by MJ */
+	      /* Effective Hubbard Hamiltonian --- added by MJ */
 	      if ( (Hub_U_switch==1 || 1<=Constraint_NCS_switch) && F_U_flag==1 && 2<=SCF_iter ){
 		H[spin][Mc_AN][h_AN][i][j] += H_Hub[spin][Mc_AN][h_AN][i][j];
 	      }
 
-	      /* core hole Hamiltonain */
+	      /* core hole Hamiltonian */
 	      if (core_hole_state_flag==1){
 		H[spin][Mc_AN][h_AN][i][j] += HCH[spin][Mc_AN][h_AN][i][j];
 	      }
-
             }
           }
         }
@@ -191,7 +201,13 @@ double Set_Hamiltonian(char *mode,
    calculation of matrix elements for dVH + Vxc (+ VNA)
   *****************************************************/
 
-  Calc_MatrixElements_dVH_Vxc_VNA(Cnt_kind);
+
+  if      (flag_Calc_MatrixElements_dVH_Vxc_VNA==0){
+    Calc_MatrixElements_dVH_Vxc_VNA_by_AI(Cnt_kind);
+  }
+  else if (flag_Calc_MatrixElements_dVH_Vxc_VNA==1){
+    Calc_MatrixElements_dVH_Vxc_VNA_by_TO(Cnt_kind);
+  }
 
   /* for time */
   if (measure_time) dtime(&time1);
@@ -208,7 +224,349 @@ double Set_Hamiltonian(char *mode,
 }
 
 
-void Calc_MatrixElements_dVH_Vxc_VNA(int Cnt_kind)
+
+void Calc_MatrixElements_dVH_Vxc_VNA_by_TO(int Cnt_kind)
+{
+  int i,j,spin,NO0,NO1,mm,Nog,Nc,Nh;
+  int Nh_0,Nh_1,Nh_2,Nh_3,Nc_0,Nc_1,Nc_2,Nc_3;
+  int Nprocs,Nthrds,Cwan,Ncs,Rnh,Hwan;
+  int Mc_AN,Gc_AN,Mh_AN,h_AN,Gh_AN;
+  int Nh0,Nh1,Nh2,Nh3;
+  int Nc0,Nc1,Nc2,Nc3;
+  int MN0,MN1,MN2,MN3;
+  int Nloop,OneD_Nloop;
+  int *OneD2spin,*OneD2Mc_AN,*OneD2h_AN;
+  int numprocs,myid,OMPID;
+  double tmp0,tmp0_0,tmp0_1,tmp0_2,tmp0_3;
+  double time0,time1,time2,mflops;
+  double **tmp_ChiV0_0,**tmp_ChiV0_1,**tmp_ChiV0_2,**tmp_ChiV0_3;
+  double *tmp_Orbs_Grid_0,*tmp_Orbs_Grid_1,*tmp_Orbs_Grid_2,*tmp_Orbs_Grid_3;
+  double *Chi0,***ChiV0,***tmp_H;
+
+  if(measure_time) dtime(&time1);
+
+  MPI_Comm_size(mpi_comm_level1,&numprocs);
+  MPI_Comm_rank(mpi_comm_level1,&myid);
+
+  dtime(&time1);
+
+  /* one-dimensionalize the Mc_AN and h_AN loops */
+
+  OneD_Nloop = 0;
+  for (Mc_AN=1; Mc_AN<=Matomnum; Mc_AN++){
+    Gc_AN = M2G[Mc_AN];    
+    for (h_AN=0; h_AN<=FNAN[Gc_AN]; h_AN++){
+      OneD_Nloop++;
+    }
+  }  
+
+  OneD2Mc_AN = (int*)malloc(sizeof(int)*(OneD_Nloop+1));
+  OneD2h_AN = (int*)malloc(sizeof(int)*(OneD_Nloop+1));
+
+  OneD_Nloop = 0;
+  for (Mc_AN=1; Mc_AN<=Matomnum; Mc_AN++){
+    Gc_AN = M2G[Mc_AN];    
+    for (h_AN=0; h_AN<=FNAN[Gc_AN]; h_AN++){
+      OneD2Mc_AN[OneD_Nloop] = Mc_AN; 
+      OneD2h_AN[OneD_Nloop] = h_AN; 
+      OneD_Nloop++;
+    }
+  }
+
+  /* OpenMP */
+
+/*
+#pragma omp parallel shared(gtv,Gxyz,atv,GridListAtom,CellListAtom,OneD2h_AN,OneD2Mc_AN,OneD_Nloop,GridN_Atom,H,CntH,List_YOUSO,GridVol,Orbs_Grid,Vpot_Grid,MGridListAtom,GListTAtoms2,GListTAtoms1,Matomnum,NumOLG,SpinP_switch,Spe_Total_CNO,Spe_Total_NO,Cnt_kind,WhatSpecies,ncn,natn,F_G2M,FNAN)  private(OMPID,Nthrds,Nprocs,h_AN,Gh_AN,Mh_AN,Rnh,Hwan,NO1,spin,i,j,tmp_H,Nog,Nc_0,Nc_1,Nc_2,Nc_3,Nh_0,Nh_1,Nh_2,Nh_3,tmp_ChiV0_0,tmp_ChiV0_1,tmp_ChiV0_2,tmp_ChiV0_3,tmp_Orbs_Grid_0,tmp_Orbs_Grid_1,tmp_Orbs_Grid_2,tmp_Orbs_Grid_3,mm,Nc,Nh,tmp0,tmp0_0,tmp0_1,tmp0_2,tmp0_3,Mc_AN,Gc_AN,Cwan,NO0,Ncs,ChiV0,Chi0,Nloop)
+  {
+*/
+    /* allocation of arrays */ 
+
+    Chi0 = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+
+    ChiV0 = (double***)malloc(sizeof(double**)*4);
+    for (i=0; i<4; i++){
+      ChiV0[i] = (double**)malloc(sizeof(double*)*List_YOUSO[7]);
+      for (j=0; j<List_YOUSO[7]; j++){
+	ChiV0[i][j] = (double*)malloc(sizeof(double)*List_YOUSO[11]);
+      }
+    }
+
+    tmp_H = (double***)malloc(sizeof(double**)*4);
+    for (i=0; i<4; i++){
+      tmp_H[i] = (double**)malloc(sizeof(double*)*List_YOUSO[7]);
+      for (j=0; j<List_YOUSO[7]; j++){
+	tmp_H[i][j] = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+      }
+    }
+
+    tmp_ChiV0_0 = (double**)malloc(sizeof(double*)*4);
+    for (i=0; i<4; i++){
+      tmp_ChiV0_0[i] = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+    }
+
+    tmp_ChiV0_1 = (double**)malloc(sizeof(double*)*4);
+    for (i=0; i<4; i++){
+      tmp_ChiV0_1[i] = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+    }
+    
+    tmp_ChiV0_2 = (double**)malloc(sizeof(double*)*4);
+    for (i=0; i<4; i++){
+      tmp_ChiV0_2[i] = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+    }
+    
+    tmp_ChiV0_3 = (double**)malloc(sizeof(double*)*4);
+    for (i=0; i<4; i++){
+      tmp_ChiV0_3[i] = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+    }
+    
+    tmp_Orbs_Grid_0 = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+    tmp_Orbs_Grid_1 = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+    tmp_Orbs_Grid_2 = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+    tmp_Orbs_Grid_3 = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+    
+    /* get info. on OpenMP */ 
+
+    /*
+    OMPID = omp_get_thread_num();
+    Nthrds = omp_get_num_threads();
+    Nprocs = omp_get_num_procs();
+    */
+    
+    /* one-dimensionalized loop */
+
+    for (Nloop=0; Nloop<OneD_Nloop; Nloop++){
+
+//    for (Nloop=OMPID*OneD_Nloop/Nthrds; Nloop<(OMPID+1)*OneD_Nloop/Nthrds; Nloop++){
+
+      /* get Mc_AN and h_AN */
+
+      Mc_AN = OneD2Mc_AN[Nloop];
+      h_AN  = OneD2h_AN[Nloop];
+
+      /* set data on Mc_AN */
+
+      Gc_AN = M2G[Mc_AN];    
+      Cwan = WhatSpecies[Gc_AN];
+
+      if (Cnt_kind==0) NO0 = Spe_Total_NO[Cwan];
+      else             NO0 = Spe_Total_CNO[Cwan];
+    
+      for (spin=0; spin<=SpinP_switch; spin++){
+	for (i=0; i<NO0; i++){
+
+	  for (Nc=0; Nc<GridN_Atom[Gc_AN]; Nc++){
+	    ChiV0[spin][i][Nc] = Orbs_Grid[Mc_AN][Nc][i]*Vpot_Grid[spin][MGridListAtom[Mc_AN][Nc]];
+	  }
+
+	  Ncs = GridN_Atom[Gc_AN] - GridN_Atom[Gc_AN]%4; 
+	  for (Nc=Ncs; Nc<GridN_Atom[Gc_AN]; Nc++){
+	    ChiV0[spin][i][Nc] = Orbs_Grid[Mc_AN][Nc][i]*Vpot_Grid[spin][MGridListAtom[Mc_AN][Nc]];
+	  }
+	}
+      }
+
+      /* set data on h_AN */
+
+      Gh_AN = natn[Gc_AN][h_AN];
+      Mh_AN = F_G2M[Gh_AN];
+
+      Rnh = ncn[Gc_AN][h_AN];
+      Hwan = WhatSpecies[Gh_AN];
+
+      if (Cnt_kind==0)
+	NO1 = Spe_Total_NO[Hwan];
+      else   
+	NO1 = Spe_Total_CNO[Hwan];
+
+      /* initialize tmp_H */
+
+      for (spin=0; spin<=SpinP_switch; spin++){
+	for (i=0; i<NO0; i++){
+	  for (j=0; j<NO1; j++){
+	    tmp_H[spin][i][j] = 0.0;                          
+	  }
+	}
+      }
+      
+      /* summation of non-zero elements */
+
+      for (Nog=0; Nog<NumOLG[Mc_AN][h_AN]-3; Nog+=4){
+
+        Nc_0 = GListTAtoms1[Mc_AN][h_AN][Nog+0];
+        Nc_1 = GListTAtoms1[Mc_AN][h_AN][Nog+1];
+        Nc_2 = GListTAtoms1[Mc_AN][h_AN][Nog+2];
+        Nc_3 = GListTAtoms1[Mc_AN][h_AN][Nog+3];
+
+        Nh_0 = GListTAtoms2[Mc_AN][h_AN][Nog+0];
+        Nh_1 = GListTAtoms2[Mc_AN][h_AN][Nog+1];
+        Nh_2 = GListTAtoms2[Mc_AN][h_AN][Nog+2];
+        Nh_3 = GListTAtoms2[Mc_AN][h_AN][Nog+3];
+
+	/* store ChiV0 in tmp_ChiV0 */
+ 
+	for (spin=0; spin<=SpinP_switch; spin++){
+	  for (i=0; i<NO0; i++){
+	    tmp_ChiV0_0[spin][i] = ChiV0[spin][i][Nc_0];
+	    tmp_ChiV0_1[spin][i] = ChiV0[spin][i][Nc_1];
+	    tmp_ChiV0_2[spin][i] = ChiV0[spin][i][Nc_2];
+	    tmp_ChiV0_3[spin][i] = ChiV0[spin][i][Nc_3];
+	  }
+	}
+
+	/* store Orbs_Grid in tmp_Orbs_Grid */
+
+	for (j=0; j<NO1; j++){
+	  tmp_Orbs_Grid_0[j] = Orbs_Grid[Mh_AN][Nh_0][j];
+	  tmp_Orbs_Grid_1[j] = Orbs_Grid[Mh_AN][Nh_1][j];
+	  tmp_Orbs_Grid_2[j] = Orbs_Grid[Mh_AN][Nh_2][j];
+	  tmp_Orbs_Grid_3[j] = Orbs_Grid[Mh_AN][Nh_3][j];
+	}
+
+	/* integration */
+ 
+	for (spin=0; spin<=SpinP_switch; spin++){
+	  for (i=0; i<NO0; i++){
+
+	    tmp0_0 = tmp_ChiV0_0[spin][i];
+	    tmp0_1 = tmp_ChiV0_1[spin][i];
+	    tmp0_2 = tmp_ChiV0_2[spin][i];
+	    tmp0_3 = tmp_ChiV0_3[spin][i];
+
+	    for (j=0; j<NO1; j++){
+	      tmp_H[spin][i][j] += (  tmp0_0*tmp_Orbs_Grid_0[j]
+			             +tmp0_1*tmp_Orbs_Grid_1[j]
+				     +tmp0_2*tmp_Orbs_Grid_2[j]
+				     +tmp0_3*tmp_Orbs_Grid_3[j]);
+	    }
+
+	  }
+	}
+      }
+
+      mm = NumOLG[Mc_AN][h_AN]-(NumOLG[Mc_AN][h_AN]/4)*4;
+
+      if(mm != 0){
+ 
+	for (Nog=NumOLG[Mc_AN][h_AN]-mm; Nog<NumOLG[Mc_AN][h_AN]; Nog++){
+ 
+	  Nc = GListTAtoms1[Mc_AN][h_AN][Nog];
+	  Nh = GListTAtoms2[Mc_AN][h_AN][Nog];
+
+	  /* store ChiV0 in tmp_ChiV0_0 */
+ 
+	  for (spin=0; spin<=SpinP_switch; spin++){
+	    for (i=0; i<NO0; i++){
+	      tmp_ChiV0_0[spin][i] = ChiV0[spin][i][Nc];
+	    }
+	  }
+ 
+	  /* store Orbs_Grid in tmp_Orbs_Grid */
+
+	  for (j=0; j<NO1; j++){
+	    tmp_Orbs_Grid_0[j] = Orbs_Grid[Mh_AN][Nh][j];
+	  }
+
+	  /* integration */
+
+	  for (spin=0; spin<=SpinP_switch; spin++){
+
+	    for (i=0; i<NO0; i++){
+	      tmp0 = tmp_ChiV0_0[spin][i];
+	      for (j=0; j<NO1; j++){
+		tmp_H[spin][i][j] += tmp0*tmp_Orbs_Grid_0[j];
+	      }
+	    }
+	  }
+	}
+      }
+      
+      /* add tmp_H to H or CntH */
+
+      if (Cnt_kind==0){
+
+	for (spin=0; spin<=SpinP_switch; spin++){
+	  for (i=0; i<NO0; i++){
+	    for (j=0; j<NO1; j++){
+	      H[spin][Mc_AN][h_AN][i][j] += tmp_H[spin][i][j]*GridVol;
+	    }
+	  }
+	}
+      }
+ 
+      else{
+	for (spin=0; spin<=SpinP_switch; spin++){
+	  for (i=0; i<NO0; i++){
+	    for (j=0; j<NO1; j++){
+	      CntH[spin][Mc_AN][h_AN][i][j] += tmp_H[spin][i][j]*GridVol;
+	    }
+	  }
+	}
+      }
+      
+    } /* Nloop */
+
+    /* freeing of arrays */ 
+
+    free(tmp_Orbs_Grid_3);
+    free(tmp_Orbs_Grid_2);
+    free(tmp_Orbs_Grid_1);
+    free(tmp_Orbs_Grid_0);
+
+    for (i=0; i<4; i++){
+      free(tmp_ChiV0_3[i]);
+    }
+    free(tmp_ChiV0_3);
+
+    for (i=0; i<4; i++){
+      free(tmp_ChiV0_2[i]);
+    }
+    free(tmp_ChiV0_2);
+
+    for (i=0; i<4; i++){
+      free(tmp_ChiV0_1[i]);
+    }
+    free(tmp_ChiV0_1);
+
+    for (i=0; i<4; i++){
+      free(tmp_ChiV0_0[i]);
+    }
+    free(tmp_ChiV0_0);
+
+    for (i=0; i<4; i++){
+      for (j=0; j<List_YOUSO[7]; j++){
+	free(tmp_H[i][j]);
+      }
+      free(tmp_H[i]);
+    }
+    free(tmp_H);
+
+    for (i=0; i<4; i++){
+      for (j=0; j<List_YOUSO[7]; j++){
+	free(ChiV0[i][j]);
+      }
+      free(ChiV0[i]);
+    }
+    free(ChiV0);
+
+    free(Chi0);
+
+//#pragma omp flush(H,CntH)
+
+  //} /* #pragma omp parallel */
+
+  /* freeing of arrays */ 
+
+  free(OneD2h_AN);
+  free(OneD2Mc_AN);
+
+  if(measure_time){ 
+    dtime(&time2);
+    printf("myid=%4d Time4=%18.10f\n",myid,time2-time1);fflush(stdout);
+  }
+}
+
+
+void Calc_MatrixElements_dVH_Vxc_VNA_by_AI(int Cnt_kind)
 {
   int Mc_AN,Gc_AN,Mh_AN,h_AN,Gh_AN;
   int Nh0,Nh1,Nh2,Nh3;
@@ -359,8 +717,7 @@ void Calc_MatrixElements_dVH_Vxc_VNA(int Cnt_kind)
 	  int Nh = GListTAtoms2[Mc_AN][h_AN][Nog];
 		
 	  double AI_tmp_GVVG = GridVol * Vpot_Grid[0][MN];
-
-
+	  
 	  if (G2ID[Gh_AN]==myid){
 	    int i;
 	    for (i=0; i<NO0; i++){
@@ -450,7 +807,6 @@ void Calc_MatrixElements_dVH_Vxc_VNA(int Cnt_kind)
 	  double AI_tmp_GVVG = GridVol * Vpot_Grid[0][MN];
 	  double AI_tmp_GVVG1 = GridVol * Vpot_Grid[1][MN];
 
-
 	  if (G2ID[Gh_AN]==myid){
 				
 	    int i;
@@ -493,7 +849,6 @@ void Calc_MatrixElements_dVH_Vxc_VNA(int Cnt_kind)
 	      }
 	    }
 	  }
-
 		
 	}/* Nog */
 	
@@ -782,7 +1137,6 @@ void Calc_MatrixElements_dVH_Vxc_VNA(int Cnt_kind)
     }
 
   } /* pragma omp parallel */ 
-
   /* freeing of arrays */
 
   free(OneD2Mc_AN);

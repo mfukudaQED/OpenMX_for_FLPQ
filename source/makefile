@@ -4,58 +4,79 @@
 #  Examples of CC and LIB on several platforms are shown below.   #
 #                                                                 #
 ###################################################################
+ 
+
+### ohtaka, Intel compiler + Intel MKL + OpenMPI
+### used module ###
+#module load oneapi_compiler/2023.0.0 oneapi_mkl/2023.0.0 openmpi/4.1.5-oneapi-2023.0.0-classic
+### 
+CC = mpicc -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -I${MKLROOT}/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3
+FC = mpifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3
+LIB= -L${MKLROOT}/lib/intel64 -qmkl=parallel -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi  -lifcoremt
+CXX = mpic++ -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -std=c++11  -I${MKLROOT}/include/fftw
+
+#CC = mpicc -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -I${MKLROOT}/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -qopt-report
+##CC2 = mpicc -O2 -Wunused -march=core-avx2 -ip -no-prec-div -qopenmp -I${MKLROOT}/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -qopt-report
+#FC = mpifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -qopt-report
+#LIB= -L${MKLROOT}/lib/intel64 -mkl=parallel -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi  -lifcoremt
+#CXX = mpic++ -O3 -xHOST -ip -no-prec-div -qopenmp -std=c++11 -I/opt/intel/mkl/include/fftw
 
 #MKLROOT = /opt/intel/mkl
+##CC = mpicc -O3 -xHOST -ip -no-prec-div -qopenmp -I/opt/intel/mkl/include/fftw/
+#
+#CC = mpicc -O3 -xHOST -ip -no-prec-div -qopenmp -DLEAK_DETECT -I/opt/intel/mkl/include/fftw/
+#
+#FC = mpif90 -O3 -xHOST -ip -no-prec-div -qopenmp
+#LIB= -L${MKLROOT}/lib/intel64 -lmkl_scalapack_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lmkl_blacs_openmpi_lp64 -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lifcore -liomp5 -lpthread -lm -ldl
+
+
+ 
+#MKLROOT = /opt/intel/oneapi/mkl/2022.0.2
+#CC = mpiicc -O3 -xHOST -ip -no-prec-div -qopenmp -I${MKLROOT}/include -I/opt/intel/oneapi/mkl/2021.3.0/include/fftw
+
+#CC = mpiicc -cc=icx -O3 -fcommon -xHOST -qopenmp -I${MKLROOT}/include -I/opt/intel/oneapi/mkl/2021.3.0/include/fftw
+
+#FC = mpiifort -O3 -xHOST -ip -no-prec-div -qopenmp
+
+#FC = mpiifort -fc=ifx -O3 -xHOST -qopenmp
+
+#LIB= -L${MKLROOT}/lib/intel64 -lmkl_scalapack_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lifcore -lmkl_blacs_intelmpi_lp64 -liomp5 -lpthread -lm -ldl
+
+#LIB= -L${MKLROOT}/lib/intel64 -lmkl_scalapack_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lifcore -lmkl_blacs_intelmpi_lp64 -liomp5 -lpthread -lm -ldl
+
+
+#MKLROOT = /opt/intel/mkl
+#CC = mpicc -O3 -xHOST -ip -no-prec-div -qopenmp -DLEAK_DETECT -I/opt/intel/mkl/include/fftw
 #CC = mpicc -O3 -xHOST -ip -no-prec-div -qopenmp -I/opt/intel/mkl/include/fftw
 #FC = mpif90 -O3 -xHOST -ip -no-prec-div -qopenmp
 #LIB= -L${MKLROOT}/lib/intel64 -lmkl_scalapack_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lmkl_blacs_openmpi_lp64 -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -liomp5 -lpthread -lm -ldl
 
-### ohtaka, Intel compiler + Intel MKL + Open MPI
-### used module ###
-#module load oneapi_compiler/2023.0.0 oneapi_mkl/2023.0.0 openmpi/4.1.5-oneapi-2023.0.0-classic
-#CC = mpicc -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -I${MKLROOT}/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -qopt-report
-#CC2 = mpicc -O2 -march=core-avx2 -ip -no-prec-div -qopenmp -I${MKLROOT}/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -qopt-report
-#FC = mpifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -qopt-report
-#LIB= -L${MKLROOT}/lib/intel64 -mkl=parallel -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi  -lifcoremt
 
-### ohtaka, Intel compiler + Intel MKL + Intel MPI
-### used module ###
-#module load intel_compiler/2020.2.254 intel_mkl/2020.2.254 intel_mpi/2020.2.254
-### 
-CC = mpiicc -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -I${MKLROOT}/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -qopt-report
-FC = mpiifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -qopt-report
-CC2 = mpiicc -O2 -march=core-avx2 -ip -no-prec-div -qopenmp -I${MKLROOT}/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -qopt-report
-LIB= -L${MKLROOT}/lib/intel64 -qmkl=parallel -lmkl_scalapack_lp64 -lmkl_blacs_intelmpi_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lifcore -lpthread -lm -ldl
 
-### ohtaka, Intel compiler + Intel MKL + Intel MPI
-### used module ###
-#module load intel_compiler/2020.2.254 intel_mkl/2020.2.254 intel_mpi/2020.2.254
-### 
-#CC = mpicc -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -I${MKLROOT}/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -qopt-report
-#FC = mpifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -qopt-report
-#LIB= -L${MKLROOT}/lib/intel64 -mkl=parallel -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi  -lifcoremt
+
+
 #
 # Ubuntu 18.04.4 LTS on WSL on Windows 10 (64bit)
 #
-# MKLROOT = /opt/intel/oneapi/mkl/2021.3.0/
+# MKLROOT = /opt/intel/oneapi/mkl/latest
 # CC = mpiicc -O3 -xHOST -ip -no-prec-div -qopenmp -I${MKLROOT}/include -I/opt/intel/oneapi/mkl/2021.3.0/include/fftw
 # FC = mpiifort -O3 -xHOST -ip -no-prec-div -qopenmp
 # LIB= -L${MKLROOT}/lib/intel64 -lmkl_scalapack_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lifcore -lmkl_blacs_intelmpi_lp64 -liomp5 -lpthread -lm -ldl
 
 #
-# System B (Sekirei) at ISSP, Univ. of Tokyo
+# System B (Ohtaka) at ISSP, Univ. of Tokyo
 #
-# CC = mpicc -O3  -xHOST -ip -no-prec-div -qopenmp -I${MKLROOT}/include/fftw -Dkcomp -fp-model precise
-# FC = mpif90 -O3 -xHOST -ip -no-prec-div -qopenmp  -I${MKLROOT}/include/fftw -Dkcomp -fp-model precise
-# LIB= -L${MKLROOT}/lib/intel64 -lmkl_scalapack_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lifcore -lmkl_blacs_sgimpt_lp64 -lmpi -liomp5 -lpthread -lm -ldl
+# on command line, perform the followings:
+# module purge
+# module load oneapi_compiler/2023.0.0 oneapi_mkl/2023.0.0 openmpi/4.1.5-oneapi-2023.0.0-classic
 #
-
+# specify the followings in makefile 
 #
-# System C (Enaga) at ISSP, Univ. of Tokyo
+# MKLROOT = /opt/intel/oneapi/mkl/2023.0.0/
+# CC = mpicc -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -I${MKLROOT}/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -qopt-report
+# FC = mpifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -qopt-report
+# LIB= -L${MKLROOT}/lib/intel64 -mkl=parallel -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi -lifcoremt
 #
-# CC = mpicc -O3  -xHOST -ip -no-prec-div -qopenmp -I${MKLROOT}/include/fftw -Dkcomp -fp-model precise
-# FC = mpif90 -O3 -xHOST -ip -no-prec-div -qopenmp  -I${MKLROOT}/include/fftw -Dkcomp -fp-model precise
-# LIB= -L${MKLROOT}/lib/intel64 -lmkl_scalapack_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lifcore -lmkl_blacs_sgimpt_lp64 -lmpi -liomp5 -lpthread -lm -ldl
 #
 
 #
@@ -131,13 +152,13 @@ CFLAGS  = -g
 OBJS    = openmx.o openmx_common.o Input_std.o Inputtools.o init.o LU_inverse.o ReLU_inverse.o \
           truncation.o readfile.o FT_PAO.o FT_NLP.o FT_ProExpn_VNA.o FT_VNA.o FT_ProductPAO.o \
           Hamiltonian_Cluster.o Hamiltonian_Cluster_Hs.o Hamiltonian_Cluster_NC_Hs2.o Hamiltonian_Band_NC_Hs2.o \
-          Overlap_Cluster_NC_Ss2.o Overlap_Band_NC_Ss2.o Overlap_Cluster.o Overlap_Cluster_Ss.o \
+          Overlap_Cluster_NC_Ss2.o Overlap_Band_NC_Ss2.o Overlap_Cluster.o Overlap_Cluster_Ss.o Overlap_Cluster_LNO_Ss.o \
           Set_ContMat_Cluster_LNO.o Hamiltonian_Band.o Matrix_Band_LNO.o Overlap_Band.o Hamiltonian_Cluster_NC.o \
           Hamiltonian_Band_NC.o Hamiltonian_Cluster_SO.o Get_OneD_HS_Col.o SetPara_DFT.o XC_Ceperly_Alder.o XC_CA_LSDA.o \
           XC_PW92C.o XC_PBE.o XC_EX.o DFT.o Mixing_DM.o Mixing_H.o Mixing_V.o Force.o Stress.o Poisson.o Poisson_ESM.o \
-          Cluster_DFT_Col.o Cluster_DFT_NonCol.o Cluster_DFT_Dosout.o Cluster_DFT_ON2.o Cluster_DFT_LNO.o \
-          Band_DFT_Col.o Band_DFT_NonCol.o Band_DFT_NonCol_GB.o \
-          Band_DFT_kpath.o Band_DFT_kpath_LNO.o Band_DFT_MO.o \
+          Cluster_DFT_Col.o Cluster_DFT_NonCol.o Cluster_DFT_Dosout.o Cluster_DFT_ON2.o Cluster_DFT_Col_LNO.o \
+          Band_DFT_Col.o Band_DFT_NonCol.o Band_DFT_NonCol_GB.o Band_DFT_kpath.o Band_DFT_kpath_LNO.o Band_DFT_MO.o \
+          Cluster_DFT_Col_CWF.o Cluster_DFT_NonCol_CWF.o Band_DFT_Col_CWF.o Band_DFT_NonCol_CWF.o \
           Unfolding_Bands.o Band_DFT_Dosout.o Set_Density_Grid.o Set_Orbitals_Grid.o Set_Aden_Grid.o \
           Gauss_Legendre.o zero_cfrac.o xyz2spherical.o AngularF.o RadialF.o Dr_RadialF.o PhiF.o \
           VNAF.o Dr_VNAF.o VH_AtomF.o Dr_VH_AtomF.o RF_BesselF.o QuickSort.o Nonlocal_RadialF.o \
@@ -152,7 +173,7 @@ OBJS    = openmx.o openmx_common.o Input_std.o Inputtools.o init.o LU_inverse.o 
           RestartFileDFT.o Output_CompTime.o Merge_LogFile.o Make_FracCoord.o \
           Make_InputFile_with_FinalCoord.o Output_Energy_Decomposition.o \
           Divide_Conquer.o Divide_Conquer_LNO.o Krylov.o \
-          Divide_Conquer_Dosout.o EGAC_DFT.o LNO.o \
+          Divide_Conquer_Dosout.o EGAC_DFT.o LNO.o Calc_LNAO.o Calc_LNBO.o \
           Eigen_lapack.o Eigen_lapack2.o Eigen_lapack3.o EigenBand_lapack.o \
           Eigen_PReHH.o BroadCast_ReMatrix.o \
           Eigen_PHH.o BroadCast_ComplexMatrix.o \
@@ -161,13 +182,13 @@ OBJS    = openmx.o openmx_common.o Input_std.o Inputtools.o init.o LU_inverse.o 
           lapack_dstevx1.o lapack_dstevx2.o lapack_dstevx3.o \
           lapack_dstevx4.o lapack_dstevx5.o lapack_dsteqr1.o \
           Nonlocal_Basis.o Set_OLP_Kin.o Set_Nonlocal.o Set_ProExpn_VNA.o \
-          Set_CoreHoleMatrix.o Set_OLP_p.o Set_Hamiltonian.o Set_Vpot.o \
+          Set_CoreHoleMatrix.o Set_XMCD_penalty.o Set_OLP_p.o Set_Hamiltonian.o Set_Vpot.o \
           Voronoi_Charge.o Voronoi_Orbital_Moment.o Fuzzy_Weight.o \
           dampingF.o deri_dampingF.o Spherical_Bessel.o \
           iterout.o iterout_md.o Allocate_Arrays.o Free_Arrays.o \
           Init_List_YOUSO.o outputfile1.o \
           malloc_multidimarray.o PrintMemory.o PrintMemory_Fix.o \
-          dtime.o OutData.o OutData_Binary.o init_alloc_first.o File_CntCoes.o \
+          dtime.o OutData.o init_alloc_first.o File_CntCoes.o \
           SCF2File.o mimic_sse.o Make_Comm_Worlds.o \
           Set_Allocate_Atom2CPU.o Cutoff.o Generating_MP_Special_Kpt.o \
           Maketest.o Runtest.o Memory_Leak_test.o \
@@ -206,7 +227,7 @@ OBJS    = openmx.o openmx_common.o Input_std.o Inputtools.o init.o LU_inverse.o 
 #-----------------------------------------------------------------------
 LIBELPADIR = ./elpa-2018.05.001
 
-OBJS    += mod_precision.o elpa_utilities.o\
+OBJS	 += mod_precision.o elpa_utilities.o\
 	elpa1_compute_real.o elpa1_compute_complex.o\
 	aligned_mem.o elpa2_determine_workload.o\
 	mod_redist_band_real.o mod_redist_band_complex.o\
@@ -220,24 +241,31 @@ CC      += -I$(LIBELPADIR)
 FC      += -I$(LIBELPADIR)
 
 #
+# memory leak detecter by AI
+# enable the following comment out lines
+# add the option, -DLEAK_DETECT, to CC.
+# add the option, -std=c++0x, to CXX in some environment.
+#
+
+ifdef LEAK_DETECT
+CC      += -DLEAK_DETECT
+OBJS    += leakdetect.o
+endif
+
+
+
+#
+# OpenMX
 # set program name
 # destination directory
 #
 
 PROG    = openmx
 DESTDIR = ../work
-UTIL 	= DosMain jx analysis_example esp polB calB Z2FH bandgnu13 bin2txt cube2xsf intensity_map md2axsf tp kSpin BandDispersion ADenBand FermiLoop GridCalc MulPOnly MulPCalc example_mpi_spawn gcube2oned
-
-#
-# OpenMX
-#
+UTIL 	= DosMain cohp jx analysis_example esp polB calB Z2FH bandgnu13 bin2txt cube2xsf intensity_map md2axsf tp kSpin BandDispersion ADenBand FermiLoop GridCalc MulPOnly MulPCalc example_mpi_spawn gcube2oned
 
 openmx:	$(OBJS)
-	$(CC) $(OBJS) $(STACK) $(LIB) -lm -o openmx
-	@echo ""
-	@echo "**********************************************"
-	@echo "*** OpenMX has been compiled successfully. ***"
-	@echo "**********************************************"
+	$(CC) $(OBJS) $(LIB) -lm -o openmx
 
 #
 #
@@ -247,6 +275,11 @@ openmx:	$(OBJS)
 
 all: $(PROG) $(UTIL)
 	cp $(PROG) $(UTIL) $(DESTDIR)/
+
+ifdef LEAK_DETECT
+leakdetect.o: leakdetect.cpp leakdetect.h
+	$(CXX) -c leakdetect.cpp
+endif
 
 openmx.o: openmx.c openmx_common.h tran_variables.h tran_prototypes.h 
 	$(CC) -c openmx.c
@@ -288,7 +321,9 @@ Overlap_Band_NC_Ss2.o: Overlap_Band_NC_Ss2.c openmx_common.h
 Overlap_Cluster.o: Overlap_Cluster.c openmx_common.h
 	$(CC) -c Overlap_Cluster.c  
 Overlap_Cluster_Ss.o: Overlap_Cluster_Ss.c openmx_common.h
-	$(CC) -c Overlap_Cluster_Ss.c  
+	$(CC) -c Overlap_Cluster_Ss.c
+Overlap_Cluster_LNO_Ss.o: Overlap_Cluster_LNO_Ss.c openmx_common.h
+	$(CC) -c Overlap_Cluster_LNO_Ss.c  
 Set_ContMat_Cluster_LNO.o: Set_ContMat_Cluster_LNO.c openmx_common.h
 	$(CC) -c Set_ContMat_Cluster_LNO.c
 Hamiltonian_Band.o: Hamiltonian_Band.c openmx_common.h
@@ -354,12 +389,14 @@ Cluster_DFT_Dosout.o: Cluster_DFT_Dosout.c openmx_common.h
 	$(CC) -c Cluster_DFT_Dosout.c
 Cluster_DFT_ON2.o: Cluster_DFT_ON2.c openmx_common.h
 	$(CC) -c Cluster_DFT_ON2.c
-Cluster_DFT_LNO.o: Cluster_DFT_LNO.c openmx_common.h
-	$(CC) -c Cluster_DFT_LNO.c
+Cluster_DFT_Col_LNO.o: Cluster_DFT_Col_LNO.c openmx_common.h
+	$(CC) -c Cluster_DFT_Col_LNO.c
 Band_DFT_Col.o: Band_DFT_Col.c openmx_common.h
 	$(CC) -c Band_DFT_Col.c
 Band_DFT_NonCol.o: Band_DFT_NonCol.c openmx_common.h
 	$(CC) -c Band_DFT_NonCol.c
+Band_DFT_NonCol_CWF.o: Band_DFT_NonCol_CWF.c openmx_common.h
+	$(CC) -c Band_DFT_NonCol_CWF.c
 Band_DFT_NonCol_GB.o: Band_DFT_NonCol_GB.c openmx_common.h
 	$(CC) -c Band_DFT_NonCol_GB.c
 Band_DFT_kpath.o: Band_DFT_kpath.c openmx_common.h
@@ -368,8 +405,14 @@ Band_DFT_kpath_LNO.o: Band_DFT_kpath_LNO.c openmx_common.h
 	$(CC) -c Band_DFT_kpath_LNO.c
 Band_DFT_MO.o: Band_DFT_MO.c openmx_common.h
 	$(CC) -c Band_DFT_MO.c
+Band_DFT_Col_CWF.o: Band_DFT_Col_CWF.c openmx_common.h
+	$(CC) -c Band_DFT_Col_CWF.c
+Cluster_DFT_Col_CWF.o: Cluster_DFT_Col_CWF.c openmx_common.h
+	$(CC) -c Cluster_DFT_Col_CWF.c
+Cluster_DFT_NonCol_CWF.o: Cluster_DFT_NonCol_CWF.c openmx_common.h
+	$(CC) -c Cluster_DFT_NonCol_CWF.c
 Unfolding_Bands.o: Unfolding_Bands.c openmx_common.h
-	$(CC2) -c Unfolding_Bands.c
+	$(CC) -c Unfolding_Bands.c
 Band_DFT_Dosout.o: Band_DFT_Dosout.c openmx_common.h
 	$(CC) -c Band_DFT_Dosout.c
 Mixing_DM.o: Mixing_DM.c openmx_common.h
@@ -559,6 +602,8 @@ Set_ProExpn_VNA.o: Set_ProExpn_VNA.c openmx_common.h
 	$(CC) -c Set_ProExpn_VNA.c
 Set_CoreHoleMatrix.o: Set_CoreHoleMatrix.c openmx_common.h
 	$(CC) -c Set_CoreHoleMatrix.c
+Set_XMCD_penalty.o: Set_XMCD_penalty.c openmx_common.h
+	$(CC) -c Set_XMCD_penalty.c
 Set_OLP_p.o: Set_OLP_p.c openmx_common.h 
 	$(CC) -c Set_OLP_p.c
 Set_Hamiltonian.o: Set_Hamiltonian.c openmx_common.h
@@ -596,6 +641,13 @@ LNO.o: LNO.c openmx_common.h
 #
 #
 #
+Calc_LNAO.o: Calc_LNAO.c openmx_common.h
+	$(CC) -c Calc_LNAO.c
+Calc_LNBO.o: Calc_LNBO.c openmx_common.h
+	$(CC) -c Calc_LNBO.c
+#
+#
+#
 MD_pac.o: MD_pac.c openmx_common.h lapack_prototypes.h
 	$(CC) -c MD_pac.c
 #
@@ -623,8 +675,6 @@ dtime.o: dtime.c
 	$(CC) -c dtime.c 
 OutData.o: OutData.c openmx_common.h
 	$(CC) -c OutData.c
-OutData_Binary.o: OutData_Binary.c openmx_common.h
-	$(CC) -c OutData_Binary.c
 init_alloc_first.o: init_alloc_first.c openmx_common.h
 	$(CC) -c init_alloc_first.c
 File_CntCoes.o: File_CntCoes.c openmx_common.h
@@ -687,6 +737,7 @@ Band_DFT_Col_Optical_ScaLAPACK.o: Band_DFT_Col_Optical_ScaLAPACK.c openmx_common
 Cluster_DFT_Col_Optical_ScaLAPACK.o: Cluster_DFT_Col_Optical_ScaLAPACK.c openmx_common.h
 	$(CC) -c Cluster_DFT_Col_Optical_ScaLAPACK.c
 
+
 #
 #
 #
@@ -732,7 +783,7 @@ install: $(PROG)
 #
 
 clean:
-	rm -f $(PROG) $(OBJS) $(OBJS_jx) $(UTIL) *.o *.mod *.dbg *.optrpt
+	rm -f $(PROG) $(OBJS) $(OBJS_jx) $(UTIL) *.o *.mod *.dbg 
 
 #
 #
@@ -748,6 +799,19 @@ DosMain.o :DosMain.c openmx_common.h
 	$(CC) -o $@ -c DosMain.c
 Tetrahedron_Blochl.o : Tetrahedron_Blochl.c
 	$(CC) -o $@ -c Tetrahedron_Blochl.c 
+
+#
+#
+#  COHP: Crystal Orbital Hamilton Population 
+#
+#
+
+cohp: cohp.o Inputtools.o Tetrahedron_Blochl.o 
+	$(CC) -o $@ cohp.o Inputtools.o Tetrahedron_Blochl.o -lm 
+	cp cohp $(DESTDIR)/cohp
+
+cohp.o :cohp.c openmx_common.h
+	$(CC) -o $@ -c cohp.c
 
 #
 #
@@ -814,6 +878,84 @@ analysis_example.o: analysis_example.c read_scfout.h
 
 read_scfout.o: read_scfout.c read_scfout.h 
 	$(CC) -c read_scfout.c
+
+#
+#
+# analysis_cwf_col and analysis_cwf_noncol
+#
+#
+
+analysis_cwf_col: analysis_cwf_col.o 
+	$(CC) analysis_cwf_col.o $(LIB) -lm -o analysis_cwf_col
+	cp analysis_cwf_col $(DESTDIR)/analysis_cwf_col
+
+analysis_cwf_col.o: analysis_cwf_col.c 
+	$(CC) -c analysis_cwf_col.c
+
+analysis_cwf_noncol: analysis_cwf_noncol.o 
+	$(CC) analysis_cwf_noncol.o $(LIB) -lm -o analysis_cwf_noncol
+	cp analysis_cwf_noncol $(DESTDIR)/analysis_cwf_noncol
+
+analysis_cwf_noncol.o: analysis_cwf_noncol.c 
+	$(CC) -c analysis_cwf_noncol.c
+
+#
+#
+# 1D periodic well model 
+#
+#
+
+1d_periodic_well: 1d_periodic_well.o 
+	$(CC) 1d_periodic_well.o $(LIB) -lm -o 1d_periodic_well
+	cp 1d_periodic_well $(DESTDIR)/1d_periodic_well
+
+1d_periodic_well.o: 1d_periodic_well.c 
+	$(CC) -c 1d_periodic_well.c
+
+#
+#
+# elpa_col and elpa_noncol
+#
+#
+
+OBJS_elpa_col = elpa_col.o elpa1.o solve_evp_real.o solve_evp_complex.o \
+	mod_precision.o elpa_utilities.o\
+	elpa1_compute_real.o elpa1_compute_complex.o\
+	aligned_mem.o elpa2_determine_workload.o\
+	mod_redist_band_real.o mod_redist_band_complex.o\
+	mod_pack_unpack_cpu_real.o mod_pack_unpack_cpu_complex.o\
+	real.o complex.o\
+	mod_single_hh_trafo_real.o mod_compute_hh_trafo_real.o mod_compute_hh_trafo_complex.o\
+	elpa2_compute_real.o elpa2_compute_complex.o \
+	elpa_solve_evp_real_2stage_double_impl.o elpa_solve_evp_complex_2stage_double_impl.o
+
+
+elpa_col:	$(OBJS_elpa_col)
+		$(CC) $(OBJS_elpa_col) $(LIB) -lm -o elpa_col
+		cp elpa_col $(DESTDIR)/elpa_col
+
+elpa_col.o: elpa_col.c 
+	$(CC) -c elpa_col.c
+
+
+OBJS_elpa_noncol = elpa_noncol.o elpa1.o solve_evp_real.o solve_evp_complex.o \
+	mod_precision.o elpa_utilities.o\
+	elpa1_compute_real.o elpa1_compute_complex.o\
+	aligned_mem.o elpa2_determine_workload.o\
+	mod_redist_band_real.o mod_redist_band_complex.o\
+	mod_pack_unpack_cpu_real.o mod_pack_unpack_cpu_complex.o\
+	real.o complex.o\
+	mod_single_hh_trafo_real.o mod_compute_hh_trafo_real.o mod_compute_hh_trafo_complex.o\
+	elpa2_compute_real.o elpa2_compute_complex.o \
+	elpa_solve_evp_real_2stage_double_impl.o elpa_solve_evp_complex_2stage_double_impl.o
+
+
+elpa_noncol:	$(OBJS_elpa_noncol)
+		$(CC) $(OBJS_elpa_noncol) $(LIB) -lm -o elpa_noncol
+		cp elpa_noncol $(DESTDIR)/elpa_noncol
+
+elpa_noncol.o: elpa_noncol.c 
+	$(CC) -c elpa_noncol.c
 
 #
 #
@@ -1207,5 +1349,4 @@ MO.o: MulPOnly.c Tools_BandCalc.h Inputtools.h read_scfout.h EigenValue_Problem.
 
 SigmaEK.o: SigmaEK.c
 	$(CC) -c $< -o $@
-
 

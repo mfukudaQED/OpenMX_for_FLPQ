@@ -22,7 +22,6 @@
 
 /*** subroutine */
 static void MPI_OLP(double *****OLP1);
-static void Set_Lebedev_Grid();
 static void Stress3();
 static void Stress4();
 static void Stress4B(double *****CDM0);
@@ -77,11 +76,6 @@ static void dHNL_SO(
 
 
 
-
-
-
-#define  Num_Leb_Grid  590
-double Leb_Grid_XYZW[Num_Leb_Grid][4];
 
 
 
@@ -810,7 +804,9 @@ double Stress(double *****H0,
 	    /* contribution of Exc^(0) */
 
 	    /* begin(yshiihara) */
-	    {
+
+	    if (Exc0_correction_flag==1){
+
 	      double exc0;
 	      /*exc0 = XC_Ceperly_Alder(tmp2,0)*F_Vxc_flag;*/
 	      /*tmp3 = RefVxc_Grid[MNc]*tmp2*F_Vxc_flag;*/
@@ -871,24 +867,28 @@ double Stress(double *****H0,
 	      /* end(yshiihara) */
 
 	      /* contribution of Exc^(0) */
+  
+  	      if (Exc0_correction_flag==1){
 
-	      tmp2 = 2.0*RefVxc_Grid[MNc];
-	      tmp1 = tmp2*tmp0/r;
-	      sumx += tmp1*dx;
-	      sumy += tmp1*dy;
-	      sumz += tmp1*dz;
+		tmp2 = 2.0*RefVxc_Grid[MNc];
+		tmp1 = tmp2*tmp0/r;
+		sumx += tmp1*dx;
+		sumy += tmp1*dy;
+		sumz += tmp1*dz;
 
-	      /* begin(yshiihara) */
-	      sumt4[0] += tmp1*dx*dx;
-	      sumt4[1] += tmp1*dy*dx;
-	      sumt4[2] += tmp1*dz*dx;
-	      sumt4[3] += tmp1*dx*dy;
-	      sumt4[4] += tmp1*dy*dy;
-	      sumt4[5] += tmp1*dz*dy;
-	      sumt4[6] += tmp1*dx*dz;
-	      sumt4[7] += tmp1*dy*dz;
-	      sumt4[8] += tmp1*dz*dz;
-	      /* end(yshiihara) */
+		/* begin(yshiihara) */
+		sumt4[0] += tmp1*dx*dx;
+		sumt4[1] += tmp1*dy*dx;
+		sumt4[2] += tmp1*dz*dx;
+		sumt4[3] += tmp1*dx*dy;
+		sumt4[4] += tmp1*dy*dy;
+		sumt4[5] += tmp1*dz*dy;
+		sumt4[6] += tmp1*dx*dz;
+		sumt4[7] += tmp1*dy*dz;
+		sumt4[8] += tmp1*dz*dz;
+		/* end(yshiihara) */
+	      }
+
 	    }
 	  }
 	} /* Nc */
@@ -960,10 +960,6 @@ double Stress(double *****H0,
     }
 
     MPI_Allreduce(&My_Stress[0],&Stress[0],9,MPI_DOUBLE,MPI_SUM,mpi_comm_level1);
-
-    /*
-    printf("ABC1 EXC#1 %15.12f\n",-My_EXC*GridVol);
-    */
 
     /* add #1 of stress to Stress_Tensor */
 
@@ -1042,358 +1038,344 @@ double Stress(double *****H0,
  
     Note that there is no stress coming from volume term.
   ********************************************************/
-  
-  Set_Lebedev_Grid();
-  
-  /* get Nthrds0 */  
-#pragma omp parallel shared(Nthrds0)
-  {
-    Nthrds0 = omp_get_num_threads();
-  }
 
-  /* initialize the temporal array storing the force contribution */
+  if (Exc0_correction_flag==1){
 
-  for (Gc_AN=1; Gc_AN<=atomnum; Gc_AN++){
-    Gxyz[Gc_AN][41] = 0.0;
-    Gxyz[Gc_AN][42] = 0.0;
-    Gxyz[Gc_AN][43] = 0.0;
-  }
+    double **Leb_Grid_XYZW;
 
-  /* begin(yshiihara) */
-  {
-
-    double exc0,vxc0,rs,sum,sumr,sumt,re,Sr,Dr,sumtx,sumty,sumtz,den,den0,gden0,w;
-    double x0,y0,z0,x1,y1,z1,dx1,dy1,dz1,r1;
-    double *My_sumr;
-    int Nloop,Rn,ir,ia;
-
-    /* start calc. */
-
-    for (i=0; i<9; i++){
-      My_Stress[i] = 0.0;
-      Stress[i]    = 0.0;
+    Leb_Grid_XYZW = (double**)malloc(sizeof(double*)*Num_Leb_Grid); 
+    for (i=0; i<Num_Leb_Grid; i++){
+      Leb_Grid_XYZW[i] = (double*)malloc(sizeof(double)*4);
     }
 
-    rs = 0.0;
-    sum = 0.0;
+    Set_Lebedev_Grid(Num_Leb_Grid,Leb_Grid_XYZW);
 
-    for (Mc_AN=1; Mc_AN<=Matomnum; Mc_AN++){
+    /* get Nthrds0 */  
+#pragma omp parallel shared(Nthrds0)
+    {
+      Nthrds0 = omp_get_num_threads();
+    }
 
-      Gc_AN = M2G[Mc_AN];
-      Cwan = WhatSpecies[Gc_AN];
-      re = Spe_Atom_Cut1[Cwan];
-      Sr = re + rs;
-      Dr = re - rs;
+    /* initialize the temporal array storing the force contribution */
 
-      /* allocation of arrays */
+    for (Gc_AN=1; Gc_AN<=atomnum; Gc_AN++){
+      Gxyz[Gc_AN][41] = 0.0;
+      Gxyz[Gc_AN][42] = 0.0;
+      Gxyz[Gc_AN][43] = 0.0;
+    }
 
-      double *My_sumr,**My_sumrx,**My_sumry,**My_sumrz;
+    /* begin(yshiihara) */
+    {
 
-      My_sumr = (double*)malloc(sizeof(double)*Nthrds0);
-      for (i=0; i<Nthrds0; i++) My_sumr[i]  = 0.0;
+      double exc0,vxc0,rs,sum,sumr,sumt,re,Sr,Dr,sumtx,sumty,sumtz,den,den0,gden0,w;
+      double x0,y0,z0,x1,y1,z1,dx1,dy1,dz1,r1;
+      double *My_sumr;
+      int Nloop,Rn,ir,ia;
 
-      My_sumrx = (double**)malloc(sizeof(double*)*Nthrds0);
-      for (i=0; i<Nthrds0; i++){
-	My_sumrx[i] = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
-	for (j=0; j<(FNAN[Gc_AN]+1); j++){
-	  My_sumrx[i][j] = 0.0;
-	}
+      /* start calc. */
+
+      for (i=0; i<9; i++){
+	My_Stress[i] = 0.0;
+	Stress[i]    = 0.0;
       }
 
-      My_sumry = (double**)malloc(sizeof(double*)*Nthrds0);
-      for (i=0; i<Nthrds0; i++){
-	My_sumry[i] = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
-	for (j=0; j<(FNAN[Gc_AN]+1); j++){
-	  My_sumry[i][j] = 0.0;
-	}
-      }
+      rs = 0.0;
+      sum = 0.0;
 
-      My_sumrz = (double**)malloc(sizeof(double*)*Nthrds0);
-      for (i=0; i<Nthrds0; i++){
-	My_sumrz[i] = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
-	for (j=0; j<(FNAN[Gc_AN]+1); j++){
-	  My_sumrz[i][j] = 0.0;
-	}
-      }
+      for (Mc_AN=1; Mc_AN<=Matomnum; Mc_AN++){
 
-      My_Stress_threads=(double**)malloc(sizeof(double*)*(Nthrds0));
-      for (Nloop=0; Nloop<Nthrds0; Nloop++){
-	My_Stress_threads[Nloop] = (double*)malloc(sizeof(double)*9);
-	for (i=0; i<9; i++){
-	  My_Stress_threads[Nloop][i] = 0.0;
-	}
-      }
-	
-#pragma omp parallel shared(Spe_Atomic_Den2,Spe_PAO_XV,Spe_Num_Mesh_PAO,Leb_Grid_XYZW,My_sumr,My_sumrx,My_sumry,My_sumrz,My_Stress,My_Stress_threads,Dr,Sr,CoarseGL_Abscissae,CoarseGL_Weight,Gxyz,Gc_AN,FNAN,natn,ncn,WhatSpecies,atv,F_Vxc_flag,Cwan,PCC_switch) private(OMPID,Nthrds,Nprocs,ir,ia,r,w,sumt,sumtx,sumty,sumtz,x,x0,y0,z0,h_AN,Gh_AN,Rn,Hwan,x1,y1,z1,dx,dy,dz,r1,den,den0,gden0,dx1,dy1,dz1,exc0,vxc0,sumt1)
-      {
+	Gc_AN = M2G[Mc_AN];
+	Cwan = WhatSpecies[Gc_AN];
+	re = Spe_Atom_Cut1[Cwan];
+	Sr = re + rs;
+	Dr = re - rs;
 
-        double dx2,dy2,dz2;
-	double *gx,*gy,*gz,dexc0;
-	double *sum_gx,*sum_gy,*sum_gz;
+	/* allocation of arrays */
 
-	gx = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
-	gy = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
-	gz = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
-	sum_gx = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
-	sum_gy = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
-	sum_gz = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
+	double *My_sumr,**My_sumrx,**My_sumry,**My_sumrz;
 
-	/* get info. on OpenMP */ 
+	My_sumr = (double*)malloc(sizeof(double)*Nthrds0);
+	for (i=0; i<Nthrds0; i++) My_sumr[i]  = 0.0;
 
-	OMPID = omp_get_thread_num();
-	Nthrds = omp_get_num_threads();
-	Nprocs = omp_get_num_procs();
-
-	for (ir=(OMPID*CoarseGL_Mesh/Nthrds); ir<((OMPID+1)*CoarseGL_Mesh/Nthrds); ir++){
-
-	  r = 0.50*(Dr*CoarseGL_Abscissae[ir] + Sr);
-	  sumt  = 0.0; 
-
-	  for (i=0; i<(FNAN[Gc_AN]+1); i++){
-	    sum_gx[i] = 0.0;
-	    sum_gy[i] = 0.0;
-	    sum_gz[i] = 0.0;
+	My_sumrx = (double**)malloc(sizeof(double*)*Nthrds0);
+	for (i=0; i<Nthrds0; i++){
+	  My_sumrx[i] = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
+	  for (j=0; j<(FNAN[Gc_AN]+1); j++){
+	    My_sumrx[i][j] = 0.0;
 	  }
+	}
 
-	  for (i=0; i<9; i++) sumt1[i] = 0.0;
+	My_sumry = (double**)malloc(sizeof(double*)*Nthrds0);
+	for (i=0; i<Nthrds0; i++){
+	  My_sumry[i] = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
+	  for (j=0; j<(FNAN[Gc_AN]+1); j++){
+	    My_sumry[i][j] = 0.0;
+	  }
+	}
 
-	  for (ia=0; ia<Num_Leb_Grid; ia++){
+	My_sumrz = (double**)malloc(sizeof(double*)*Nthrds0);
+	for (i=0; i<Nthrds0; i++){
+	  My_sumrz[i] = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
+	  for (j=0; j<(FNAN[Gc_AN]+1); j++){
+	    My_sumrz[i][j] = 0.0;
+	  }
+	}
 
-	    x0 = r*Leb_Grid_XYZW[ia][0] + Gxyz[Gc_AN][1];
-	    y0 = r*Leb_Grid_XYZW[ia][1] + Gxyz[Gc_AN][2];
-	    z0 = r*Leb_Grid_XYZW[ia][2] + Gxyz[Gc_AN][3];
+	My_Stress_threads=(double**)malloc(sizeof(double*)*(Nthrds0));
+	for (Nloop=0; Nloop<Nthrds0; Nloop++){
+	  My_Stress_threads[Nloop] = (double*)malloc(sizeof(double)*9);
+	  for (i=0; i<9; i++){
+	    My_Stress_threads[Nloop][i] = 0.0;
+	  }
+	}
+	
+#pragma omp parallel shared(Leb_Grid_XYZW,Num_Leb_Grid,Spe_Atomic_Den2,Spe_PAO_XV,Spe_Num_Mesh_PAO,My_sumr,My_sumrx,My_sumry,My_sumrz,My_Stress,My_Stress_threads,Dr,Sr,CoarseGL_Abscissae,CoarseGL_Weight,Gxyz,Gc_AN,FNAN,natn,ncn,WhatSpecies,atv,F_Vxc_flag,Cwan,PCC_switch) private(OMPID,Nthrds,Nprocs,ir,ia,r,w,sumt,sumtx,sumty,sumtz,x,x0,y0,z0,h_AN,Gh_AN,Rn,Hwan,x1,y1,z1,dx,dy,dz,r1,den,den0,gden0,dx1,dy1,dz1,exc0,vxc0,sumt1)
+	{
 
-	    /* calculate rho_atom + rho_pcc */ 
+	  double dx2,dy2,dz2;
+	  double *gx,*gy,*gz,dexc0;
+	  double *sum_gx,*sum_gy,*sum_gz;
 
-	    den = 0.0;
+	  gx = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
+	  gy = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
+	  gz = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
+	  sum_gx = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
+	  sum_gy = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
+	  sum_gz = (double*)malloc(sizeof(double)*(FNAN[Gc_AN]+1));
 
-	    for (h_AN=0; h_AN<=FNAN[Gc_AN]; h_AN++){
+	  /* get info. on OpenMP */ 
 
-	      Gh_AN = natn[Gc_AN][h_AN];
-	      Rn = ncn[Gc_AN][h_AN]; 
-	      Hwan = WhatSpecies[Gh_AN];
+	  OMPID = omp_get_thread_num();
+	  Nthrds = omp_get_num_threads();
+	  Nprocs = omp_get_num_procs();
 
-	      x1 = Gxyz[Gh_AN][1] + atv[Rn][1];
-	      y1 = Gxyz[Gh_AN][2] + atv[Rn][2];
-	      z1 = Gxyz[Gh_AN][3] + atv[Rn][3];
+	  for (ir=(OMPID*CoarseGL_Mesh/Nthrds); ir<((OMPID+1)*CoarseGL_Mesh/Nthrds); ir++){
+
+	    r = 0.50*(Dr*CoarseGL_Abscissae[ir] + Sr);
+	    sumt  = 0.0; 
+
+	    for (i=0; i<(FNAN[Gc_AN]+1); i++){
+	      sum_gx[i] = 0.0;
+	      sum_gy[i] = 0.0;
+	      sum_gz[i] = 0.0;
+	    }
+
+	    for (i=0; i<9; i++) sumt1[i] = 0.0;
+
+	    for (ia=0; ia<Num_Leb_Grid; ia++){
+
+	      x0 = r*Leb_Grid_XYZW[ia][0] + Gxyz[Gc_AN][1];
+	      y0 = r*Leb_Grid_XYZW[ia][1] + Gxyz[Gc_AN][2];
+	      z0 = r*Leb_Grid_XYZW[ia][2] + Gxyz[Gc_AN][3];
+
+	      /* calculate rho_atom + rho_pcc */ 
+
+	      den = 0.0;
+
+	      for (h_AN=0; h_AN<=FNAN[Gc_AN]; h_AN++){
+
+		Gh_AN = natn[Gc_AN][h_AN];
+		Rn = ncn[Gc_AN][h_AN]; 
+		Hwan = WhatSpecies[Gh_AN];
+
+		x1 = Gxyz[Gh_AN][1] + atv[Rn][1];
+		y1 = Gxyz[Gh_AN][2] + atv[Rn][2];
+		z1 = Gxyz[Gh_AN][3] + atv[Rn][3];
             
-	      dx = x1 - x0;
-	      dy = y1 - y0;
-	      dz = z1 - z0;
+		dx = x1 - x0;
+		dy = y1 - y0;
+		dz = z1 - z0;
 
-	      x = 0.5*log(dx*dx + dy*dy + dz*dz);
+		x = 0.5*log(dx*dx + dy*dy + dz*dz);
 
-	      /* calculate density */
+		/* calculate density */
 
-	      den += KumoF( Spe_Num_Mesh_PAO[Hwan], x, 
-			    Spe_PAO_XV[Hwan], Spe_PAO_RV[Hwan], Spe_Atomic_Den2[Hwan])*F_Vxc_flag;
+		den += KumoF( Spe_Num_Mesh_PAO[Hwan], x, 
+			      Spe_PAO_XV[Hwan], Spe_PAO_RV[Hwan], Spe_Atomic_Den2[Hwan])*F_Vxc_flag;
 
-	      if (h_AN==0) den0 = den;
+		if (h_AN==0) den0 = den;
 
-	      /* calculate gradient of density */
+		/* calculate gradient of density */
 
-	      if (h_AN!=0){
-		r1 = sqrt(dx*dx + dy*dy + dz*dz);
-		gden0 = Dr_KumoF( Spe_Num_Mesh_PAO[Hwan], x, r1, 
-				  Spe_PAO_XV[Hwan], Spe_PAO_RV[Hwan], Spe_Atomic_Den2[Hwan])*F_Vxc_flag;
+		if (h_AN!=0){
+		  r1 = sqrt(dx*dx + dy*dy + dz*dz);
+		  gden0 = Dr_KumoF( Spe_Num_Mesh_PAO[Hwan], x, r1, 
+				    Spe_PAO_XV[Hwan], Spe_PAO_RV[Hwan], Spe_Atomic_Den2[Hwan])*F_Vxc_flag;
 
-		gx[h_AN] = gden0/r1*dx;
-		gy[h_AN] = gden0/r1*dy;
-		gz[h_AN] = gden0/r1*dz;
-	      }
+		  gx[h_AN] = gden0/r1*dx;
+		  gy[h_AN] = gden0/r1*dy;
+		  gz[h_AN] = gden0/r1*dz;
+		}
 
-	    } /* h_AN */
+	      } /* h_AN */
 
-	    /* calculate the CA-LDA exchange-correlation energy density */
-	    exc0 = XC_Ceperly_Alder(den,0);
+	      /* calculate the CA-LDA exchange-correlation energy density */
+	      exc0 = XC_Ceperly_Alder(den,0);
 
-	    /* calculate the CA-LDA exchange-correlation potential */
-	    dexc0 = XC_Ceperly_Alder(den,3);
+	      /* calculate the CA-LDA exchange-correlation potential */
+	      dexc0 = XC_Ceperly_Alder(den,3);
 
-	    /* Lebedev quadrature */
+	      /* Lebedev quadrature */
 
-	    w = Leb_Grid_XYZW[ia][3];
-	    sumt += w*den0*exc0;
+	      w = Leb_Grid_XYZW[ia][3];
+	      sumt += w*den0*exc0;
+
+	      for (h_AN=1; h_AN<=FNAN[Gc_AN]; h_AN++){
+              
+		dx1 = w*den0*dexc0*gx[h_AN]; 
+		dy1 = w*den0*dexc0*gy[h_AN]; 
+		dz1 = w*den0*dexc0*gz[h_AN]; 
+
+		sum_gx[h_AN] += dx1;
+		sum_gy[h_AN] += dy1;
+		sum_gz[h_AN] += dz1;
+
+		Gh_AN = natn[Gc_AN][h_AN];
+		Rn = ncn[Gc_AN][h_AN]; 
+              
+		dx2 = Gxyz[Gh_AN][1] + atv[Rn][1] - Gxyz[Gc_AN][1];
+		dy2 = Gxyz[Gh_AN][2] + atv[Rn][2] - Gxyz[Gc_AN][2];
+		dz2 = Gxyz[Gh_AN][3] + atv[Rn][3] - Gxyz[Gc_AN][3];
+
+		sumt1[0] += dx1*dx2;
+		sumt1[1] += dx1*dy2;
+		sumt1[2] += dx1*dz2;
+		sumt1[3] += dy1*dx2;
+		sumt1[4] += dy1*dy2;
+		sumt1[5] += dy1*dz2;
+		sumt1[6] += dz1*dx2;
+		sumt1[7] += dz1*dy2;
+		sumt1[8] += dz1*dz2;
+
+	      } /* h_AN */
+
+	    } /* ia */
+
+	    /* r for Gauss-Legendre quadrature */
+
+	    w = r*r*CoarseGL_Weight[ir]; 
+	    My_sumr[OMPID]  += w*sumt;
 
 	    for (h_AN=1; h_AN<=FNAN[Gc_AN]; h_AN++){
-              
-              dx1 = w*den0*dexc0*gx[h_AN]; 
-              dy1 = w*den0*dexc0*gy[h_AN]; 
-              dz1 = w*den0*dexc0*gz[h_AN]; 
+	      My_sumrx[OMPID][h_AN] += w*sum_gx[h_AN];
+	      My_sumry[OMPID][h_AN] += w*sum_gy[h_AN];
+	      My_sumrz[OMPID][h_AN] += w*sum_gz[h_AN];
+	    }
 
-	      sum_gx[h_AN] += dx1;
-	      sum_gy[h_AN] += dy1;
-	      sum_gz[h_AN] += dz1;
+	    for(i=0; i<9; i++){
+	      My_Stress_threads[OMPID][i] += w*sumt1[i];
+	    }
 
-	      Gh_AN = natn[Gc_AN][h_AN];
-	      Rn = ncn[Gc_AN][h_AN]; 
-              
-	      dx2 = Gxyz[Gh_AN][1] + atv[Rn][1] - Gxyz[Gc_AN][1];
-	      dy2 = Gxyz[Gh_AN][2] + atv[Rn][2] - Gxyz[Gc_AN][2];
-	      dz2 = Gxyz[Gh_AN][3] + atv[Rn][3] - Gxyz[Gc_AN][3];
+	  } /* ir */
 
-	      sumt1[0] += dx1*dx2;
-	      sumt1[1] += dx1*dy2;
-	      sumt1[2] += dx1*dz2;
-	      sumt1[3] += dy1*dx2;
-	      sumt1[4] += dy1*dy2;
-	      sumt1[5] += dy1*dz2;
-	      sumt1[6] += dz1*dx2;
-	      sumt1[7] += dz1*dy2;
-	      sumt1[8] += dz1*dz2;
+	  free(gx);
+	  free(gy);
+	  free(gz);
+	  free(sum_gx);
+	  free(sum_gy);
+	  free(sum_gz);
 
-	    } /* h_AN */
+	} /* #pragma omp */
 
-	  } /* ia */
-
-	  /* r for Gauss-Legendre quadrature */
-
-	  w = r*r*CoarseGL_Weight[ir]; 
-	  My_sumr[OMPID]  += w*sumt;
-
-	  for (h_AN=1; h_AN<=FNAN[Gc_AN]; h_AN++){
-	    My_sumrx[OMPID][h_AN] += w*sum_gx[h_AN];
-	    My_sumry[OMPID][h_AN] += w*sum_gy[h_AN];
-	    My_sumrz[OMPID][h_AN] += w*sum_gz[h_AN];
-	  }
-
-	  for(i=0; i<9; i++){
-	    My_Stress_threads[OMPID][i] += w*sumt1[i];
-	  }
-
-	} /* ir */
-
-	free(gx);
-	free(gy);
-	free(gz);
-	free(sum_gx);
-	free(sum_gy);
-	free(sum_gz);
-
-      } /* #pragma omp */
-
-      sumr = 0.0;
-      for (Nloop=0; Nloop<Nthrds0; Nloop++){
-	sumr += My_sumr[Nloop];
-      }
-      sum += 2.0*PI*Dr*sumr;
-
-      /* add force */
-
-      for (h_AN=1; h_AN<=FNAN[Gc_AN]; h_AN++){
-
-        double sumrx,sumry,sumrz;
-
-	sumrx = 0.0;
-	sumry = 0.0;
-	sumrz = 0.0;
+	sumr = 0.0;
 	for (Nloop=0; Nloop<Nthrds0; Nloop++){
-	  sumrx += My_sumrx[Nloop][h_AN];
-	  sumry += My_sumry[Nloop][h_AN];
-	  sumrz += My_sumrz[Nloop][h_AN];
+	  sumr += My_sumr[Nloop];
+	}
+	sum += 2.0*PI*Dr*sumr;
+
+	/* add force */
+
+	for (h_AN=1; h_AN<=FNAN[Gc_AN]; h_AN++){
+
+	  double sumrx,sumry,sumrz;
+
+	  sumrx = 0.0;
+	  sumry = 0.0;
+	  sumrz = 0.0;
+	  for (Nloop=0; Nloop<Nthrds0; Nloop++){
+	    sumrx += My_sumrx[Nloop][h_AN];
+	    sumry += My_sumry[Nloop][h_AN];
+	    sumrz += My_sumrz[Nloop][h_AN];
+	  }
+
+	  Gh_AN = natn[Gc_AN][h_AN];
+
+	  Gxyz[Gh_AN][41] += 2.0*PI*Dr*sumrx;
+	  Gxyz[Gh_AN][42] += 2.0*PI*Dr*sumry;
+	  Gxyz[Gh_AN][43] += 2.0*PI*Dr*sumrz;
+
+	  Gxyz[Gc_AN][41] -= 2.0*PI*Dr*sumrx;
+	  Gxyz[Gc_AN][42] -= 2.0*PI*Dr*sumry;
+	  Gxyz[Gc_AN][43] -= 2.0*PI*Dr*sumrz;
 	}
 
-	Gh_AN = natn[Gc_AN][h_AN];
-
-	Gxyz[Gh_AN][41] += 2.0*PI*Dr*sumrx;
-	Gxyz[Gh_AN][42] += 2.0*PI*Dr*sumry;
-	Gxyz[Gh_AN][43] += 2.0*PI*Dr*sumrz;
-
-	Gxyz[Gc_AN][41] -= 2.0*PI*Dr*sumrx;
-	Gxyz[Gc_AN][42] -= 2.0*PI*Dr*sumry;
-	Gxyz[Gc_AN][43] -= 2.0*PI*Dr*sumrz;
-      }
-
-      /* add stress */
+	/* add stress */
       
-      for (Nloop=0; Nloop<Nthrds0; Nloop++){
-	for(i=0; i<9; i++){
-	  My_Stress[i] += 2.0*PI*Dr*My_Stress_threads[Nloop][i];
+	for (Nloop=0; Nloop<Nthrds0; Nloop++){
+	  for(i=0; i<9; i++){
+	    My_Stress[i] += 2.0*PI*Dr*My_Stress_threads[Nloop][i];
+	  }
 	}
-      }
 
-      /* freeing of arrays */
+	/* freeing of arrays */
 
-      free(My_sumr);
+	free(My_sumr);
 
-      for (i=0; i<Nthrds0; i++){
-	free(My_sumrx[i]);
-      }
-      free(My_sumrx);
+	for (i=0; i<Nthrds0; i++){
+	  free(My_sumrx[i]);
+	}
+	free(My_sumrx);
 
-      for (i=0; i<Nthrds0; i++){
-	free(My_sumry[i]);
-      }
-      free(My_sumry);
+	for (i=0; i<Nthrds0; i++){
+	  free(My_sumry[i]);
+	}
+	free(My_sumry);
 
-      for (i=0; i<Nthrds0; i++){
-	free(My_sumrz[i]);
-      }
-      free(My_sumrz);
+	for (i=0; i<Nthrds0; i++){
+	  free(My_sumrz[i]);
+	}
+	free(My_sumrz);
 
-      for (i=0; i<Nthrds0; i++){
-        free(My_Stress_threads[i]);
-      }
-      free(My_Stress_threads);
+	for (i=0; i<Nthrds0; i++){
+	  free(My_Stress_threads[i]);
+	}
+	free(My_Stress_threads);
 	
-    } /* Mc_AN */
+      } /* Mc_AN */
 
-    /****************************************************
+      /****************************************************
                        MPI, My_Stress
-    ****************************************************/
+      ****************************************************/
 
-    /*
-    printf("ABC1 Lebedev %15.12f\n",sum);
-    */
+      MPI_Allreduce(&My_Stress[0],&Stress[0],9,MPI_DOUBLE,MPI_SUM,mpi_comm_level1);
 
-    MPI_Allreduce(&My_Stress[0],&Stress[0],9,MPI_DOUBLE,MPI_SUM,mpi_comm_level1);
+      /* add components of stress (Lebedev) to Stress_Tensor */
 
-    /* add components of stress (Lebedev) to Stress_Tensor */
+      for (i=0; i<9; i++){
+	Stress_Tensor[i] += Stress[i];
+      }
 
-    for (i=0; i<9; i++){
-      Stress_Tensor[i] += Stress[i];
-    }
+      /* show stress (Lebedev) */
 
-    /* show stress (Lebedev) */
-
-    if (myid==Host_ID && 1<level_stdout){
-      printf(" Components of stress (Lebedev): \n");fflush(stdout);
-      for (i = 0; i<3; i++){
-	for (j = 0; j<3; j++){
-	  printf("%16.8f ", Stress[3*i+j]);
+      if (myid==Host_ID && 1<level_stdout){
+	printf(" Components of stress (Lebedev): \n");fflush(stdout);
+	for (i = 0; i<3; i++){
+	  for (j = 0; j<3; j++){
+	    printf("%16.8f ", Stress[3*i+j]);
+	  }
+	  printf("\n");fflush(stdout);
 	}
-	printf("\n");fflush(stdout);
       }
+
     }
+    /* end(yshiihara) */
 
-    /* add Exc^0 calculated on the fine mesh to My_EXC */
-
-    /*
-    My_EXC[0] += 0.5*sum;
-    My_EXC[1] += 0.5*sum;
-    */
-
-    /* MPI: Gxyz[][41,42,43] */
-
-    /*
-    for (Gc_AN=1; Gc_AN<=atomnum; Gc_AN++){
-
-      double gradxyz[3];  
-
-      MPI_Allreduce(&Gxyz[Gc_AN][41], &gradxyz[0], 3, MPI_DOUBLE, MPI_SUM, mpi_comm_level1);
-      Gxyz[Gc_AN][17] += gradxyz[0];
-      Gxyz[Gc_AN][18] += gradxyz[1];
-      Gxyz[Gc_AN][19] += gradxyz[2];
-
-      if (2<=level_stdout){
-	printf("<Total_Ene>  force(8) myid=%2d Gc_AN=%2d  %15.12f %15.12f %15.12f\n",
-	       myid,Gc_AN,gradxyz[0],gradxyz[1],gradxyz[2]);
-      }
+    for (i=0; i<Num_Leb_Grid; i++){
+      free(Leb_Grid_XYZW[i]);
     }
-    */
+    free(Leb_Grid_XYZW);
 
-  }
-  /* end(yshiihara) */
+  } /* end of if (Exc0_correction_flag==1) */
 
   /****************************************************
                       #2 of Stress
@@ -2482,11 +2464,8 @@ void Stress3()
 
 					
 	}
-				
-
 
       }/* Nc, here omp barrier is called implicitly because of end of for loop */
-
 
       dtime(&current_time);
       time1 += current_time - last_time;
@@ -2573,8 +2552,6 @@ void Stress3()
 	}/* Nog */
       }/* h_AN, here omp barrier is called implicitly because of end of for loop  */
 
-
-			
 #pragma omp master
       {
 	/**********************************
@@ -8648,2965 +8625,8 @@ void MPI_OLP(double *****OLP1)
   free(Rcv_S_Size);
 }
 
-void Set_Lebedev_Grid()
-{
-  /* 590 */
 
-  if (Num_Leb_Grid==590){
 
-    Leb_Grid_XYZW[   0][0]= 1.000000000000000;
-    Leb_Grid_XYZW[   0][1]= 0.000000000000000;
-    Leb_Grid_XYZW[   0][2]= 0.000000000000000;
-    Leb_Grid_XYZW[   0][3]= 0.000309512129531;
-
-    Leb_Grid_XYZW[   1][0]=-1.000000000000000;
-    Leb_Grid_XYZW[   1][1]= 0.000000000000000;
-    Leb_Grid_XYZW[   1][2]= 0.000000000000000;
-    Leb_Grid_XYZW[   1][3]= 0.000309512129531;
-
-    Leb_Grid_XYZW[   2][0]= 0.000000000000000;
-    Leb_Grid_XYZW[   2][1]= 1.000000000000000;
-    Leb_Grid_XYZW[   2][2]= 0.000000000000000;
-    Leb_Grid_XYZW[   2][3]= 0.000309512129531;
-
-    Leb_Grid_XYZW[   3][0]= 0.000000000000000;
-    Leb_Grid_XYZW[   3][1]=-1.000000000000000;
-    Leb_Grid_XYZW[   3][2]= 0.000000000000000;
-    Leb_Grid_XYZW[   3][3]= 0.000309512129531;
-
-    Leb_Grid_XYZW[   4][0]= 0.000000000000000;
-    Leb_Grid_XYZW[   4][1]= 0.000000000000000;
-    Leb_Grid_XYZW[   4][2]= 1.000000000000000;
-    Leb_Grid_XYZW[   4][3]= 0.000309512129531;
-
-    Leb_Grid_XYZW[   5][0]= 0.000000000000000;
-    Leb_Grid_XYZW[   5][1]= 0.000000000000000;
-    Leb_Grid_XYZW[   5][2]=-1.000000000000000;
-    Leb_Grid_XYZW[   5][3]= 0.000309512129531;
-
-    Leb_Grid_XYZW[   6][0]= 0.577350269189626;
-    Leb_Grid_XYZW[   6][1]= 0.577350269189626;
-    Leb_Grid_XYZW[   6][2]= 0.577350269189626;
-    Leb_Grid_XYZW[   6][3]= 0.001852379698597;
-
-    Leb_Grid_XYZW[   7][0]=-0.577350269189626;
-    Leb_Grid_XYZW[   7][1]= 0.577350269189626;
-    Leb_Grid_XYZW[   7][2]= 0.577350269189626;
-    Leb_Grid_XYZW[   7][3]= 0.001852379698597;
-
-    Leb_Grid_XYZW[   8][0]= 0.577350269189626;
-    Leb_Grid_XYZW[   8][1]=-0.577350269189626;
-    Leb_Grid_XYZW[   8][2]= 0.577350269189626;
-    Leb_Grid_XYZW[   8][3]= 0.001852379698597;
-
-    Leb_Grid_XYZW[   9][0]=-0.577350269189626;
-    Leb_Grid_XYZW[   9][1]=-0.577350269189626;
-    Leb_Grid_XYZW[   9][2]= 0.577350269189626;
-    Leb_Grid_XYZW[   9][3]= 0.001852379698597;
-
-    Leb_Grid_XYZW[  10][0]= 0.577350269189626;
-    Leb_Grid_XYZW[  10][1]= 0.577350269189626;
-    Leb_Grid_XYZW[  10][2]=-0.577350269189626;
-    Leb_Grid_XYZW[  10][3]= 0.001852379698597;
-
-    Leb_Grid_XYZW[  11][0]=-0.577350269189626;
-    Leb_Grid_XYZW[  11][1]= 0.577350269189626;
-    Leb_Grid_XYZW[  11][2]=-0.577350269189626;
-    Leb_Grid_XYZW[  11][3]= 0.001852379698597;
-
-    Leb_Grid_XYZW[  12][0]= 0.577350269189626;
-    Leb_Grid_XYZW[  12][1]=-0.577350269189626;
-    Leb_Grid_XYZW[  12][2]=-0.577350269189626;
-    Leb_Grid_XYZW[  12][3]= 0.001852379698597;
-
-    Leb_Grid_XYZW[  13][0]=-0.577350269189626;
-    Leb_Grid_XYZW[  13][1]=-0.577350269189626;
-    Leb_Grid_XYZW[  13][2]=-0.577350269189626;
-    Leb_Grid_XYZW[  13][3]= 0.001852379698597;
-
-    Leb_Grid_XYZW[  14][0]= 0.704095493822747;
-    Leb_Grid_XYZW[  14][1]= 0.704095493822747;
-    Leb_Grid_XYZW[  14][2]= 0.092190407076898;
-    Leb_Grid_XYZW[  14][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  15][0]=-0.704095493822747;
-    Leb_Grid_XYZW[  15][1]= 0.704095493822747;
-    Leb_Grid_XYZW[  15][2]= 0.092190407076898;
-    Leb_Grid_XYZW[  15][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  16][0]= 0.704095493822747;
-    Leb_Grid_XYZW[  16][1]=-0.704095493822747;
-    Leb_Grid_XYZW[  16][2]= 0.092190407076898;
-    Leb_Grid_XYZW[  16][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  17][0]=-0.704095493822747;
-    Leb_Grid_XYZW[  17][1]=-0.704095493822747;
-    Leb_Grid_XYZW[  17][2]= 0.092190407076898;
-    Leb_Grid_XYZW[  17][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  18][0]= 0.704095493822747;
-    Leb_Grid_XYZW[  18][1]= 0.704095493822747;
-    Leb_Grid_XYZW[  18][2]=-0.092190407076898;
-    Leb_Grid_XYZW[  18][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  19][0]=-0.704095493822747;
-    Leb_Grid_XYZW[  19][1]= 0.704095493822747;
-    Leb_Grid_XYZW[  19][2]=-0.092190407076898;
-    Leb_Grid_XYZW[  19][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  20][0]= 0.704095493822747;
-    Leb_Grid_XYZW[  20][1]=-0.704095493822747;
-    Leb_Grid_XYZW[  20][2]=-0.092190407076898;
-    Leb_Grid_XYZW[  20][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  21][0]=-0.704095493822747;
-    Leb_Grid_XYZW[  21][1]=-0.704095493822747;
-    Leb_Grid_XYZW[  21][2]=-0.092190407076898;
-    Leb_Grid_XYZW[  21][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  22][0]= 0.704095493822747;
-    Leb_Grid_XYZW[  22][1]= 0.092190407076898;
-    Leb_Grid_XYZW[  22][2]= 0.704095493822747;
-    Leb_Grid_XYZW[  22][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  23][0]=-0.704095493822747;
-    Leb_Grid_XYZW[  23][1]= 0.092190407076898;
-    Leb_Grid_XYZW[  23][2]= 0.704095493822747;
-    Leb_Grid_XYZW[  23][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  24][0]= 0.704095493822747;
-    Leb_Grid_XYZW[  24][1]=-0.092190407076898;
-    Leb_Grid_XYZW[  24][2]= 0.704095493822747;
-    Leb_Grid_XYZW[  24][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  25][0]=-0.704095493822747;
-    Leb_Grid_XYZW[  25][1]=-0.092190407076898;
-    Leb_Grid_XYZW[  25][2]= 0.704095493822747;
-    Leb_Grid_XYZW[  25][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  26][0]= 0.704095493822747;
-    Leb_Grid_XYZW[  26][1]= 0.092190407076898;
-    Leb_Grid_XYZW[  26][2]=-0.704095493822747;
-    Leb_Grid_XYZW[  26][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  27][0]=-0.704095493822747;
-    Leb_Grid_XYZW[  27][1]= 0.092190407076898;
-    Leb_Grid_XYZW[  27][2]=-0.704095493822747;
-    Leb_Grid_XYZW[  27][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  28][0]= 0.704095493822747;
-    Leb_Grid_XYZW[  28][1]=-0.092190407076898;
-    Leb_Grid_XYZW[  28][2]=-0.704095493822747;
-    Leb_Grid_XYZW[  28][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  29][0]=-0.704095493822747;
-    Leb_Grid_XYZW[  29][1]=-0.092190407076898;
-    Leb_Grid_XYZW[  29][2]=-0.704095493822747;
-    Leb_Grid_XYZW[  29][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  30][0]= 0.092190407076898;
-    Leb_Grid_XYZW[  30][1]= 0.704095493822747;
-    Leb_Grid_XYZW[  30][2]= 0.704095493822747;
-    Leb_Grid_XYZW[  30][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  31][0]=-0.092190407076898;
-    Leb_Grid_XYZW[  31][1]= 0.704095493822747;
-    Leb_Grid_XYZW[  31][2]= 0.704095493822747;
-    Leb_Grid_XYZW[  31][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  32][0]= 0.092190407076898;
-    Leb_Grid_XYZW[  32][1]=-0.704095493822747;
-    Leb_Grid_XYZW[  32][2]= 0.704095493822747;
-    Leb_Grid_XYZW[  32][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  33][0]=-0.092190407076898;
-    Leb_Grid_XYZW[  33][1]=-0.704095493822747;
-    Leb_Grid_XYZW[  33][2]= 0.704095493822747;
-    Leb_Grid_XYZW[  33][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  34][0]= 0.092190407076898;
-    Leb_Grid_XYZW[  34][1]= 0.704095493822747;
-    Leb_Grid_XYZW[  34][2]=-0.704095493822747;
-    Leb_Grid_XYZW[  34][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  35][0]=-0.092190407076898;
-    Leb_Grid_XYZW[  35][1]= 0.704095493822747;
-    Leb_Grid_XYZW[  35][2]=-0.704095493822747;
-    Leb_Grid_XYZW[  35][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  36][0]= 0.092190407076898;
-    Leb_Grid_XYZW[  36][1]=-0.704095493822747;
-    Leb_Grid_XYZW[  36][2]=-0.704095493822747;
-    Leb_Grid_XYZW[  36][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  37][0]=-0.092190407076898;
-    Leb_Grid_XYZW[  37][1]=-0.704095493822747;
-    Leb_Grid_XYZW[  37][2]=-0.704095493822747;
-    Leb_Grid_XYZW[  37][3]= 0.001871790639278;
-
-    Leb_Grid_XYZW[  38][0]= 0.680774406645524;
-    Leb_Grid_XYZW[  38][1]= 0.680774406645524;
-    Leb_Grid_XYZW[  38][2]= 0.270356088359165;
-    Leb_Grid_XYZW[  38][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  39][0]=-0.680774406645524;
-    Leb_Grid_XYZW[  39][1]= 0.680774406645524;
-    Leb_Grid_XYZW[  39][2]= 0.270356088359165;
-    Leb_Grid_XYZW[  39][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  40][0]= 0.680774406645524;
-    Leb_Grid_XYZW[  40][1]=-0.680774406645524;
-    Leb_Grid_XYZW[  40][2]= 0.270356088359165;
-    Leb_Grid_XYZW[  40][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  41][0]=-0.680774406645524;
-    Leb_Grid_XYZW[  41][1]=-0.680774406645524;
-    Leb_Grid_XYZW[  41][2]= 0.270356088359165;
-    Leb_Grid_XYZW[  41][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  42][0]= 0.680774406645524;
-    Leb_Grid_XYZW[  42][1]= 0.680774406645524;
-    Leb_Grid_XYZW[  42][2]=-0.270356088359165;
-    Leb_Grid_XYZW[  42][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  43][0]=-0.680774406645524;
-    Leb_Grid_XYZW[  43][1]= 0.680774406645524;
-    Leb_Grid_XYZW[  43][2]=-0.270356088359165;
-    Leb_Grid_XYZW[  43][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  44][0]= 0.680774406645524;
-    Leb_Grid_XYZW[  44][1]=-0.680774406645524;
-    Leb_Grid_XYZW[  44][2]=-0.270356088359165;
-    Leb_Grid_XYZW[  44][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  45][0]=-0.680774406645524;
-    Leb_Grid_XYZW[  45][1]=-0.680774406645524;
-    Leb_Grid_XYZW[  45][2]=-0.270356088359165;
-    Leb_Grid_XYZW[  45][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  46][0]= 0.680774406645524;
-    Leb_Grid_XYZW[  46][1]= 0.270356088359165;
-    Leb_Grid_XYZW[  46][2]= 0.680774406645524;
-    Leb_Grid_XYZW[  46][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  47][0]=-0.680774406645524;
-    Leb_Grid_XYZW[  47][1]= 0.270356088359165;
-    Leb_Grid_XYZW[  47][2]= 0.680774406645524;
-    Leb_Grid_XYZW[  47][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  48][0]= 0.680774406645524;
-    Leb_Grid_XYZW[  48][1]=-0.270356088359165;
-    Leb_Grid_XYZW[  48][2]= 0.680774406645524;
-    Leb_Grid_XYZW[  48][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  49][0]=-0.680774406645524;
-    Leb_Grid_XYZW[  49][1]=-0.270356088359165;
-    Leb_Grid_XYZW[  49][2]= 0.680774406645524;
-    Leb_Grid_XYZW[  49][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  50][0]= 0.680774406645524;
-    Leb_Grid_XYZW[  50][1]= 0.270356088359165;
-    Leb_Grid_XYZW[  50][2]=-0.680774406645524;
-    Leb_Grid_XYZW[  50][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  51][0]=-0.680774406645524;
-    Leb_Grid_XYZW[  51][1]= 0.270356088359165;
-    Leb_Grid_XYZW[  51][2]=-0.680774406645524;
-    Leb_Grid_XYZW[  51][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  52][0]= 0.680774406645524;
-    Leb_Grid_XYZW[  52][1]=-0.270356088359165;
-    Leb_Grid_XYZW[  52][2]=-0.680774406645524;
-    Leb_Grid_XYZW[  52][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  53][0]=-0.680774406645524;
-    Leb_Grid_XYZW[  53][1]=-0.270356088359165;
-    Leb_Grid_XYZW[  53][2]=-0.680774406645524;
-    Leb_Grid_XYZW[  53][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  54][0]= 0.270356088359165;
-    Leb_Grid_XYZW[  54][1]= 0.680774406645524;
-    Leb_Grid_XYZW[  54][2]= 0.680774406645524;
-    Leb_Grid_XYZW[  54][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  55][0]=-0.270356088359165;
-    Leb_Grid_XYZW[  55][1]= 0.680774406645524;
-    Leb_Grid_XYZW[  55][2]= 0.680774406645524;
-    Leb_Grid_XYZW[  55][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  56][0]= 0.270356088359165;
-    Leb_Grid_XYZW[  56][1]=-0.680774406645524;
-    Leb_Grid_XYZW[  56][2]= 0.680774406645524;
-    Leb_Grid_XYZW[  56][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  57][0]=-0.270356088359165;
-    Leb_Grid_XYZW[  57][1]=-0.680774406645524;
-    Leb_Grid_XYZW[  57][2]= 0.680774406645524;
-    Leb_Grid_XYZW[  57][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  58][0]= 0.270356088359165;
-    Leb_Grid_XYZW[  58][1]= 0.680774406645524;
-    Leb_Grid_XYZW[  58][2]=-0.680774406645524;
-    Leb_Grid_XYZW[  58][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  59][0]=-0.270356088359165;
-    Leb_Grid_XYZW[  59][1]= 0.680774406645524;
-    Leb_Grid_XYZW[  59][2]=-0.680774406645524;
-    Leb_Grid_XYZW[  59][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  60][0]= 0.270356088359165;
-    Leb_Grid_XYZW[  60][1]=-0.680774406645524;
-    Leb_Grid_XYZW[  60][2]=-0.680774406645524;
-    Leb_Grid_XYZW[  60][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  61][0]=-0.270356088359165;
-    Leb_Grid_XYZW[  61][1]=-0.680774406645524;
-    Leb_Grid_XYZW[  61][2]=-0.680774406645524;
-    Leb_Grid_XYZW[  61][3]= 0.001858812585438;
-
-    Leb_Grid_XYZW[  62][0]= 0.637254693925875;
-    Leb_Grid_XYZW[  62][1]= 0.637254693925875;
-    Leb_Grid_XYZW[  62][2]= 0.433373868777154;
-    Leb_Grid_XYZW[  62][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  63][0]=-0.637254693925875;
-    Leb_Grid_XYZW[  63][1]= 0.637254693925875;
-    Leb_Grid_XYZW[  63][2]= 0.433373868777154;
-    Leb_Grid_XYZW[  63][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  64][0]= 0.637254693925875;
-    Leb_Grid_XYZW[  64][1]=-0.637254693925875;
-    Leb_Grid_XYZW[  64][2]= 0.433373868777154;
-    Leb_Grid_XYZW[  64][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  65][0]=-0.637254693925875;
-    Leb_Grid_XYZW[  65][1]=-0.637254693925875;
-    Leb_Grid_XYZW[  65][2]= 0.433373868777154;
-    Leb_Grid_XYZW[  65][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  66][0]= 0.637254693925875;
-    Leb_Grid_XYZW[  66][1]= 0.637254693925875;
-    Leb_Grid_XYZW[  66][2]=-0.433373868777154;
-    Leb_Grid_XYZW[  66][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  67][0]=-0.637254693925875;
-    Leb_Grid_XYZW[  67][1]= 0.637254693925875;
-    Leb_Grid_XYZW[  67][2]=-0.433373868777154;
-    Leb_Grid_XYZW[  67][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  68][0]= 0.637254693925875;
-    Leb_Grid_XYZW[  68][1]=-0.637254693925875;
-    Leb_Grid_XYZW[  68][2]=-0.433373868777154;
-    Leb_Grid_XYZW[  68][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  69][0]=-0.637254693925875;
-    Leb_Grid_XYZW[  69][1]=-0.637254693925875;
-    Leb_Grid_XYZW[  69][2]=-0.433373868777154;
-    Leb_Grid_XYZW[  69][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  70][0]= 0.637254693925875;
-    Leb_Grid_XYZW[  70][1]= 0.433373868777154;
-    Leb_Grid_XYZW[  70][2]= 0.637254693925875;
-    Leb_Grid_XYZW[  70][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  71][0]=-0.637254693925875;
-    Leb_Grid_XYZW[  71][1]= 0.433373868777154;
-    Leb_Grid_XYZW[  71][2]= 0.637254693925875;
-    Leb_Grid_XYZW[  71][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  72][0]= 0.637254693925875;
-    Leb_Grid_XYZW[  72][1]=-0.433373868777154;
-    Leb_Grid_XYZW[  72][2]= 0.637254693925875;
-    Leb_Grid_XYZW[  72][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  73][0]=-0.637254693925875;
-    Leb_Grid_XYZW[  73][1]=-0.433373868777154;
-    Leb_Grid_XYZW[  73][2]= 0.637254693925875;
-    Leb_Grid_XYZW[  73][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  74][0]= 0.637254693925875;
-    Leb_Grid_XYZW[  74][1]= 0.433373868777154;
-    Leb_Grid_XYZW[  74][2]=-0.637254693925875;
-    Leb_Grid_XYZW[  74][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  75][0]=-0.637254693925875;
-    Leb_Grid_XYZW[  75][1]= 0.433373868777154;
-    Leb_Grid_XYZW[  75][2]=-0.637254693925875;
-    Leb_Grid_XYZW[  75][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  76][0]= 0.637254693925875;
-    Leb_Grid_XYZW[  76][1]=-0.433373868777154;
-    Leb_Grid_XYZW[  76][2]=-0.637254693925875;
-    Leb_Grid_XYZW[  76][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  77][0]=-0.637254693925875;
-    Leb_Grid_XYZW[  77][1]=-0.433373868777154;
-    Leb_Grid_XYZW[  77][2]=-0.637254693925875;
-    Leb_Grid_XYZW[  77][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  78][0]= 0.433373868777154;
-    Leb_Grid_XYZW[  78][1]= 0.637254693925875;
-    Leb_Grid_XYZW[  78][2]= 0.637254693925875;
-    Leb_Grid_XYZW[  78][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  79][0]=-0.433373868777154;
-    Leb_Grid_XYZW[  79][1]= 0.637254693925875;
-    Leb_Grid_XYZW[  79][2]= 0.637254693925875;
-    Leb_Grid_XYZW[  79][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  80][0]= 0.433373868777154;
-    Leb_Grid_XYZW[  80][1]=-0.637254693925875;
-    Leb_Grid_XYZW[  80][2]= 0.637254693925875;
-    Leb_Grid_XYZW[  80][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  81][0]=-0.433373868777154;
-    Leb_Grid_XYZW[  81][1]=-0.637254693925875;
-    Leb_Grid_XYZW[  81][2]= 0.637254693925875;
-    Leb_Grid_XYZW[  81][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  82][0]= 0.433373868777154;
-    Leb_Grid_XYZW[  82][1]= 0.637254693925875;
-    Leb_Grid_XYZW[  82][2]=-0.637254693925875;
-    Leb_Grid_XYZW[  82][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  83][0]=-0.433373868777154;
-    Leb_Grid_XYZW[  83][1]= 0.637254693925875;
-    Leb_Grid_XYZW[  83][2]=-0.637254693925875;
-    Leb_Grid_XYZW[  83][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  84][0]= 0.433373868777154;
-    Leb_Grid_XYZW[  84][1]=-0.637254693925875;
-    Leb_Grid_XYZW[  84][2]=-0.637254693925875;
-    Leb_Grid_XYZW[  84][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  85][0]=-0.433373868777154;
-    Leb_Grid_XYZW[  85][1]=-0.637254693925875;
-    Leb_Grid_XYZW[  85][2]=-0.637254693925875;
-    Leb_Grid_XYZW[  85][3]= 0.001852028828296;
-
-    Leb_Grid_XYZW[  86][0]= 0.504441970780036;
-    Leb_Grid_XYZW[  86][1]= 0.504441970780036;
-    Leb_Grid_XYZW[  86][2]= 0.700768575373573;
-    Leb_Grid_XYZW[  86][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[  87][0]=-0.504441970780036;
-    Leb_Grid_XYZW[  87][1]= 0.504441970780036;
-    Leb_Grid_XYZW[  87][2]= 0.700768575373573;
-    Leb_Grid_XYZW[  87][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[  88][0]= 0.504441970780036;
-    Leb_Grid_XYZW[  88][1]=-0.504441970780036;
-    Leb_Grid_XYZW[  88][2]= 0.700768575373573;
-    Leb_Grid_XYZW[  88][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[  89][0]=-0.504441970780036;
-    Leb_Grid_XYZW[  89][1]=-0.504441970780036;
-    Leb_Grid_XYZW[  89][2]= 0.700768575373573;
-    Leb_Grid_XYZW[  89][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[  90][0]= 0.504441970780036;
-    Leb_Grid_XYZW[  90][1]= 0.504441970780036;
-    Leb_Grid_XYZW[  90][2]=-0.700768575373573;
-    Leb_Grid_XYZW[  90][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[  91][0]=-0.504441970780036;
-    Leb_Grid_XYZW[  91][1]= 0.504441970780036;
-    Leb_Grid_XYZW[  91][2]=-0.700768575373573;
-    Leb_Grid_XYZW[  91][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[  92][0]= 0.504441970780036;
-    Leb_Grid_XYZW[  92][1]=-0.504441970780036;
-    Leb_Grid_XYZW[  92][2]=-0.700768575373573;
-    Leb_Grid_XYZW[  92][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[  93][0]=-0.504441970780036;
-    Leb_Grid_XYZW[  93][1]=-0.504441970780036;
-    Leb_Grid_XYZW[  93][2]=-0.700768575373573;
-    Leb_Grid_XYZW[  93][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[  94][0]= 0.504441970780036;
-    Leb_Grid_XYZW[  94][1]= 0.700768575373573;
-    Leb_Grid_XYZW[  94][2]= 0.504441970780036;
-    Leb_Grid_XYZW[  94][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[  95][0]=-0.504441970780036;
-    Leb_Grid_XYZW[  95][1]= 0.700768575373573;
-    Leb_Grid_XYZW[  95][2]= 0.504441970780036;
-    Leb_Grid_XYZW[  95][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[  96][0]= 0.504441970780036;
-    Leb_Grid_XYZW[  96][1]=-0.700768575373573;
-    Leb_Grid_XYZW[  96][2]= 0.504441970780036;
-    Leb_Grid_XYZW[  96][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[  97][0]=-0.504441970780036;
-    Leb_Grid_XYZW[  97][1]=-0.700768575373573;
-    Leb_Grid_XYZW[  97][2]= 0.504441970780036;
-    Leb_Grid_XYZW[  97][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[  98][0]= 0.504441970780036;
-    Leb_Grid_XYZW[  98][1]= 0.700768575373573;
-    Leb_Grid_XYZW[  98][2]=-0.504441970780036;
-    Leb_Grid_XYZW[  98][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[  99][0]=-0.504441970780036;
-    Leb_Grid_XYZW[  99][1]= 0.700768575373573;
-    Leb_Grid_XYZW[  99][2]=-0.504441970780036;
-    Leb_Grid_XYZW[  99][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[ 100][0]= 0.504441970780036;
-    Leb_Grid_XYZW[ 100][1]=-0.700768575373573;
-    Leb_Grid_XYZW[ 100][2]=-0.504441970780036;
-    Leb_Grid_XYZW[ 100][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[ 101][0]=-0.504441970780036;
-    Leb_Grid_XYZW[ 101][1]=-0.700768575373573;
-    Leb_Grid_XYZW[ 101][2]=-0.504441970780036;
-    Leb_Grid_XYZW[ 101][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[ 102][0]= 0.700768575373573;
-    Leb_Grid_XYZW[ 102][1]= 0.504441970780036;
-    Leb_Grid_XYZW[ 102][2]= 0.504441970780036;
-    Leb_Grid_XYZW[ 102][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[ 103][0]=-0.700768575373573;
-    Leb_Grid_XYZW[ 103][1]= 0.504441970780036;
-    Leb_Grid_XYZW[ 103][2]= 0.504441970780036;
-    Leb_Grid_XYZW[ 103][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[ 104][0]= 0.700768575373573;
-    Leb_Grid_XYZW[ 104][1]=-0.504441970780036;
-    Leb_Grid_XYZW[ 104][2]= 0.504441970780036;
-    Leb_Grid_XYZW[ 104][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[ 105][0]=-0.700768575373573;
-    Leb_Grid_XYZW[ 105][1]=-0.504441970780036;
-    Leb_Grid_XYZW[ 105][2]= 0.504441970780036;
-    Leb_Grid_XYZW[ 105][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[ 106][0]= 0.700768575373573;
-    Leb_Grid_XYZW[ 106][1]= 0.504441970780036;
-    Leb_Grid_XYZW[ 106][2]=-0.504441970780036;
-    Leb_Grid_XYZW[ 106][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[ 107][0]=-0.700768575373573;
-    Leb_Grid_XYZW[ 107][1]= 0.504441970780036;
-    Leb_Grid_XYZW[ 107][2]=-0.504441970780036;
-    Leb_Grid_XYZW[ 107][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[ 108][0]= 0.700768575373573;
-    Leb_Grid_XYZW[ 108][1]=-0.504441970780036;
-    Leb_Grid_XYZW[ 108][2]=-0.504441970780036;
-    Leb_Grid_XYZW[ 108][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[ 109][0]=-0.700768575373573;
-    Leb_Grid_XYZW[ 109][1]=-0.504441970780036;
-    Leb_Grid_XYZW[ 109][2]=-0.504441970780036;
-    Leb_Grid_XYZW[ 109][3]= 0.001846715956151;
-
-    Leb_Grid_XYZW[ 110][0]= 0.421576178401097;
-    Leb_Grid_XYZW[ 110][1]= 0.421576178401097;
-    Leb_Grid_XYZW[ 110][2]= 0.802836877335274;
-    Leb_Grid_XYZW[ 110][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 111][0]=-0.421576178401097;
-    Leb_Grid_XYZW[ 111][1]= 0.421576178401097;
-    Leb_Grid_XYZW[ 111][2]= 0.802836877335274;
-    Leb_Grid_XYZW[ 111][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 112][0]= 0.421576178401097;
-    Leb_Grid_XYZW[ 112][1]=-0.421576178401097;
-    Leb_Grid_XYZW[ 112][2]= 0.802836877335274;
-    Leb_Grid_XYZW[ 112][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 113][0]=-0.421576178401097;
-    Leb_Grid_XYZW[ 113][1]=-0.421576178401097;
-    Leb_Grid_XYZW[ 113][2]= 0.802836877335274;
-    Leb_Grid_XYZW[ 113][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 114][0]= 0.421576178401097;
-    Leb_Grid_XYZW[ 114][1]= 0.421576178401097;
-    Leb_Grid_XYZW[ 114][2]=-0.802836877335274;
-    Leb_Grid_XYZW[ 114][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 115][0]=-0.421576178401097;
-    Leb_Grid_XYZW[ 115][1]= 0.421576178401097;
-    Leb_Grid_XYZW[ 115][2]=-0.802836877335274;
-    Leb_Grid_XYZW[ 115][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 116][0]= 0.421576178401097;
-    Leb_Grid_XYZW[ 116][1]=-0.421576178401097;
-    Leb_Grid_XYZW[ 116][2]=-0.802836877335274;
-    Leb_Grid_XYZW[ 116][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 117][0]=-0.421576178401097;
-    Leb_Grid_XYZW[ 117][1]=-0.421576178401097;
-    Leb_Grid_XYZW[ 117][2]=-0.802836877335274;
-    Leb_Grid_XYZW[ 117][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 118][0]= 0.421576178401097;
-    Leb_Grid_XYZW[ 118][1]= 0.802836877335274;
-    Leb_Grid_XYZW[ 118][2]= 0.421576178401097;
-    Leb_Grid_XYZW[ 118][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 119][0]=-0.421576178401097;
-    Leb_Grid_XYZW[ 119][1]= 0.802836877335274;
-    Leb_Grid_XYZW[ 119][2]= 0.421576178401097;
-    Leb_Grid_XYZW[ 119][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 120][0]= 0.421576178401097;
-    Leb_Grid_XYZW[ 120][1]=-0.802836877335274;
-    Leb_Grid_XYZW[ 120][2]= 0.421576178401097;
-    Leb_Grid_XYZW[ 120][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 121][0]=-0.421576178401097;
-    Leb_Grid_XYZW[ 121][1]=-0.802836877335274;
-    Leb_Grid_XYZW[ 121][2]= 0.421576178401097;
-    Leb_Grid_XYZW[ 121][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 122][0]= 0.421576178401097;
-    Leb_Grid_XYZW[ 122][1]= 0.802836877335274;
-    Leb_Grid_XYZW[ 122][2]=-0.421576178401097;
-    Leb_Grid_XYZW[ 122][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 123][0]=-0.421576178401097;
-    Leb_Grid_XYZW[ 123][1]= 0.802836877335274;
-    Leb_Grid_XYZW[ 123][2]=-0.421576178401097;
-    Leb_Grid_XYZW[ 123][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 124][0]= 0.421576178401097;
-    Leb_Grid_XYZW[ 124][1]=-0.802836877335274;
-    Leb_Grid_XYZW[ 124][2]=-0.421576178401097;
-    Leb_Grid_XYZW[ 124][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 125][0]=-0.421576178401097;
-    Leb_Grid_XYZW[ 125][1]=-0.802836877335274;
-    Leb_Grid_XYZW[ 125][2]=-0.421576178401097;
-    Leb_Grid_XYZW[ 125][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 126][0]= 0.802836877335274;
-    Leb_Grid_XYZW[ 126][1]= 0.421576178401097;
-    Leb_Grid_XYZW[ 126][2]= 0.421576178401097;
-    Leb_Grid_XYZW[ 126][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 127][0]=-0.802836877335274;
-    Leb_Grid_XYZW[ 127][1]= 0.421576178401097;
-    Leb_Grid_XYZW[ 127][2]= 0.421576178401097;
-    Leb_Grid_XYZW[ 127][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 128][0]= 0.802836877335274;
-    Leb_Grid_XYZW[ 128][1]=-0.421576178401097;
-    Leb_Grid_XYZW[ 128][2]= 0.421576178401097;
-    Leb_Grid_XYZW[ 128][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 129][0]=-0.802836877335274;
-    Leb_Grid_XYZW[ 129][1]=-0.421576178401097;
-    Leb_Grid_XYZW[ 129][2]= 0.421576178401097;
-    Leb_Grid_XYZW[ 129][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 130][0]= 0.802836877335274;
-    Leb_Grid_XYZW[ 130][1]= 0.421576178401097;
-    Leb_Grid_XYZW[ 130][2]=-0.421576178401097;
-    Leb_Grid_XYZW[ 130][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 131][0]=-0.802836877335274;
-    Leb_Grid_XYZW[ 131][1]= 0.421576178401097;
-    Leb_Grid_XYZW[ 131][2]=-0.421576178401097;
-    Leb_Grid_XYZW[ 131][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 132][0]= 0.802836877335274;
-    Leb_Grid_XYZW[ 132][1]=-0.421576178401097;
-    Leb_Grid_XYZW[ 132][2]=-0.421576178401097;
-    Leb_Grid_XYZW[ 132][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 133][0]=-0.802836877335274;
-    Leb_Grid_XYZW[ 133][1]=-0.421576178401097;
-    Leb_Grid_XYZW[ 133][2]=-0.421576178401097;
-    Leb_Grid_XYZW[ 133][3]= 0.001818471778163;
-
-    Leb_Grid_XYZW[ 134][0]= 0.331792073647212;
-    Leb_Grid_XYZW[ 134][1]= 0.331792073647212;
-    Leb_Grid_XYZW[ 134][2]= 0.883078727934133;
-    Leb_Grid_XYZW[ 134][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 135][0]=-0.331792073647212;
-    Leb_Grid_XYZW[ 135][1]= 0.331792073647212;
-    Leb_Grid_XYZW[ 135][2]= 0.883078727934133;
-    Leb_Grid_XYZW[ 135][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 136][0]= 0.331792073647212;
-    Leb_Grid_XYZW[ 136][1]=-0.331792073647212;
-    Leb_Grid_XYZW[ 136][2]= 0.883078727934133;
-    Leb_Grid_XYZW[ 136][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 137][0]=-0.331792073647212;
-    Leb_Grid_XYZW[ 137][1]=-0.331792073647212;
-    Leb_Grid_XYZW[ 137][2]= 0.883078727934133;
-    Leb_Grid_XYZW[ 137][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 138][0]= 0.331792073647212;
-    Leb_Grid_XYZW[ 138][1]= 0.331792073647212;
-    Leb_Grid_XYZW[ 138][2]=-0.883078727934133;
-    Leb_Grid_XYZW[ 138][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 139][0]=-0.331792073647212;
-    Leb_Grid_XYZW[ 139][1]= 0.331792073647212;
-    Leb_Grid_XYZW[ 139][2]=-0.883078727934133;
-    Leb_Grid_XYZW[ 139][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 140][0]= 0.331792073647212;
-    Leb_Grid_XYZW[ 140][1]=-0.331792073647212;
-    Leb_Grid_XYZW[ 140][2]=-0.883078727934133;
-    Leb_Grid_XYZW[ 140][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 141][0]=-0.331792073647212;
-    Leb_Grid_XYZW[ 141][1]=-0.331792073647212;
-    Leb_Grid_XYZW[ 141][2]=-0.883078727934133;
-    Leb_Grid_XYZW[ 141][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 142][0]= 0.331792073647212;
-    Leb_Grid_XYZW[ 142][1]= 0.883078727934133;
-    Leb_Grid_XYZW[ 142][2]= 0.331792073647212;
-    Leb_Grid_XYZW[ 142][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 143][0]=-0.331792073647212;
-    Leb_Grid_XYZW[ 143][1]= 0.883078727934133;
-    Leb_Grid_XYZW[ 143][2]= 0.331792073647212;
-    Leb_Grid_XYZW[ 143][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 144][0]= 0.331792073647212;
-    Leb_Grid_XYZW[ 144][1]=-0.883078727934133;
-    Leb_Grid_XYZW[ 144][2]= 0.331792073647212;
-    Leb_Grid_XYZW[ 144][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 145][0]=-0.331792073647212;
-    Leb_Grid_XYZW[ 145][1]=-0.883078727934133;
-    Leb_Grid_XYZW[ 145][2]= 0.331792073647212;
-    Leb_Grid_XYZW[ 145][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 146][0]= 0.331792073647212;
-    Leb_Grid_XYZW[ 146][1]= 0.883078727934133;
-    Leb_Grid_XYZW[ 146][2]=-0.331792073647212;
-    Leb_Grid_XYZW[ 146][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 147][0]=-0.331792073647212;
-    Leb_Grid_XYZW[ 147][1]= 0.883078727934133;
-    Leb_Grid_XYZW[ 147][2]=-0.331792073647212;
-    Leb_Grid_XYZW[ 147][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 148][0]= 0.331792073647212;
-    Leb_Grid_XYZW[ 148][1]=-0.883078727934133;
-    Leb_Grid_XYZW[ 148][2]=-0.331792073647212;
-    Leb_Grid_XYZW[ 148][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 149][0]=-0.331792073647212;
-    Leb_Grid_XYZW[ 149][1]=-0.883078727934133;
-    Leb_Grid_XYZW[ 149][2]=-0.331792073647212;
-    Leb_Grid_XYZW[ 149][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 150][0]= 0.883078727934133;
-    Leb_Grid_XYZW[ 150][1]= 0.331792073647212;
-    Leb_Grid_XYZW[ 150][2]= 0.331792073647212;
-    Leb_Grid_XYZW[ 150][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 151][0]=-0.883078727934133;
-    Leb_Grid_XYZW[ 151][1]= 0.331792073647212;
-    Leb_Grid_XYZW[ 151][2]= 0.331792073647212;
-    Leb_Grid_XYZW[ 151][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 152][0]= 0.883078727934133;
-    Leb_Grid_XYZW[ 152][1]=-0.331792073647212;
-    Leb_Grid_XYZW[ 152][2]= 0.331792073647212;
-    Leb_Grid_XYZW[ 152][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 153][0]=-0.883078727934133;
-    Leb_Grid_XYZW[ 153][1]=-0.331792073647212;
-    Leb_Grid_XYZW[ 153][2]= 0.331792073647212;
-    Leb_Grid_XYZW[ 153][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 154][0]= 0.883078727934133;
-    Leb_Grid_XYZW[ 154][1]= 0.331792073647212;
-    Leb_Grid_XYZW[ 154][2]=-0.331792073647212;
-    Leb_Grid_XYZW[ 154][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 155][0]=-0.883078727934133;
-    Leb_Grid_XYZW[ 155][1]= 0.331792073647212;
-    Leb_Grid_XYZW[ 155][2]=-0.331792073647212;
-    Leb_Grid_XYZW[ 155][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 156][0]= 0.883078727934133;
-    Leb_Grid_XYZW[ 156][1]=-0.331792073647212;
-    Leb_Grid_XYZW[ 156][2]=-0.331792073647212;
-    Leb_Grid_XYZW[ 156][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 157][0]=-0.883078727934133;
-    Leb_Grid_XYZW[ 157][1]=-0.331792073647212;
-    Leb_Grid_XYZW[ 157][2]=-0.331792073647212;
-    Leb_Grid_XYZW[ 157][3]= 0.001749564657281;
-
-    Leb_Grid_XYZW[ 158][0]= 0.238473670142189;
-    Leb_Grid_XYZW[ 158][1]= 0.238473670142189;
-    Leb_Grid_XYZW[ 158][2]= 0.941414158220403;
-    Leb_Grid_XYZW[ 158][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 159][0]=-0.238473670142189;
-    Leb_Grid_XYZW[ 159][1]= 0.238473670142189;
-    Leb_Grid_XYZW[ 159][2]= 0.941414158220403;
-    Leb_Grid_XYZW[ 159][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 160][0]= 0.238473670142189;
-    Leb_Grid_XYZW[ 160][1]=-0.238473670142189;
-    Leb_Grid_XYZW[ 160][2]= 0.941414158220403;
-    Leb_Grid_XYZW[ 160][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 161][0]=-0.238473670142189;
-    Leb_Grid_XYZW[ 161][1]=-0.238473670142189;
-    Leb_Grid_XYZW[ 161][2]= 0.941414158220403;
-    Leb_Grid_XYZW[ 161][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 162][0]= 0.238473670142189;
-    Leb_Grid_XYZW[ 162][1]= 0.238473670142189;
-    Leb_Grid_XYZW[ 162][2]=-0.941414158220403;
-    Leb_Grid_XYZW[ 162][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 163][0]=-0.238473670142189;
-    Leb_Grid_XYZW[ 163][1]= 0.238473670142189;
-    Leb_Grid_XYZW[ 163][2]=-0.941414158220403;
-    Leb_Grid_XYZW[ 163][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 164][0]= 0.238473670142189;
-    Leb_Grid_XYZW[ 164][1]=-0.238473670142189;
-    Leb_Grid_XYZW[ 164][2]=-0.941414158220403;
-    Leb_Grid_XYZW[ 164][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 165][0]=-0.238473670142189;
-    Leb_Grid_XYZW[ 165][1]=-0.238473670142189;
-    Leb_Grid_XYZW[ 165][2]=-0.941414158220403;
-    Leb_Grid_XYZW[ 165][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 166][0]= 0.238473670142189;
-    Leb_Grid_XYZW[ 166][1]= 0.941414158220403;
-    Leb_Grid_XYZW[ 166][2]= 0.238473670142189;
-    Leb_Grid_XYZW[ 166][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 167][0]=-0.238473670142189;
-    Leb_Grid_XYZW[ 167][1]= 0.941414158220403;
-    Leb_Grid_XYZW[ 167][2]= 0.238473670142189;
-    Leb_Grid_XYZW[ 167][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 168][0]= 0.238473670142189;
-    Leb_Grid_XYZW[ 168][1]=-0.941414158220403;
-    Leb_Grid_XYZW[ 168][2]= 0.238473670142189;
-    Leb_Grid_XYZW[ 168][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 169][0]=-0.238473670142189;
-    Leb_Grid_XYZW[ 169][1]=-0.941414158220403;
-    Leb_Grid_XYZW[ 169][2]= 0.238473670142189;
-    Leb_Grid_XYZW[ 169][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 170][0]= 0.238473670142189;
-    Leb_Grid_XYZW[ 170][1]= 0.941414158220403;
-    Leb_Grid_XYZW[ 170][2]=-0.238473670142189;
-    Leb_Grid_XYZW[ 170][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 171][0]=-0.238473670142189;
-    Leb_Grid_XYZW[ 171][1]= 0.941414158220403;
-    Leb_Grid_XYZW[ 171][2]=-0.238473670142189;
-    Leb_Grid_XYZW[ 171][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 172][0]= 0.238473670142189;
-    Leb_Grid_XYZW[ 172][1]=-0.941414158220403;
-    Leb_Grid_XYZW[ 172][2]=-0.238473670142189;
-    Leb_Grid_XYZW[ 172][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 173][0]=-0.238473670142189;
-    Leb_Grid_XYZW[ 173][1]=-0.941414158220403;
-    Leb_Grid_XYZW[ 173][2]=-0.238473670142189;
-    Leb_Grid_XYZW[ 173][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 174][0]= 0.941414158220403;
-    Leb_Grid_XYZW[ 174][1]= 0.238473670142189;
-    Leb_Grid_XYZW[ 174][2]= 0.238473670142189;
-    Leb_Grid_XYZW[ 174][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 175][0]=-0.941414158220403;
-    Leb_Grid_XYZW[ 175][1]= 0.238473670142189;
-    Leb_Grid_XYZW[ 175][2]= 0.238473670142189;
-    Leb_Grid_XYZW[ 175][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 176][0]= 0.941414158220403;
-    Leb_Grid_XYZW[ 176][1]=-0.238473670142189;
-    Leb_Grid_XYZW[ 176][2]= 0.238473670142189;
-    Leb_Grid_XYZW[ 176][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 177][0]=-0.941414158220403;
-    Leb_Grid_XYZW[ 177][1]=-0.238473670142189;
-    Leb_Grid_XYZW[ 177][2]= 0.238473670142189;
-    Leb_Grid_XYZW[ 177][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 178][0]= 0.941414158220403;
-    Leb_Grid_XYZW[ 178][1]= 0.238473670142189;
-    Leb_Grid_XYZW[ 178][2]=-0.238473670142189;
-    Leb_Grid_XYZW[ 178][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 179][0]=-0.941414158220403;
-    Leb_Grid_XYZW[ 179][1]= 0.238473670142189;
-    Leb_Grid_XYZW[ 179][2]=-0.238473670142189;
-    Leb_Grid_XYZW[ 179][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 180][0]= 0.941414158220403;
-    Leb_Grid_XYZW[ 180][1]=-0.238473670142189;
-    Leb_Grid_XYZW[ 180][2]=-0.238473670142189;
-    Leb_Grid_XYZW[ 180][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 181][0]=-0.941414158220403;
-    Leb_Grid_XYZW[ 181][1]=-0.238473670142189;
-    Leb_Grid_XYZW[ 181][2]=-0.238473670142189;
-    Leb_Grid_XYZW[ 181][3]= 0.001617210647254;
-
-    Leb_Grid_XYZW[ 182][0]= 0.145903644915776;
-    Leb_Grid_XYZW[ 182][1]= 0.145903644915776;
-    Leb_Grid_XYZW[ 182][2]= 0.978480583762694;
-    Leb_Grid_XYZW[ 182][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 183][0]=-0.145903644915776;
-    Leb_Grid_XYZW[ 183][1]= 0.145903644915776;
-    Leb_Grid_XYZW[ 183][2]= 0.978480583762694;
-    Leb_Grid_XYZW[ 183][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 184][0]= 0.145903644915776;
-    Leb_Grid_XYZW[ 184][1]=-0.145903644915776;
-    Leb_Grid_XYZW[ 184][2]= 0.978480583762694;
-    Leb_Grid_XYZW[ 184][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 185][0]=-0.145903644915776;
-    Leb_Grid_XYZW[ 185][1]=-0.145903644915776;
-    Leb_Grid_XYZW[ 185][2]= 0.978480583762694;
-    Leb_Grid_XYZW[ 185][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 186][0]= 0.145903644915776;
-    Leb_Grid_XYZW[ 186][1]= 0.145903644915776;
-    Leb_Grid_XYZW[ 186][2]=-0.978480583762694;
-    Leb_Grid_XYZW[ 186][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 187][0]=-0.145903644915776;
-    Leb_Grid_XYZW[ 187][1]= 0.145903644915776;
-    Leb_Grid_XYZW[ 187][2]=-0.978480583762694;
-    Leb_Grid_XYZW[ 187][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 188][0]= 0.145903644915776;
-    Leb_Grid_XYZW[ 188][1]=-0.145903644915776;
-    Leb_Grid_XYZW[ 188][2]=-0.978480583762694;
-    Leb_Grid_XYZW[ 188][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 189][0]=-0.145903644915776;
-    Leb_Grid_XYZW[ 189][1]=-0.145903644915776;
-    Leb_Grid_XYZW[ 189][2]=-0.978480583762694;
-    Leb_Grid_XYZW[ 189][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 190][0]= 0.145903644915776;
-    Leb_Grid_XYZW[ 190][1]= 0.978480583762694;
-    Leb_Grid_XYZW[ 190][2]= 0.145903644915776;
-    Leb_Grid_XYZW[ 190][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 191][0]=-0.145903644915776;
-    Leb_Grid_XYZW[ 191][1]= 0.978480583762694;
-    Leb_Grid_XYZW[ 191][2]= 0.145903644915776;
-    Leb_Grid_XYZW[ 191][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 192][0]= 0.145903644915776;
-    Leb_Grid_XYZW[ 192][1]=-0.978480583762694;
-    Leb_Grid_XYZW[ 192][2]= 0.145903644915776;
-    Leb_Grid_XYZW[ 192][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 193][0]=-0.145903644915776;
-    Leb_Grid_XYZW[ 193][1]=-0.978480583762694;
-    Leb_Grid_XYZW[ 193][2]= 0.145903644915776;
-    Leb_Grid_XYZW[ 193][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 194][0]= 0.145903644915776;
-    Leb_Grid_XYZW[ 194][1]= 0.978480583762694;
-    Leb_Grid_XYZW[ 194][2]=-0.145903644915776;
-    Leb_Grid_XYZW[ 194][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 195][0]=-0.145903644915776;
-    Leb_Grid_XYZW[ 195][1]= 0.978480583762694;
-    Leb_Grid_XYZW[ 195][2]=-0.145903644915776;
-    Leb_Grid_XYZW[ 195][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 196][0]= 0.145903644915776;
-    Leb_Grid_XYZW[ 196][1]=-0.978480583762694;
-    Leb_Grid_XYZW[ 196][2]=-0.145903644915776;
-    Leb_Grid_XYZW[ 196][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 197][0]=-0.145903644915776;
-    Leb_Grid_XYZW[ 197][1]=-0.978480583762694;
-    Leb_Grid_XYZW[ 197][2]=-0.145903644915776;
-    Leb_Grid_XYZW[ 197][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 198][0]= 0.978480583762694;
-    Leb_Grid_XYZW[ 198][1]= 0.145903644915776;
-    Leb_Grid_XYZW[ 198][2]= 0.145903644915776;
-    Leb_Grid_XYZW[ 198][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 199][0]=-0.978480583762694;
-    Leb_Grid_XYZW[ 199][1]= 0.145903644915776;
-    Leb_Grid_XYZW[ 199][2]= 0.145903644915776;
-    Leb_Grid_XYZW[ 199][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 200][0]= 0.978480583762694;
-    Leb_Grid_XYZW[ 200][1]=-0.145903644915776;
-    Leb_Grid_XYZW[ 200][2]= 0.145903644915776;
-    Leb_Grid_XYZW[ 200][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 201][0]=-0.978480583762694;
-    Leb_Grid_XYZW[ 201][1]=-0.145903644915776;
-    Leb_Grid_XYZW[ 201][2]= 0.145903644915776;
-    Leb_Grid_XYZW[ 201][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 202][0]= 0.978480583762694;
-    Leb_Grid_XYZW[ 202][1]= 0.145903644915776;
-    Leb_Grid_XYZW[ 202][2]=-0.145903644915776;
-    Leb_Grid_XYZW[ 202][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 203][0]=-0.978480583762694;
-    Leb_Grid_XYZW[ 203][1]= 0.145903644915776;
-    Leb_Grid_XYZW[ 203][2]=-0.145903644915776;
-    Leb_Grid_XYZW[ 203][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 204][0]= 0.978480583762694;
-    Leb_Grid_XYZW[ 204][1]=-0.145903644915776;
-    Leb_Grid_XYZW[ 204][2]=-0.145903644915776;
-    Leb_Grid_XYZW[ 204][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 205][0]=-0.978480583762694;
-    Leb_Grid_XYZW[ 205][1]=-0.145903644915776;
-    Leb_Grid_XYZW[ 205][2]=-0.145903644915776;
-    Leb_Grid_XYZW[ 205][3]= 0.001384737234852;
-
-    Leb_Grid_XYZW[ 206][0]= 0.060950341155072;
-    Leb_Grid_XYZW[ 206][1]= 0.060950341155072;
-    Leb_Grid_XYZW[ 206][2]= 0.996278129754016;
-    Leb_Grid_XYZW[ 206][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 207][0]=-0.060950341155072;
-    Leb_Grid_XYZW[ 207][1]= 0.060950341155072;
-    Leb_Grid_XYZW[ 207][2]= 0.996278129754016;
-    Leb_Grid_XYZW[ 207][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 208][0]= 0.060950341155072;
-    Leb_Grid_XYZW[ 208][1]=-0.060950341155072;
-    Leb_Grid_XYZW[ 208][2]= 0.996278129754016;
-    Leb_Grid_XYZW[ 208][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 209][0]=-0.060950341155072;
-    Leb_Grid_XYZW[ 209][1]=-0.060950341155072;
-    Leb_Grid_XYZW[ 209][2]= 0.996278129754016;
-    Leb_Grid_XYZW[ 209][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 210][0]= 0.060950341155072;
-    Leb_Grid_XYZW[ 210][1]= 0.060950341155072;
-    Leb_Grid_XYZW[ 210][2]=-0.996278129754016;
-    Leb_Grid_XYZW[ 210][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 211][0]=-0.060950341155072;
-    Leb_Grid_XYZW[ 211][1]= 0.060950341155072;
-    Leb_Grid_XYZW[ 211][2]=-0.996278129754016;
-    Leb_Grid_XYZW[ 211][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 212][0]= 0.060950341155072;
-    Leb_Grid_XYZW[ 212][1]=-0.060950341155072;
-    Leb_Grid_XYZW[ 212][2]=-0.996278129754016;
-    Leb_Grid_XYZW[ 212][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 213][0]=-0.060950341155072;
-    Leb_Grid_XYZW[ 213][1]=-0.060950341155072;
-    Leb_Grid_XYZW[ 213][2]=-0.996278129754016;
-    Leb_Grid_XYZW[ 213][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 214][0]= 0.060950341155072;
-    Leb_Grid_XYZW[ 214][1]= 0.996278129754016;
-    Leb_Grid_XYZW[ 214][2]= 0.060950341155072;
-    Leb_Grid_XYZW[ 214][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 215][0]=-0.060950341155072;
-    Leb_Grid_XYZW[ 215][1]= 0.996278129754016;
-    Leb_Grid_XYZW[ 215][2]= 0.060950341155072;
-    Leb_Grid_XYZW[ 215][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 216][0]= 0.060950341155072;
-    Leb_Grid_XYZW[ 216][1]=-0.996278129754016;
-    Leb_Grid_XYZW[ 216][2]= 0.060950341155072;
-    Leb_Grid_XYZW[ 216][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 217][0]=-0.060950341155072;
-    Leb_Grid_XYZW[ 217][1]=-0.996278129754016;
-    Leb_Grid_XYZW[ 217][2]= 0.060950341155072;
-    Leb_Grid_XYZW[ 217][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 218][0]= 0.060950341155072;
-    Leb_Grid_XYZW[ 218][1]= 0.996278129754016;
-    Leb_Grid_XYZW[ 218][2]=-0.060950341155072;
-    Leb_Grid_XYZW[ 218][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 219][0]=-0.060950341155072;
-    Leb_Grid_XYZW[ 219][1]= 0.996278129754016;
-    Leb_Grid_XYZW[ 219][2]=-0.060950341155072;
-    Leb_Grid_XYZW[ 219][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 220][0]= 0.060950341155072;
-    Leb_Grid_XYZW[ 220][1]=-0.996278129754016;
-    Leb_Grid_XYZW[ 220][2]=-0.060950341155072;
-    Leb_Grid_XYZW[ 220][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 221][0]=-0.060950341155072;
-    Leb_Grid_XYZW[ 221][1]=-0.996278129754016;
-    Leb_Grid_XYZW[ 221][2]=-0.060950341155072;
-    Leb_Grid_XYZW[ 221][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 222][0]= 0.996278129754016;
-    Leb_Grid_XYZW[ 222][1]= 0.060950341155072;
-    Leb_Grid_XYZW[ 222][2]= 0.060950341155072;
-    Leb_Grid_XYZW[ 222][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 223][0]=-0.996278129754016;
-    Leb_Grid_XYZW[ 223][1]= 0.060950341155072;
-    Leb_Grid_XYZW[ 223][2]= 0.060950341155072;
-    Leb_Grid_XYZW[ 223][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 224][0]= 0.996278129754016;
-    Leb_Grid_XYZW[ 224][1]=-0.060950341155072;
-    Leb_Grid_XYZW[ 224][2]= 0.060950341155072;
-    Leb_Grid_XYZW[ 224][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 225][0]=-0.996278129754016;
-    Leb_Grid_XYZW[ 225][1]=-0.060950341155072;
-    Leb_Grid_XYZW[ 225][2]= 0.060950341155072;
-    Leb_Grid_XYZW[ 225][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 226][0]= 0.996278129754016;
-    Leb_Grid_XYZW[ 226][1]= 0.060950341155072;
-    Leb_Grid_XYZW[ 226][2]=-0.060950341155072;
-    Leb_Grid_XYZW[ 226][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 227][0]=-0.996278129754016;
-    Leb_Grid_XYZW[ 227][1]= 0.060950341155072;
-    Leb_Grid_XYZW[ 227][2]=-0.060950341155072;
-    Leb_Grid_XYZW[ 227][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 228][0]= 0.996278129754016;
-    Leb_Grid_XYZW[ 228][1]=-0.060950341155072;
-    Leb_Grid_XYZW[ 228][2]=-0.060950341155072;
-    Leb_Grid_XYZW[ 228][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 229][0]=-0.996278129754016;
-    Leb_Grid_XYZW[ 229][1]=-0.060950341155072;
-    Leb_Grid_XYZW[ 229][2]=-0.060950341155072;
-    Leb_Grid_XYZW[ 229][3]= 0.000976433116505;
-
-    Leb_Grid_XYZW[ 230][0]= 0.611684344200988;
-    Leb_Grid_XYZW[ 230][1]= 0.791101929626902;
-    Leb_Grid_XYZW[ 230][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 230][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 231][0]=-0.611684344200988;
-    Leb_Grid_XYZW[ 231][1]= 0.791101929626902;
-    Leb_Grid_XYZW[ 231][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 231][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 232][0]= 0.611684344200988;
-    Leb_Grid_XYZW[ 232][1]=-0.791101929626902;
-    Leb_Grid_XYZW[ 232][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 232][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 233][0]=-0.611684344200988;
-    Leb_Grid_XYZW[ 233][1]=-0.791101929626902;
-    Leb_Grid_XYZW[ 233][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 233][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 234][0]= 0.791101929626902;
-    Leb_Grid_XYZW[ 234][1]= 0.611684344200988;
-    Leb_Grid_XYZW[ 234][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 234][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 235][0]=-0.791101929626902;
-    Leb_Grid_XYZW[ 235][1]= 0.611684344200988;
-    Leb_Grid_XYZW[ 235][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 235][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 236][0]= 0.791101929626902;
-    Leb_Grid_XYZW[ 236][1]=-0.611684344200988;
-    Leb_Grid_XYZW[ 236][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 236][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 237][0]=-0.791101929626902;
-    Leb_Grid_XYZW[ 237][1]=-0.611684344200988;
-    Leb_Grid_XYZW[ 237][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 237][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 238][0]= 0.611684344200988;
-    Leb_Grid_XYZW[ 238][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 238][2]= 0.791101929626902;
-    Leb_Grid_XYZW[ 238][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 239][0]=-0.611684344200988;
-    Leb_Grid_XYZW[ 239][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 239][2]= 0.791101929626902;
-    Leb_Grid_XYZW[ 239][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 240][0]= 0.611684344200988;
-    Leb_Grid_XYZW[ 240][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 240][2]=-0.791101929626902;
-    Leb_Grid_XYZW[ 240][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 241][0]=-0.611684344200988;
-    Leb_Grid_XYZW[ 241][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 241][2]=-0.791101929626902;
-    Leb_Grid_XYZW[ 241][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 242][0]= 0.791101929626902;
-    Leb_Grid_XYZW[ 242][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 242][2]= 0.611684344200988;
-    Leb_Grid_XYZW[ 242][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 243][0]=-0.791101929626902;
-    Leb_Grid_XYZW[ 243][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 243][2]= 0.611684344200988;
-    Leb_Grid_XYZW[ 243][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 244][0]= 0.791101929626902;
-    Leb_Grid_XYZW[ 244][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 244][2]=-0.611684344200988;
-    Leb_Grid_XYZW[ 244][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 245][0]=-0.791101929626902;
-    Leb_Grid_XYZW[ 245][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 245][2]=-0.611684344200988;
-    Leb_Grid_XYZW[ 245][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 246][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 246][1]= 0.611684344200988;
-    Leb_Grid_XYZW[ 246][2]= 0.791101929626902;
-    Leb_Grid_XYZW[ 246][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 247][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 247][1]=-0.611684344200988;
-    Leb_Grid_XYZW[ 247][2]= 0.791101929626902;
-    Leb_Grid_XYZW[ 247][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 248][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 248][1]= 0.611684344200988;
-    Leb_Grid_XYZW[ 248][2]=-0.791101929626902;
-    Leb_Grid_XYZW[ 248][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 249][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 249][1]=-0.611684344200988;
-    Leb_Grid_XYZW[ 249][2]=-0.791101929626902;
-    Leb_Grid_XYZW[ 249][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 250][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 250][1]= 0.791101929626902;
-    Leb_Grid_XYZW[ 250][2]= 0.611684344200988;
-    Leb_Grid_XYZW[ 250][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 251][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 251][1]=-0.791101929626902;
-    Leb_Grid_XYZW[ 251][2]= 0.611684344200988;
-    Leb_Grid_XYZW[ 251][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 252][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 252][1]= 0.791101929626902;
-    Leb_Grid_XYZW[ 252][2]=-0.611684344200988;
-    Leb_Grid_XYZW[ 252][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 253][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 253][1]=-0.791101929626902;
-    Leb_Grid_XYZW[ 253][2]=-0.611684344200988;
-    Leb_Grid_XYZW[ 253][3]= 0.001857161196774;
-
-    Leb_Grid_XYZW[ 254][0]= 0.396475534819986;
-    Leb_Grid_XYZW[ 254][1]= 0.918045287711454;
-    Leb_Grid_XYZW[ 254][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 254][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 255][0]=-0.396475534819986;
-    Leb_Grid_XYZW[ 255][1]= 0.918045287711454;
-    Leb_Grid_XYZW[ 255][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 255][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 256][0]= 0.396475534819986;
-    Leb_Grid_XYZW[ 256][1]=-0.918045287711454;
-    Leb_Grid_XYZW[ 256][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 256][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 257][0]=-0.396475534819986;
-    Leb_Grid_XYZW[ 257][1]=-0.918045287711454;
-    Leb_Grid_XYZW[ 257][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 257][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 258][0]= 0.918045287711454;
-    Leb_Grid_XYZW[ 258][1]= 0.396475534819986;
-    Leb_Grid_XYZW[ 258][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 258][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 259][0]=-0.918045287711454;
-    Leb_Grid_XYZW[ 259][1]= 0.396475534819986;
-    Leb_Grid_XYZW[ 259][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 259][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 260][0]= 0.918045287711454;
-    Leb_Grid_XYZW[ 260][1]=-0.396475534819986;
-    Leb_Grid_XYZW[ 260][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 260][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 261][0]=-0.918045287711454;
-    Leb_Grid_XYZW[ 261][1]=-0.396475534819986;
-    Leb_Grid_XYZW[ 261][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 261][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 262][0]= 0.396475534819986;
-    Leb_Grid_XYZW[ 262][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 262][2]= 0.918045287711454;
-    Leb_Grid_XYZW[ 262][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 263][0]=-0.396475534819986;
-    Leb_Grid_XYZW[ 263][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 263][2]= 0.918045287711454;
-    Leb_Grid_XYZW[ 263][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 264][0]= 0.396475534819986;
-    Leb_Grid_XYZW[ 264][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 264][2]=-0.918045287711454;
-    Leb_Grid_XYZW[ 264][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 265][0]=-0.396475534819986;
-    Leb_Grid_XYZW[ 265][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 265][2]=-0.918045287711454;
-    Leb_Grid_XYZW[ 265][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 266][0]= 0.918045287711454;
-    Leb_Grid_XYZW[ 266][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 266][2]= 0.396475534819986;
-    Leb_Grid_XYZW[ 266][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 267][0]=-0.918045287711454;
-    Leb_Grid_XYZW[ 267][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 267][2]= 0.396475534819986;
-    Leb_Grid_XYZW[ 267][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 268][0]= 0.918045287711454;
-    Leb_Grid_XYZW[ 268][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 268][2]=-0.396475534819986;
-    Leb_Grid_XYZW[ 268][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 269][0]=-0.918045287711454;
-    Leb_Grid_XYZW[ 269][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 269][2]=-0.396475534819986;
-    Leb_Grid_XYZW[ 269][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 270][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 270][1]= 0.396475534819986;
-    Leb_Grid_XYZW[ 270][2]= 0.918045287711454;
-    Leb_Grid_XYZW[ 270][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 271][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 271][1]=-0.396475534819986;
-    Leb_Grid_XYZW[ 271][2]= 0.918045287711454;
-    Leb_Grid_XYZW[ 271][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 272][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 272][1]= 0.396475534819986;
-    Leb_Grid_XYZW[ 272][2]=-0.918045287711454;
-    Leb_Grid_XYZW[ 272][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 273][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 273][1]=-0.396475534819986;
-    Leb_Grid_XYZW[ 273][2]=-0.918045287711454;
-    Leb_Grid_XYZW[ 273][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 274][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 274][1]= 0.918045287711454;
-    Leb_Grid_XYZW[ 274][2]= 0.396475534819986;
-    Leb_Grid_XYZW[ 274][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 275][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 275][1]=-0.918045287711454;
-    Leb_Grid_XYZW[ 275][2]= 0.396475534819986;
-    Leb_Grid_XYZW[ 275][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 276][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 276][1]= 0.918045287711454;
-    Leb_Grid_XYZW[ 276][2]=-0.396475534819986;
-    Leb_Grid_XYZW[ 276][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 277][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 277][1]=-0.918045287711454;
-    Leb_Grid_XYZW[ 277][2]=-0.396475534819986;
-    Leb_Grid_XYZW[ 277][3]= 0.001705153996396;
-
-    Leb_Grid_XYZW[ 278][0]= 0.172478200990772;
-    Leb_Grid_XYZW[ 278][1]= 0.985013335028002;
-    Leb_Grid_XYZW[ 278][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 278][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 279][0]=-0.172478200990772;
-    Leb_Grid_XYZW[ 279][1]= 0.985013335028002;
-    Leb_Grid_XYZW[ 279][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 279][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 280][0]= 0.172478200990772;
-    Leb_Grid_XYZW[ 280][1]=-0.985013335028002;
-    Leb_Grid_XYZW[ 280][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 280][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 281][0]=-0.172478200990772;
-    Leb_Grid_XYZW[ 281][1]=-0.985013335028002;
-    Leb_Grid_XYZW[ 281][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 281][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 282][0]= 0.985013335028002;
-    Leb_Grid_XYZW[ 282][1]= 0.172478200990772;
-    Leb_Grid_XYZW[ 282][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 282][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 283][0]=-0.985013335028002;
-    Leb_Grid_XYZW[ 283][1]= 0.172478200990772;
-    Leb_Grid_XYZW[ 283][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 283][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 284][0]= 0.985013335028002;
-    Leb_Grid_XYZW[ 284][1]=-0.172478200990772;
-    Leb_Grid_XYZW[ 284][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 284][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 285][0]=-0.985013335028002;
-    Leb_Grid_XYZW[ 285][1]=-0.172478200990772;
-    Leb_Grid_XYZW[ 285][2]= 0.000000000000000;
-    Leb_Grid_XYZW[ 285][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 286][0]= 0.172478200990772;
-    Leb_Grid_XYZW[ 286][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 286][2]= 0.985013335028002;
-    Leb_Grid_XYZW[ 286][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 287][0]=-0.172478200990772;
-    Leb_Grid_XYZW[ 287][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 287][2]= 0.985013335028002;
-    Leb_Grid_XYZW[ 287][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 288][0]= 0.172478200990772;
-    Leb_Grid_XYZW[ 288][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 288][2]=-0.985013335028002;
-    Leb_Grid_XYZW[ 288][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 289][0]=-0.172478200990772;
-    Leb_Grid_XYZW[ 289][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 289][2]=-0.985013335028002;
-    Leb_Grid_XYZW[ 289][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 290][0]= 0.985013335028002;
-    Leb_Grid_XYZW[ 290][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 290][2]= 0.172478200990772;
-    Leb_Grid_XYZW[ 290][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 291][0]=-0.985013335028002;
-    Leb_Grid_XYZW[ 291][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 291][2]= 0.172478200990772;
-    Leb_Grid_XYZW[ 291][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 292][0]= 0.985013335028002;
-    Leb_Grid_XYZW[ 292][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 292][2]=-0.172478200990772;
-    Leb_Grid_XYZW[ 292][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 293][0]=-0.985013335028002;
-    Leb_Grid_XYZW[ 293][1]= 0.000000000000000;
-    Leb_Grid_XYZW[ 293][2]=-0.172478200990772;
-    Leb_Grid_XYZW[ 293][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 294][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 294][1]= 0.172478200990772;
-    Leb_Grid_XYZW[ 294][2]= 0.985013335028002;
-    Leb_Grid_XYZW[ 294][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 295][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 295][1]=-0.172478200990772;
-    Leb_Grid_XYZW[ 295][2]= 0.985013335028002;
-    Leb_Grid_XYZW[ 295][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 296][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 296][1]= 0.172478200990772;
-    Leb_Grid_XYZW[ 296][2]=-0.985013335028002;
-    Leb_Grid_XYZW[ 296][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 297][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 297][1]=-0.172478200990772;
-    Leb_Grid_XYZW[ 297][2]=-0.985013335028002;
-    Leb_Grid_XYZW[ 297][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 298][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 298][1]= 0.985013335028002;
-    Leb_Grid_XYZW[ 298][2]= 0.172478200990772;
-    Leb_Grid_XYZW[ 298][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 299][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 299][1]=-0.985013335028002;
-    Leb_Grid_XYZW[ 299][2]= 0.172478200990772;
-    Leb_Grid_XYZW[ 299][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 300][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 300][1]= 0.985013335028002;
-    Leb_Grid_XYZW[ 300][2]=-0.172478200990772;
-    Leb_Grid_XYZW[ 300][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 301][0]= 0.000000000000000;
-    Leb_Grid_XYZW[ 301][1]=-0.985013335028002;
-    Leb_Grid_XYZW[ 301][2]=-0.172478200990772;
-    Leb_Grid_XYZW[ 301][3]= 0.001300321685886;
-
-    Leb_Grid_XYZW[ 302][0]= 0.561026380862206;
-    Leb_Grid_XYZW[ 302][1]= 0.351828092773352;
-    Leb_Grid_XYZW[ 302][2]= 0.749310611904116;
-    Leb_Grid_XYZW[ 302][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 303][0]=-0.561026380862206;
-    Leb_Grid_XYZW[ 303][1]= 0.351828092773352;
-    Leb_Grid_XYZW[ 303][2]= 0.749310611904116;
-    Leb_Grid_XYZW[ 303][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 304][0]= 0.561026380862206;
-    Leb_Grid_XYZW[ 304][1]=-0.351828092773352;
-    Leb_Grid_XYZW[ 304][2]= 0.749310611904116;
-    Leb_Grid_XYZW[ 304][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 305][0]=-0.561026380862206;
-    Leb_Grid_XYZW[ 305][1]=-0.351828092773352;
-    Leb_Grid_XYZW[ 305][2]= 0.749310611904116;
-    Leb_Grid_XYZW[ 305][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 306][0]= 0.561026380862206;
-    Leb_Grid_XYZW[ 306][1]= 0.351828092773352;
-    Leb_Grid_XYZW[ 306][2]=-0.749310611904116;
-    Leb_Grid_XYZW[ 306][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 307][0]=-0.561026380862206;
-    Leb_Grid_XYZW[ 307][1]= 0.351828092773352;
-    Leb_Grid_XYZW[ 307][2]=-0.749310611904116;
-    Leb_Grid_XYZW[ 307][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 308][0]= 0.561026380862206;
-    Leb_Grid_XYZW[ 308][1]=-0.351828092773352;
-    Leb_Grid_XYZW[ 308][2]=-0.749310611904116;
-    Leb_Grid_XYZW[ 308][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 309][0]=-0.561026380862206;
-    Leb_Grid_XYZW[ 309][1]=-0.351828092773352;
-    Leb_Grid_XYZW[ 309][2]=-0.749310611904116;
-    Leb_Grid_XYZW[ 309][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 310][0]= 0.561026380862206;
-    Leb_Grid_XYZW[ 310][1]= 0.749310611904116;
-    Leb_Grid_XYZW[ 310][2]= 0.351828092773352;
-    Leb_Grid_XYZW[ 310][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 311][0]=-0.561026380862206;
-    Leb_Grid_XYZW[ 311][1]= 0.749310611904116;
-    Leb_Grid_XYZW[ 311][2]= 0.351828092773352;
-    Leb_Grid_XYZW[ 311][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 312][0]= 0.561026380862206;
-    Leb_Grid_XYZW[ 312][1]=-0.749310611904116;
-    Leb_Grid_XYZW[ 312][2]= 0.351828092773352;
-    Leb_Grid_XYZW[ 312][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 313][0]=-0.561026380862206;
-    Leb_Grid_XYZW[ 313][1]=-0.749310611904116;
-    Leb_Grid_XYZW[ 313][2]= 0.351828092773352;
-    Leb_Grid_XYZW[ 313][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 314][0]= 0.561026380862206;
-    Leb_Grid_XYZW[ 314][1]= 0.749310611904116;
-    Leb_Grid_XYZW[ 314][2]=-0.351828092773352;
-    Leb_Grid_XYZW[ 314][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 315][0]=-0.561026380862206;
-    Leb_Grid_XYZW[ 315][1]= 0.749310611904116;
-    Leb_Grid_XYZW[ 315][2]=-0.351828092773352;
-    Leb_Grid_XYZW[ 315][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 316][0]= 0.561026380862206;
-    Leb_Grid_XYZW[ 316][1]=-0.749310611904116;
-    Leb_Grid_XYZW[ 316][2]=-0.351828092773352;
-    Leb_Grid_XYZW[ 316][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 317][0]=-0.561026380862206;
-    Leb_Grid_XYZW[ 317][1]=-0.749310611904116;
-    Leb_Grid_XYZW[ 317][2]=-0.351828092773352;
-    Leb_Grid_XYZW[ 317][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 318][0]= 0.351828092773352;
-    Leb_Grid_XYZW[ 318][1]= 0.561026380862206;
-    Leb_Grid_XYZW[ 318][2]= 0.749310611904116;
-    Leb_Grid_XYZW[ 318][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 319][0]=-0.351828092773352;
-    Leb_Grid_XYZW[ 319][1]= 0.561026380862206;
-    Leb_Grid_XYZW[ 319][2]= 0.749310611904116;
-    Leb_Grid_XYZW[ 319][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 320][0]= 0.351828092773352;
-    Leb_Grid_XYZW[ 320][1]=-0.561026380862206;
-    Leb_Grid_XYZW[ 320][2]= 0.749310611904116;
-    Leb_Grid_XYZW[ 320][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 321][0]=-0.351828092773352;
-    Leb_Grid_XYZW[ 321][1]=-0.561026380862206;
-    Leb_Grid_XYZW[ 321][2]= 0.749310611904116;
-    Leb_Grid_XYZW[ 321][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 322][0]= 0.351828092773352;
-    Leb_Grid_XYZW[ 322][1]= 0.561026380862206;
-    Leb_Grid_XYZW[ 322][2]=-0.749310611904116;
-    Leb_Grid_XYZW[ 322][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 323][0]=-0.351828092773352;
-    Leb_Grid_XYZW[ 323][1]= 0.561026380862206;
-    Leb_Grid_XYZW[ 323][2]=-0.749310611904116;
-    Leb_Grid_XYZW[ 323][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 324][0]= 0.351828092773352;
-    Leb_Grid_XYZW[ 324][1]=-0.561026380862206;
-    Leb_Grid_XYZW[ 324][2]=-0.749310611904116;
-    Leb_Grid_XYZW[ 324][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 325][0]=-0.351828092773352;
-    Leb_Grid_XYZW[ 325][1]=-0.561026380862206;
-    Leb_Grid_XYZW[ 325][2]=-0.749310611904116;
-    Leb_Grid_XYZW[ 325][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 326][0]= 0.351828092773352;
-    Leb_Grid_XYZW[ 326][1]= 0.749310611904116;
-    Leb_Grid_XYZW[ 326][2]= 0.561026380862206;
-    Leb_Grid_XYZW[ 326][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 327][0]=-0.351828092773352;
-    Leb_Grid_XYZW[ 327][1]= 0.749310611904116;
-    Leb_Grid_XYZW[ 327][2]= 0.561026380862206;
-    Leb_Grid_XYZW[ 327][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 328][0]= 0.351828092773352;
-    Leb_Grid_XYZW[ 328][1]=-0.749310611904116;
-    Leb_Grid_XYZW[ 328][2]= 0.561026380862206;
-    Leb_Grid_XYZW[ 328][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 329][0]=-0.351828092773352;
-    Leb_Grid_XYZW[ 329][1]=-0.749310611904116;
-    Leb_Grid_XYZW[ 329][2]= 0.561026380862206;
-    Leb_Grid_XYZW[ 329][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 330][0]= 0.351828092773352;
-    Leb_Grid_XYZW[ 330][1]= 0.749310611904116;
-    Leb_Grid_XYZW[ 330][2]=-0.561026380862206;
-    Leb_Grid_XYZW[ 330][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 331][0]=-0.351828092773352;
-    Leb_Grid_XYZW[ 331][1]= 0.749310611904116;
-    Leb_Grid_XYZW[ 331][2]=-0.561026380862206;
-    Leb_Grid_XYZW[ 331][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 332][0]= 0.351828092773352;
-    Leb_Grid_XYZW[ 332][1]=-0.749310611904116;
-    Leb_Grid_XYZW[ 332][2]=-0.561026380862206;
-    Leb_Grid_XYZW[ 332][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 333][0]=-0.351828092773352;
-    Leb_Grid_XYZW[ 333][1]=-0.749310611904116;
-    Leb_Grid_XYZW[ 333][2]=-0.561026380862206;
-    Leb_Grid_XYZW[ 333][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 334][0]= 0.749310611904116;
-    Leb_Grid_XYZW[ 334][1]= 0.561026380862206;
-    Leb_Grid_XYZW[ 334][2]= 0.351828092773352;
-    Leb_Grid_XYZW[ 334][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 335][0]=-0.749310611904116;
-    Leb_Grid_XYZW[ 335][1]= 0.561026380862206;
-    Leb_Grid_XYZW[ 335][2]= 0.351828092773352;
-    Leb_Grid_XYZW[ 335][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 336][0]= 0.749310611904116;
-    Leb_Grid_XYZW[ 336][1]=-0.561026380862206;
-    Leb_Grid_XYZW[ 336][2]= 0.351828092773352;
-    Leb_Grid_XYZW[ 336][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 337][0]=-0.749310611904116;
-    Leb_Grid_XYZW[ 337][1]=-0.561026380862206;
-    Leb_Grid_XYZW[ 337][2]= 0.351828092773352;
-    Leb_Grid_XYZW[ 337][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 338][0]= 0.749310611904116;
-    Leb_Grid_XYZW[ 338][1]= 0.561026380862206;
-    Leb_Grid_XYZW[ 338][2]=-0.351828092773352;
-    Leb_Grid_XYZW[ 338][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 339][0]=-0.749310611904116;
-    Leb_Grid_XYZW[ 339][1]= 0.561026380862206;
-    Leb_Grid_XYZW[ 339][2]=-0.351828092773352;
-    Leb_Grid_XYZW[ 339][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 340][0]= 0.749310611904116;
-    Leb_Grid_XYZW[ 340][1]=-0.561026380862206;
-    Leb_Grid_XYZW[ 340][2]=-0.351828092773352;
-    Leb_Grid_XYZW[ 340][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 341][0]=-0.749310611904116;
-    Leb_Grid_XYZW[ 341][1]=-0.561026380862206;
-    Leb_Grid_XYZW[ 341][2]=-0.351828092773352;
-    Leb_Grid_XYZW[ 341][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 342][0]= 0.749310611904116;
-    Leb_Grid_XYZW[ 342][1]= 0.351828092773352;
-    Leb_Grid_XYZW[ 342][2]= 0.561026380862206;
-    Leb_Grid_XYZW[ 342][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 343][0]=-0.749310611904116;
-    Leb_Grid_XYZW[ 343][1]= 0.351828092773352;
-    Leb_Grid_XYZW[ 343][2]= 0.561026380862206;
-    Leb_Grid_XYZW[ 343][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 344][0]= 0.749310611904116;
-    Leb_Grid_XYZW[ 344][1]=-0.351828092773352;
-    Leb_Grid_XYZW[ 344][2]= 0.561026380862206;
-    Leb_Grid_XYZW[ 344][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 345][0]=-0.749310611904116;
-    Leb_Grid_XYZW[ 345][1]=-0.351828092773352;
-    Leb_Grid_XYZW[ 345][2]= 0.561026380862206;
-    Leb_Grid_XYZW[ 345][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 346][0]= 0.749310611904116;
-    Leb_Grid_XYZW[ 346][1]= 0.351828092773352;
-    Leb_Grid_XYZW[ 346][2]=-0.561026380862206;
-    Leb_Grid_XYZW[ 346][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 347][0]=-0.749310611904116;
-    Leb_Grid_XYZW[ 347][1]= 0.351828092773352;
-    Leb_Grid_XYZW[ 347][2]=-0.561026380862206;
-    Leb_Grid_XYZW[ 347][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 348][0]= 0.749310611904116;
-    Leb_Grid_XYZW[ 348][1]=-0.351828092773352;
-    Leb_Grid_XYZW[ 348][2]=-0.561026380862206;
-    Leb_Grid_XYZW[ 348][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 349][0]=-0.749310611904116;
-    Leb_Grid_XYZW[ 349][1]=-0.351828092773352;
-    Leb_Grid_XYZW[ 349][2]=-0.561026380862206;
-    Leb_Grid_XYZW[ 349][3]= 0.001842866472905;
-
-    Leb_Grid_XYZW[ 350][0]= 0.474239284255198;
-    Leb_Grid_XYZW[ 350][1]= 0.263471665593795;
-    Leb_Grid_XYZW[ 350][2]= 0.840047488359050;
-    Leb_Grid_XYZW[ 350][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 351][0]=-0.474239284255198;
-    Leb_Grid_XYZW[ 351][1]= 0.263471665593795;
-    Leb_Grid_XYZW[ 351][2]= 0.840047488359050;
-    Leb_Grid_XYZW[ 351][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 352][0]= 0.474239284255198;
-    Leb_Grid_XYZW[ 352][1]=-0.263471665593795;
-    Leb_Grid_XYZW[ 352][2]= 0.840047488359050;
-    Leb_Grid_XYZW[ 352][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 353][0]=-0.474239284255198;
-    Leb_Grid_XYZW[ 353][1]=-0.263471665593795;
-    Leb_Grid_XYZW[ 353][2]= 0.840047488359050;
-    Leb_Grid_XYZW[ 353][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 354][0]= 0.474239284255198;
-    Leb_Grid_XYZW[ 354][1]= 0.263471665593795;
-    Leb_Grid_XYZW[ 354][2]=-0.840047488359050;
-    Leb_Grid_XYZW[ 354][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 355][0]=-0.474239284255198;
-    Leb_Grid_XYZW[ 355][1]= 0.263471665593795;
-    Leb_Grid_XYZW[ 355][2]=-0.840047488359050;
-    Leb_Grid_XYZW[ 355][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 356][0]= 0.474239284255198;
-    Leb_Grid_XYZW[ 356][1]=-0.263471665593795;
-    Leb_Grid_XYZW[ 356][2]=-0.840047488359050;
-    Leb_Grid_XYZW[ 356][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 357][0]=-0.474239284255198;
-    Leb_Grid_XYZW[ 357][1]=-0.263471665593795;
-    Leb_Grid_XYZW[ 357][2]=-0.840047488359050;
-    Leb_Grid_XYZW[ 357][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 358][0]= 0.474239284255198;
-    Leb_Grid_XYZW[ 358][1]= 0.840047488359050;
-    Leb_Grid_XYZW[ 358][2]= 0.263471665593795;
-    Leb_Grid_XYZW[ 358][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 359][0]=-0.474239284255198;
-    Leb_Grid_XYZW[ 359][1]= 0.840047488359050;
-    Leb_Grid_XYZW[ 359][2]= 0.263471665593795;
-    Leb_Grid_XYZW[ 359][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 360][0]= 0.474239284255198;
-    Leb_Grid_XYZW[ 360][1]=-0.840047488359050;
-    Leb_Grid_XYZW[ 360][2]= 0.263471665593795;
-    Leb_Grid_XYZW[ 360][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 361][0]=-0.474239284255198;
-    Leb_Grid_XYZW[ 361][1]=-0.840047488359050;
-    Leb_Grid_XYZW[ 361][2]= 0.263471665593795;
-    Leb_Grid_XYZW[ 361][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 362][0]= 0.474239284255198;
-    Leb_Grid_XYZW[ 362][1]= 0.840047488359050;
-    Leb_Grid_XYZW[ 362][2]=-0.263471665593795;
-    Leb_Grid_XYZW[ 362][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 363][0]=-0.474239284255198;
-    Leb_Grid_XYZW[ 363][1]= 0.840047488359050;
-    Leb_Grid_XYZW[ 363][2]=-0.263471665593795;
-    Leb_Grid_XYZW[ 363][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 364][0]= 0.474239284255198;
-    Leb_Grid_XYZW[ 364][1]=-0.840047488359050;
-    Leb_Grid_XYZW[ 364][2]=-0.263471665593795;
-    Leb_Grid_XYZW[ 364][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 365][0]=-0.474239284255198;
-    Leb_Grid_XYZW[ 365][1]=-0.840047488359050;
-    Leb_Grid_XYZW[ 365][2]=-0.263471665593795;
-    Leb_Grid_XYZW[ 365][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 366][0]= 0.263471665593795;
-    Leb_Grid_XYZW[ 366][1]= 0.474239284255198;
-    Leb_Grid_XYZW[ 366][2]= 0.840047488359050;
-    Leb_Grid_XYZW[ 366][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 367][0]=-0.263471665593795;
-    Leb_Grid_XYZW[ 367][1]= 0.474239284255198;
-    Leb_Grid_XYZW[ 367][2]= 0.840047488359050;
-    Leb_Grid_XYZW[ 367][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 368][0]= 0.263471665593795;
-    Leb_Grid_XYZW[ 368][1]=-0.474239284255198;
-    Leb_Grid_XYZW[ 368][2]= 0.840047488359050;
-    Leb_Grid_XYZW[ 368][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 369][0]=-0.263471665593795;
-    Leb_Grid_XYZW[ 369][1]=-0.474239284255198;
-    Leb_Grid_XYZW[ 369][2]= 0.840047488359050;
-    Leb_Grid_XYZW[ 369][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 370][0]= 0.263471665593795;
-    Leb_Grid_XYZW[ 370][1]= 0.474239284255198;
-    Leb_Grid_XYZW[ 370][2]=-0.840047488359050;
-    Leb_Grid_XYZW[ 370][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 371][0]=-0.263471665593795;
-    Leb_Grid_XYZW[ 371][1]= 0.474239284255198;
-    Leb_Grid_XYZW[ 371][2]=-0.840047488359050;
-    Leb_Grid_XYZW[ 371][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 372][0]= 0.263471665593795;
-    Leb_Grid_XYZW[ 372][1]=-0.474239284255198;
-    Leb_Grid_XYZW[ 372][2]=-0.840047488359050;
-    Leb_Grid_XYZW[ 372][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 373][0]=-0.263471665593795;
-    Leb_Grid_XYZW[ 373][1]=-0.474239284255198;
-    Leb_Grid_XYZW[ 373][2]=-0.840047488359050;
-    Leb_Grid_XYZW[ 373][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 374][0]= 0.263471665593795;
-    Leb_Grid_XYZW[ 374][1]= 0.840047488359050;
-    Leb_Grid_XYZW[ 374][2]= 0.474239284255198;
-    Leb_Grid_XYZW[ 374][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 375][0]=-0.263471665593795;
-    Leb_Grid_XYZW[ 375][1]= 0.840047488359050;
-    Leb_Grid_XYZW[ 375][2]= 0.474239284255198;
-    Leb_Grid_XYZW[ 375][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 376][0]= 0.263471665593795;
-    Leb_Grid_XYZW[ 376][1]=-0.840047488359050;
-    Leb_Grid_XYZW[ 376][2]= 0.474239284255198;
-    Leb_Grid_XYZW[ 376][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 377][0]=-0.263471665593795;
-    Leb_Grid_XYZW[ 377][1]=-0.840047488359050;
-    Leb_Grid_XYZW[ 377][2]= 0.474239284255198;
-    Leb_Grid_XYZW[ 377][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 378][0]= 0.263471665593795;
-    Leb_Grid_XYZW[ 378][1]= 0.840047488359050;
-    Leb_Grid_XYZW[ 378][2]=-0.474239284255198;
-    Leb_Grid_XYZW[ 378][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 379][0]=-0.263471665593795;
-    Leb_Grid_XYZW[ 379][1]= 0.840047488359050;
-    Leb_Grid_XYZW[ 379][2]=-0.474239284255198;
-    Leb_Grid_XYZW[ 379][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 380][0]= 0.263471665593795;
-    Leb_Grid_XYZW[ 380][1]=-0.840047488359050;
-    Leb_Grid_XYZW[ 380][2]=-0.474239284255198;
-    Leb_Grid_XYZW[ 380][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 381][0]=-0.263471665593795;
-    Leb_Grid_XYZW[ 381][1]=-0.840047488359050;
-    Leb_Grid_XYZW[ 381][2]=-0.474239284255198;
-    Leb_Grid_XYZW[ 381][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 382][0]= 0.840047488359050;
-    Leb_Grid_XYZW[ 382][1]= 0.474239284255198;
-    Leb_Grid_XYZW[ 382][2]= 0.263471665593795;
-    Leb_Grid_XYZW[ 382][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 383][0]=-0.840047488359050;
-    Leb_Grid_XYZW[ 383][1]= 0.474239284255198;
-    Leb_Grid_XYZW[ 383][2]= 0.263471665593795;
-    Leb_Grid_XYZW[ 383][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 384][0]= 0.840047488359050;
-    Leb_Grid_XYZW[ 384][1]=-0.474239284255198;
-    Leb_Grid_XYZW[ 384][2]= 0.263471665593795;
-    Leb_Grid_XYZW[ 384][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 385][0]=-0.840047488359050;
-    Leb_Grid_XYZW[ 385][1]=-0.474239284255198;
-    Leb_Grid_XYZW[ 385][2]= 0.263471665593795;
-    Leb_Grid_XYZW[ 385][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 386][0]= 0.840047488359050;
-    Leb_Grid_XYZW[ 386][1]= 0.474239284255198;
-    Leb_Grid_XYZW[ 386][2]=-0.263471665593795;
-    Leb_Grid_XYZW[ 386][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 387][0]=-0.840047488359050;
-    Leb_Grid_XYZW[ 387][1]= 0.474239284255198;
-    Leb_Grid_XYZW[ 387][2]=-0.263471665593795;
-    Leb_Grid_XYZW[ 387][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 388][0]= 0.840047488359050;
-    Leb_Grid_XYZW[ 388][1]=-0.474239284255198;
-    Leb_Grid_XYZW[ 388][2]=-0.263471665593795;
-    Leb_Grid_XYZW[ 388][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 389][0]=-0.840047488359050;
-    Leb_Grid_XYZW[ 389][1]=-0.474239284255198;
-    Leb_Grid_XYZW[ 389][2]=-0.263471665593795;
-    Leb_Grid_XYZW[ 389][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 390][0]= 0.840047488359050;
-    Leb_Grid_XYZW[ 390][1]= 0.263471665593795;
-    Leb_Grid_XYZW[ 390][2]= 0.474239284255198;
-    Leb_Grid_XYZW[ 390][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 391][0]=-0.840047488359050;
-    Leb_Grid_XYZW[ 391][1]= 0.263471665593795;
-    Leb_Grid_XYZW[ 391][2]= 0.474239284255198;
-    Leb_Grid_XYZW[ 391][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 392][0]= 0.840047488359050;
-    Leb_Grid_XYZW[ 392][1]=-0.263471665593795;
-    Leb_Grid_XYZW[ 392][2]= 0.474239284255198;
-    Leb_Grid_XYZW[ 392][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 393][0]=-0.840047488359050;
-    Leb_Grid_XYZW[ 393][1]=-0.263471665593795;
-    Leb_Grid_XYZW[ 393][2]= 0.474239284255198;
-    Leb_Grid_XYZW[ 393][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 394][0]= 0.840047488359050;
-    Leb_Grid_XYZW[ 394][1]= 0.263471665593795;
-    Leb_Grid_XYZW[ 394][2]=-0.474239284255198;
-    Leb_Grid_XYZW[ 394][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 395][0]=-0.840047488359050;
-    Leb_Grid_XYZW[ 395][1]= 0.263471665593795;
-    Leb_Grid_XYZW[ 395][2]=-0.474239284255198;
-    Leb_Grid_XYZW[ 395][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 396][0]= 0.840047488359050;
-    Leb_Grid_XYZW[ 396][1]=-0.263471665593795;
-    Leb_Grid_XYZW[ 396][2]=-0.474239284255198;
-    Leb_Grid_XYZW[ 396][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 397][0]=-0.840047488359050;
-    Leb_Grid_XYZW[ 397][1]=-0.263471665593795;
-    Leb_Grid_XYZW[ 397][2]=-0.474239284255198;
-    Leb_Grid_XYZW[ 397][3]= 0.001802658934377;
-
-    Leb_Grid_XYZW[ 398][0]= 0.598412649788538;
-    Leb_Grid_XYZW[ 398][1]= 0.181664084036021;
-    Leb_Grid_XYZW[ 398][2]= 0.780320742479920;
-    Leb_Grid_XYZW[ 398][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 399][0]=-0.598412649788538;
-    Leb_Grid_XYZW[ 399][1]= 0.181664084036021;
-    Leb_Grid_XYZW[ 399][2]= 0.780320742479920;
-    Leb_Grid_XYZW[ 399][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 400][0]= 0.598412649788538;
-    Leb_Grid_XYZW[ 400][1]=-0.181664084036021;
-    Leb_Grid_XYZW[ 400][2]= 0.780320742479920;
-    Leb_Grid_XYZW[ 400][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 401][0]=-0.598412649788538;
-    Leb_Grid_XYZW[ 401][1]=-0.181664084036021;
-    Leb_Grid_XYZW[ 401][2]= 0.780320742479920;
-    Leb_Grid_XYZW[ 401][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 402][0]= 0.598412649788538;
-    Leb_Grid_XYZW[ 402][1]= 0.181664084036021;
-    Leb_Grid_XYZW[ 402][2]=-0.780320742479920;
-    Leb_Grid_XYZW[ 402][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 403][0]=-0.598412649788538;
-    Leb_Grid_XYZW[ 403][1]= 0.181664084036021;
-    Leb_Grid_XYZW[ 403][2]=-0.780320742479920;
-    Leb_Grid_XYZW[ 403][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 404][0]= 0.598412649788538;
-    Leb_Grid_XYZW[ 404][1]=-0.181664084036021;
-    Leb_Grid_XYZW[ 404][2]=-0.780320742479920;
-    Leb_Grid_XYZW[ 404][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 405][0]=-0.598412649788538;
-    Leb_Grid_XYZW[ 405][1]=-0.181664084036021;
-    Leb_Grid_XYZW[ 405][2]=-0.780320742479920;
-    Leb_Grid_XYZW[ 405][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 406][0]= 0.598412649788538;
-    Leb_Grid_XYZW[ 406][1]= 0.780320742479920;
-    Leb_Grid_XYZW[ 406][2]= 0.181664084036021;
-    Leb_Grid_XYZW[ 406][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 407][0]=-0.598412649788538;
-    Leb_Grid_XYZW[ 407][1]= 0.780320742479920;
-    Leb_Grid_XYZW[ 407][2]= 0.181664084036021;
-    Leb_Grid_XYZW[ 407][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 408][0]= 0.598412649788538;
-    Leb_Grid_XYZW[ 408][1]=-0.780320742479920;
-    Leb_Grid_XYZW[ 408][2]= 0.181664084036021;
-    Leb_Grid_XYZW[ 408][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 409][0]=-0.598412649788538;
-    Leb_Grid_XYZW[ 409][1]=-0.780320742479920;
-    Leb_Grid_XYZW[ 409][2]= 0.181664084036021;
-    Leb_Grid_XYZW[ 409][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 410][0]= 0.598412649788538;
-    Leb_Grid_XYZW[ 410][1]= 0.780320742479920;
-    Leb_Grid_XYZW[ 410][2]=-0.181664084036021;
-    Leb_Grid_XYZW[ 410][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 411][0]=-0.598412649788538;
-    Leb_Grid_XYZW[ 411][1]= 0.780320742479920;
-    Leb_Grid_XYZW[ 411][2]=-0.181664084036021;
-    Leb_Grid_XYZW[ 411][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 412][0]= 0.598412649788538;
-    Leb_Grid_XYZW[ 412][1]=-0.780320742479920;
-    Leb_Grid_XYZW[ 412][2]=-0.181664084036021;
-    Leb_Grid_XYZW[ 412][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 413][0]=-0.598412649788538;
-    Leb_Grid_XYZW[ 413][1]=-0.780320742479920;
-    Leb_Grid_XYZW[ 413][2]=-0.181664084036021;
-    Leb_Grid_XYZW[ 413][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 414][0]= 0.181664084036021;
-    Leb_Grid_XYZW[ 414][1]= 0.598412649788538;
-    Leb_Grid_XYZW[ 414][2]= 0.780320742479920;
-    Leb_Grid_XYZW[ 414][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 415][0]=-0.181664084036021;
-    Leb_Grid_XYZW[ 415][1]= 0.598412649788538;
-    Leb_Grid_XYZW[ 415][2]= 0.780320742479920;
-    Leb_Grid_XYZW[ 415][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 416][0]= 0.181664084036021;
-    Leb_Grid_XYZW[ 416][1]=-0.598412649788538;
-    Leb_Grid_XYZW[ 416][2]= 0.780320742479920;
-    Leb_Grid_XYZW[ 416][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 417][0]=-0.181664084036021;
-    Leb_Grid_XYZW[ 417][1]=-0.598412649788538;
-    Leb_Grid_XYZW[ 417][2]= 0.780320742479920;
-    Leb_Grid_XYZW[ 417][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 418][0]= 0.181664084036021;
-    Leb_Grid_XYZW[ 418][1]= 0.598412649788538;
-    Leb_Grid_XYZW[ 418][2]=-0.780320742479920;
-    Leb_Grid_XYZW[ 418][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 419][0]=-0.181664084036021;
-    Leb_Grid_XYZW[ 419][1]= 0.598412649788538;
-    Leb_Grid_XYZW[ 419][2]=-0.780320742479920;
-    Leb_Grid_XYZW[ 419][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 420][0]= 0.181664084036021;
-    Leb_Grid_XYZW[ 420][1]=-0.598412649788538;
-    Leb_Grid_XYZW[ 420][2]=-0.780320742479920;
-    Leb_Grid_XYZW[ 420][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 421][0]=-0.181664084036021;
-    Leb_Grid_XYZW[ 421][1]=-0.598412649788538;
-    Leb_Grid_XYZW[ 421][2]=-0.780320742479920;
-    Leb_Grid_XYZW[ 421][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 422][0]= 0.181664084036021;
-    Leb_Grid_XYZW[ 422][1]= 0.780320742479920;
-    Leb_Grid_XYZW[ 422][2]= 0.598412649788538;
-    Leb_Grid_XYZW[ 422][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 423][0]=-0.181664084036021;
-    Leb_Grid_XYZW[ 423][1]= 0.780320742479920;
-    Leb_Grid_XYZW[ 423][2]= 0.598412649788538;
-    Leb_Grid_XYZW[ 423][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 424][0]= 0.181664084036021;
-    Leb_Grid_XYZW[ 424][1]=-0.780320742479920;
-    Leb_Grid_XYZW[ 424][2]= 0.598412649788538;
-    Leb_Grid_XYZW[ 424][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 425][0]=-0.181664084036021;
-    Leb_Grid_XYZW[ 425][1]=-0.780320742479920;
-    Leb_Grid_XYZW[ 425][2]= 0.598412649788538;
-    Leb_Grid_XYZW[ 425][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 426][0]= 0.181664084036021;
-    Leb_Grid_XYZW[ 426][1]= 0.780320742479920;
-    Leb_Grid_XYZW[ 426][2]=-0.598412649788538;
-    Leb_Grid_XYZW[ 426][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 427][0]=-0.181664084036021;
-    Leb_Grid_XYZW[ 427][1]= 0.780320742479920;
-    Leb_Grid_XYZW[ 427][2]=-0.598412649788538;
-    Leb_Grid_XYZW[ 427][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 428][0]= 0.181664084036021;
-    Leb_Grid_XYZW[ 428][1]=-0.780320742479920;
-    Leb_Grid_XYZW[ 428][2]=-0.598412649788538;
-    Leb_Grid_XYZW[ 428][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 429][0]=-0.181664084036021;
-    Leb_Grid_XYZW[ 429][1]=-0.780320742479920;
-    Leb_Grid_XYZW[ 429][2]=-0.598412649788538;
-    Leb_Grid_XYZW[ 429][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 430][0]= 0.780320742479920;
-    Leb_Grid_XYZW[ 430][1]= 0.598412649788538;
-    Leb_Grid_XYZW[ 430][2]= 0.181664084036021;
-    Leb_Grid_XYZW[ 430][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 431][0]=-0.780320742479920;
-    Leb_Grid_XYZW[ 431][1]= 0.598412649788538;
-    Leb_Grid_XYZW[ 431][2]= 0.181664084036021;
-    Leb_Grid_XYZW[ 431][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 432][0]= 0.780320742479920;
-    Leb_Grid_XYZW[ 432][1]=-0.598412649788538;
-    Leb_Grid_XYZW[ 432][2]= 0.181664084036021;
-    Leb_Grid_XYZW[ 432][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 433][0]=-0.780320742479920;
-    Leb_Grid_XYZW[ 433][1]=-0.598412649788538;
-    Leb_Grid_XYZW[ 433][2]= 0.181664084036021;
-    Leb_Grid_XYZW[ 433][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 434][0]= 0.780320742479920;
-    Leb_Grid_XYZW[ 434][1]= 0.598412649788538;
-    Leb_Grid_XYZW[ 434][2]=-0.181664084036021;
-    Leb_Grid_XYZW[ 434][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 435][0]=-0.780320742479920;
-    Leb_Grid_XYZW[ 435][1]= 0.598412649788538;
-    Leb_Grid_XYZW[ 435][2]=-0.181664084036021;
-    Leb_Grid_XYZW[ 435][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 436][0]= 0.780320742479920;
-    Leb_Grid_XYZW[ 436][1]=-0.598412649788538;
-    Leb_Grid_XYZW[ 436][2]=-0.181664084036021;
-    Leb_Grid_XYZW[ 436][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 437][0]=-0.780320742479920;
-    Leb_Grid_XYZW[ 437][1]=-0.598412649788538;
-    Leb_Grid_XYZW[ 437][2]=-0.181664084036021;
-    Leb_Grid_XYZW[ 437][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 438][0]= 0.780320742479920;
-    Leb_Grid_XYZW[ 438][1]= 0.181664084036021;
-    Leb_Grid_XYZW[ 438][2]= 0.598412649788538;
-    Leb_Grid_XYZW[ 438][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 439][0]=-0.780320742479920;
-    Leb_Grid_XYZW[ 439][1]= 0.181664084036021;
-    Leb_Grid_XYZW[ 439][2]= 0.598412649788538;
-    Leb_Grid_XYZW[ 439][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 440][0]= 0.780320742479920;
-    Leb_Grid_XYZW[ 440][1]=-0.181664084036021;
-    Leb_Grid_XYZW[ 440][2]= 0.598412649788538;
-    Leb_Grid_XYZW[ 440][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 441][0]=-0.780320742479920;
-    Leb_Grid_XYZW[ 441][1]=-0.181664084036021;
-    Leb_Grid_XYZW[ 441][2]= 0.598412649788538;
-    Leb_Grid_XYZW[ 441][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 442][0]= 0.780320742479920;
-    Leb_Grid_XYZW[ 442][1]= 0.181664084036021;
-    Leb_Grid_XYZW[ 442][2]=-0.598412649788538;
-    Leb_Grid_XYZW[ 442][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 443][0]=-0.780320742479920;
-    Leb_Grid_XYZW[ 443][1]= 0.181664084036021;
-    Leb_Grid_XYZW[ 443][2]=-0.598412649788538;
-    Leb_Grid_XYZW[ 443][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 444][0]= 0.780320742479920;
-    Leb_Grid_XYZW[ 444][1]=-0.181664084036021;
-    Leb_Grid_XYZW[ 444][2]=-0.598412649788538;
-    Leb_Grid_XYZW[ 444][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 445][0]=-0.780320742479920;
-    Leb_Grid_XYZW[ 445][1]=-0.181664084036021;
-    Leb_Grid_XYZW[ 445][2]=-0.598412649788538;
-    Leb_Grid_XYZW[ 445][3]= 0.001849830560444;
-
-    Leb_Grid_XYZW[ 446][0]= 0.379103540769556;
-    Leb_Grid_XYZW[ 446][1]= 0.172079522565688;
-    Leb_Grid_XYZW[ 446][2]= 0.909213475092374;
-    Leb_Grid_XYZW[ 446][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 447][0]=-0.379103540769556;
-    Leb_Grid_XYZW[ 447][1]= 0.172079522565688;
-    Leb_Grid_XYZW[ 447][2]= 0.909213475092374;
-    Leb_Grid_XYZW[ 447][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 448][0]= 0.379103540769556;
-    Leb_Grid_XYZW[ 448][1]=-0.172079522565688;
-    Leb_Grid_XYZW[ 448][2]= 0.909213475092374;
-    Leb_Grid_XYZW[ 448][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 449][0]=-0.379103540769556;
-    Leb_Grid_XYZW[ 449][1]=-0.172079522565688;
-    Leb_Grid_XYZW[ 449][2]= 0.909213475092374;
-    Leb_Grid_XYZW[ 449][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 450][0]= 0.379103540769556;
-    Leb_Grid_XYZW[ 450][1]= 0.172079522565688;
-    Leb_Grid_XYZW[ 450][2]=-0.909213475092374;
-    Leb_Grid_XYZW[ 450][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 451][0]=-0.379103540769556;
-    Leb_Grid_XYZW[ 451][1]= 0.172079522565688;
-    Leb_Grid_XYZW[ 451][2]=-0.909213475092374;
-    Leb_Grid_XYZW[ 451][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 452][0]= 0.379103540769556;
-    Leb_Grid_XYZW[ 452][1]=-0.172079522565688;
-    Leb_Grid_XYZW[ 452][2]=-0.909213475092374;
-    Leb_Grid_XYZW[ 452][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 453][0]=-0.379103540769556;
-    Leb_Grid_XYZW[ 453][1]=-0.172079522565688;
-    Leb_Grid_XYZW[ 453][2]=-0.909213475092374;
-    Leb_Grid_XYZW[ 453][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 454][0]= 0.379103540769556;
-    Leb_Grid_XYZW[ 454][1]= 0.909213475092374;
-    Leb_Grid_XYZW[ 454][2]= 0.172079522565688;
-    Leb_Grid_XYZW[ 454][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 455][0]=-0.379103540769556;
-    Leb_Grid_XYZW[ 455][1]= 0.909213475092374;
-    Leb_Grid_XYZW[ 455][2]= 0.172079522565688;
-    Leb_Grid_XYZW[ 455][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 456][0]= 0.379103540769556;
-    Leb_Grid_XYZW[ 456][1]=-0.909213475092374;
-    Leb_Grid_XYZW[ 456][2]= 0.172079522565688;
-    Leb_Grid_XYZW[ 456][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 457][0]=-0.379103540769556;
-    Leb_Grid_XYZW[ 457][1]=-0.909213475092374;
-    Leb_Grid_XYZW[ 457][2]= 0.172079522565688;
-    Leb_Grid_XYZW[ 457][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 458][0]= 0.379103540769556;
-    Leb_Grid_XYZW[ 458][1]= 0.909213475092374;
-    Leb_Grid_XYZW[ 458][2]=-0.172079522565688;
-    Leb_Grid_XYZW[ 458][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 459][0]=-0.379103540769556;
-    Leb_Grid_XYZW[ 459][1]= 0.909213475092374;
-    Leb_Grid_XYZW[ 459][2]=-0.172079522565688;
-    Leb_Grid_XYZW[ 459][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 460][0]= 0.379103540769556;
-    Leb_Grid_XYZW[ 460][1]=-0.909213475092374;
-    Leb_Grid_XYZW[ 460][2]=-0.172079522565688;
-    Leb_Grid_XYZW[ 460][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 461][0]=-0.379103540769556;
-    Leb_Grid_XYZW[ 461][1]=-0.909213475092374;
-    Leb_Grid_XYZW[ 461][2]=-0.172079522565688;
-    Leb_Grid_XYZW[ 461][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 462][0]= 0.172079522565688;
-    Leb_Grid_XYZW[ 462][1]= 0.379103540769556;
-    Leb_Grid_XYZW[ 462][2]= 0.909213475092374;
-    Leb_Grid_XYZW[ 462][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 463][0]=-0.172079522565688;
-    Leb_Grid_XYZW[ 463][1]= 0.379103540769556;
-    Leb_Grid_XYZW[ 463][2]= 0.909213475092374;
-    Leb_Grid_XYZW[ 463][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 464][0]= 0.172079522565688;
-    Leb_Grid_XYZW[ 464][1]=-0.379103540769556;
-    Leb_Grid_XYZW[ 464][2]= 0.909213475092374;
-    Leb_Grid_XYZW[ 464][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 465][0]=-0.172079522565688;
-    Leb_Grid_XYZW[ 465][1]=-0.379103540769556;
-    Leb_Grid_XYZW[ 465][2]= 0.909213475092374;
-    Leb_Grid_XYZW[ 465][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 466][0]= 0.172079522565688;
-    Leb_Grid_XYZW[ 466][1]= 0.379103540769556;
-    Leb_Grid_XYZW[ 466][2]=-0.909213475092374;
-    Leb_Grid_XYZW[ 466][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 467][0]=-0.172079522565688;
-    Leb_Grid_XYZW[ 467][1]= 0.379103540769556;
-    Leb_Grid_XYZW[ 467][2]=-0.909213475092374;
-    Leb_Grid_XYZW[ 467][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 468][0]= 0.172079522565688;
-    Leb_Grid_XYZW[ 468][1]=-0.379103540769556;
-    Leb_Grid_XYZW[ 468][2]=-0.909213475092374;
-    Leb_Grid_XYZW[ 468][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 469][0]=-0.172079522565688;
-    Leb_Grid_XYZW[ 469][1]=-0.379103540769556;
-    Leb_Grid_XYZW[ 469][2]=-0.909213475092374;
-    Leb_Grid_XYZW[ 469][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 470][0]= 0.172079522565688;
-    Leb_Grid_XYZW[ 470][1]= 0.909213475092374;
-    Leb_Grid_XYZW[ 470][2]= 0.379103540769556;
-    Leb_Grid_XYZW[ 470][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 471][0]=-0.172079522565688;
-    Leb_Grid_XYZW[ 471][1]= 0.909213475092374;
-    Leb_Grid_XYZW[ 471][2]= 0.379103540769556;
-    Leb_Grid_XYZW[ 471][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 472][0]= 0.172079522565688;
-    Leb_Grid_XYZW[ 472][1]=-0.909213475092374;
-    Leb_Grid_XYZW[ 472][2]= 0.379103540769556;
-    Leb_Grid_XYZW[ 472][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 473][0]=-0.172079522565688;
-    Leb_Grid_XYZW[ 473][1]=-0.909213475092374;
-    Leb_Grid_XYZW[ 473][2]= 0.379103540769556;
-    Leb_Grid_XYZW[ 473][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 474][0]= 0.172079522565688;
-    Leb_Grid_XYZW[ 474][1]= 0.909213475092374;
-    Leb_Grid_XYZW[ 474][2]=-0.379103540769556;
-    Leb_Grid_XYZW[ 474][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 475][0]=-0.172079522565688;
-    Leb_Grid_XYZW[ 475][1]= 0.909213475092374;
-    Leb_Grid_XYZW[ 475][2]=-0.379103540769556;
-    Leb_Grid_XYZW[ 475][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 476][0]= 0.172079522565688;
-    Leb_Grid_XYZW[ 476][1]=-0.909213475092374;
-    Leb_Grid_XYZW[ 476][2]=-0.379103540769556;
-    Leb_Grid_XYZW[ 476][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 477][0]=-0.172079522565688;
-    Leb_Grid_XYZW[ 477][1]=-0.909213475092374;
-    Leb_Grid_XYZW[ 477][2]=-0.379103540769556;
-    Leb_Grid_XYZW[ 477][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 478][0]= 0.909213475092374;
-    Leb_Grid_XYZW[ 478][1]= 0.379103540769556;
-    Leb_Grid_XYZW[ 478][2]= 0.172079522565688;
-    Leb_Grid_XYZW[ 478][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 479][0]=-0.909213475092374;
-    Leb_Grid_XYZW[ 479][1]= 0.379103540769556;
-    Leb_Grid_XYZW[ 479][2]= 0.172079522565688;
-    Leb_Grid_XYZW[ 479][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 480][0]= 0.909213475092374;
-    Leb_Grid_XYZW[ 480][1]=-0.379103540769556;
-    Leb_Grid_XYZW[ 480][2]= 0.172079522565688;
-    Leb_Grid_XYZW[ 480][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 481][0]=-0.909213475092374;
-    Leb_Grid_XYZW[ 481][1]=-0.379103540769556;
-    Leb_Grid_XYZW[ 481][2]= 0.172079522565688;
-    Leb_Grid_XYZW[ 481][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 482][0]= 0.909213475092374;
-    Leb_Grid_XYZW[ 482][1]= 0.379103540769556;
-    Leb_Grid_XYZW[ 482][2]=-0.172079522565688;
-    Leb_Grid_XYZW[ 482][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 483][0]=-0.909213475092374;
-    Leb_Grid_XYZW[ 483][1]= 0.379103540769556;
-    Leb_Grid_XYZW[ 483][2]=-0.172079522565688;
-    Leb_Grid_XYZW[ 483][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 484][0]= 0.909213475092374;
-    Leb_Grid_XYZW[ 484][1]=-0.379103540769556;
-    Leb_Grid_XYZW[ 484][2]=-0.172079522565688;
-    Leb_Grid_XYZW[ 484][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 485][0]=-0.909213475092374;
-    Leb_Grid_XYZW[ 485][1]=-0.379103540769556;
-    Leb_Grid_XYZW[ 485][2]=-0.172079522565688;
-    Leb_Grid_XYZW[ 485][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 486][0]= 0.909213475092374;
-    Leb_Grid_XYZW[ 486][1]= 0.172079522565688;
-    Leb_Grid_XYZW[ 486][2]= 0.379103540769556;
-    Leb_Grid_XYZW[ 486][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 487][0]=-0.909213475092374;
-    Leb_Grid_XYZW[ 487][1]= 0.172079522565688;
-    Leb_Grid_XYZW[ 487][2]= 0.379103540769556;
-    Leb_Grid_XYZW[ 487][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 488][0]= 0.909213475092374;
-    Leb_Grid_XYZW[ 488][1]=-0.172079522565688;
-    Leb_Grid_XYZW[ 488][2]= 0.379103540769556;
-    Leb_Grid_XYZW[ 488][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 489][0]=-0.909213475092374;
-    Leb_Grid_XYZW[ 489][1]=-0.172079522565688;
-    Leb_Grid_XYZW[ 489][2]= 0.379103540769556;
-    Leb_Grid_XYZW[ 489][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 490][0]= 0.909213475092374;
-    Leb_Grid_XYZW[ 490][1]= 0.172079522565688;
-    Leb_Grid_XYZW[ 490][2]=-0.379103540769556;
-    Leb_Grid_XYZW[ 490][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 491][0]=-0.909213475092374;
-    Leb_Grid_XYZW[ 491][1]= 0.172079522565688;
-    Leb_Grid_XYZW[ 491][2]=-0.379103540769556;
-    Leb_Grid_XYZW[ 491][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 492][0]= 0.909213475092374;
-    Leb_Grid_XYZW[ 492][1]=-0.172079522565688;
-    Leb_Grid_XYZW[ 492][2]=-0.379103540769556;
-    Leb_Grid_XYZW[ 492][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 493][0]=-0.909213475092374;
-    Leb_Grid_XYZW[ 493][1]=-0.172079522565688;
-    Leb_Grid_XYZW[ 493][2]=-0.379103540769556;
-    Leb_Grid_XYZW[ 493][3]= 0.001713904507107;
-
-    Leb_Grid_XYZW[ 494][0]= 0.277867319058624;
-    Leb_Grid_XYZW[ 494][1]= 0.082130215819325;
-    Leb_Grid_XYZW[ 494][2]= 0.957102074310073;
-    Leb_Grid_XYZW[ 494][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 495][0]=-0.277867319058624;
-    Leb_Grid_XYZW[ 495][1]= 0.082130215819325;
-    Leb_Grid_XYZW[ 495][2]= 0.957102074310073;
-    Leb_Grid_XYZW[ 495][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 496][0]= 0.277867319058624;
-    Leb_Grid_XYZW[ 496][1]=-0.082130215819325;
-    Leb_Grid_XYZW[ 496][2]= 0.957102074310073;
-    Leb_Grid_XYZW[ 496][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 497][0]=-0.277867319058624;
-    Leb_Grid_XYZW[ 497][1]=-0.082130215819325;
-    Leb_Grid_XYZW[ 497][2]= 0.957102074310073;
-    Leb_Grid_XYZW[ 497][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 498][0]= 0.277867319058624;
-    Leb_Grid_XYZW[ 498][1]= 0.082130215819325;
-    Leb_Grid_XYZW[ 498][2]=-0.957102074310073;
-    Leb_Grid_XYZW[ 498][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 499][0]=-0.277867319058624;
-    Leb_Grid_XYZW[ 499][1]= 0.082130215819325;
-    Leb_Grid_XYZW[ 499][2]=-0.957102074310073;
-    Leb_Grid_XYZW[ 499][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 500][0]= 0.277867319058624;
-    Leb_Grid_XYZW[ 500][1]=-0.082130215819325;
-    Leb_Grid_XYZW[ 500][2]=-0.957102074310073;
-    Leb_Grid_XYZW[ 500][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 501][0]=-0.277867319058624;
-    Leb_Grid_XYZW[ 501][1]=-0.082130215819325;
-    Leb_Grid_XYZW[ 501][2]=-0.957102074310073;
-    Leb_Grid_XYZW[ 501][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 502][0]= 0.277867319058624;
-    Leb_Grid_XYZW[ 502][1]= 0.957102074310073;
-    Leb_Grid_XYZW[ 502][2]= 0.082130215819325;
-    Leb_Grid_XYZW[ 502][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 503][0]=-0.277867319058624;
-    Leb_Grid_XYZW[ 503][1]= 0.957102074310073;
-    Leb_Grid_XYZW[ 503][2]= 0.082130215819325;
-    Leb_Grid_XYZW[ 503][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 504][0]= 0.277867319058624;
-    Leb_Grid_XYZW[ 504][1]=-0.957102074310073;
-    Leb_Grid_XYZW[ 504][2]= 0.082130215819325;
-    Leb_Grid_XYZW[ 504][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 505][0]=-0.277867319058624;
-    Leb_Grid_XYZW[ 505][1]=-0.957102074310073;
-    Leb_Grid_XYZW[ 505][2]= 0.082130215819325;
-    Leb_Grid_XYZW[ 505][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 506][0]= 0.277867319058624;
-    Leb_Grid_XYZW[ 506][1]= 0.957102074310073;
-    Leb_Grid_XYZW[ 506][2]=-0.082130215819325;
-    Leb_Grid_XYZW[ 506][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 507][0]=-0.277867319058624;
-    Leb_Grid_XYZW[ 507][1]= 0.957102074310073;
-    Leb_Grid_XYZW[ 507][2]=-0.082130215819325;
-    Leb_Grid_XYZW[ 507][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 508][0]= 0.277867319058624;
-    Leb_Grid_XYZW[ 508][1]=-0.957102074310073;
-    Leb_Grid_XYZW[ 508][2]=-0.082130215819325;
-    Leb_Grid_XYZW[ 508][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 509][0]=-0.277867319058624;
-    Leb_Grid_XYZW[ 509][1]=-0.957102074310073;
-    Leb_Grid_XYZW[ 509][2]=-0.082130215819325;
-    Leb_Grid_XYZW[ 509][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 510][0]= 0.082130215819325;
-    Leb_Grid_XYZW[ 510][1]= 0.277867319058624;
-    Leb_Grid_XYZW[ 510][2]= 0.957102074310073;
-    Leb_Grid_XYZW[ 510][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 511][0]=-0.082130215819325;
-    Leb_Grid_XYZW[ 511][1]= 0.277867319058624;
-    Leb_Grid_XYZW[ 511][2]= 0.957102074310073;
-    Leb_Grid_XYZW[ 511][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 512][0]= 0.082130215819325;
-    Leb_Grid_XYZW[ 512][1]=-0.277867319058624;
-    Leb_Grid_XYZW[ 512][2]= 0.957102074310073;
-    Leb_Grid_XYZW[ 512][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 513][0]=-0.082130215819325;
-    Leb_Grid_XYZW[ 513][1]=-0.277867319058624;
-    Leb_Grid_XYZW[ 513][2]= 0.957102074310073;
-    Leb_Grid_XYZW[ 513][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 514][0]= 0.082130215819325;
-    Leb_Grid_XYZW[ 514][1]= 0.277867319058624;
-    Leb_Grid_XYZW[ 514][2]=-0.957102074310073;
-    Leb_Grid_XYZW[ 514][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 515][0]=-0.082130215819325;
-    Leb_Grid_XYZW[ 515][1]= 0.277867319058624;
-    Leb_Grid_XYZW[ 515][2]=-0.957102074310073;
-    Leb_Grid_XYZW[ 515][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 516][0]= 0.082130215819325;
-    Leb_Grid_XYZW[ 516][1]=-0.277867319058624;
-    Leb_Grid_XYZW[ 516][2]=-0.957102074310073;
-    Leb_Grid_XYZW[ 516][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 517][0]=-0.082130215819325;
-    Leb_Grid_XYZW[ 517][1]=-0.277867319058624;
-    Leb_Grid_XYZW[ 517][2]=-0.957102074310073;
-    Leb_Grid_XYZW[ 517][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 518][0]= 0.082130215819325;
-    Leb_Grid_XYZW[ 518][1]= 0.957102074310073;
-    Leb_Grid_XYZW[ 518][2]= 0.277867319058624;
-    Leb_Grid_XYZW[ 518][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 519][0]=-0.082130215819325;
-    Leb_Grid_XYZW[ 519][1]= 0.957102074310073;
-    Leb_Grid_XYZW[ 519][2]= 0.277867319058624;
-    Leb_Grid_XYZW[ 519][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 520][0]= 0.082130215819325;
-    Leb_Grid_XYZW[ 520][1]=-0.957102074310073;
-    Leb_Grid_XYZW[ 520][2]= 0.277867319058624;
-    Leb_Grid_XYZW[ 520][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 521][0]=-0.082130215819325;
-    Leb_Grid_XYZW[ 521][1]=-0.957102074310073;
-    Leb_Grid_XYZW[ 521][2]= 0.277867319058624;
-    Leb_Grid_XYZW[ 521][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 522][0]= 0.082130215819325;
-    Leb_Grid_XYZW[ 522][1]= 0.957102074310073;
-    Leb_Grid_XYZW[ 522][2]=-0.277867319058624;
-    Leb_Grid_XYZW[ 522][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 523][0]=-0.082130215819325;
-    Leb_Grid_XYZW[ 523][1]= 0.957102074310073;
-    Leb_Grid_XYZW[ 523][2]=-0.277867319058624;
-    Leb_Grid_XYZW[ 523][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 524][0]= 0.082130215819325;
-    Leb_Grid_XYZW[ 524][1]=-0.957102074310073;
-    Leb_Grid_XYZW[ 524][2]=-0.277867319058624;
-    Leb_Grid_XYZW[ 524][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 525][0]=-0.082130215819325;
-    Leb_Grid_XYZW[ 525][1]=-0.957102074310073;
-    Leb_Grid_XYZW[ 525][2]=-0.277867319058624;
-    Leb_Grid_XYZW[ 525][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 526][0]= 0.957102074310073;
-    Leb_Grid_XYZW[ 526][1]= 0.277867319058624;
-    Leb_Grid_XYZW[ 526][2]= 0.082130215819325;
-    Leb_Grid_XYZW[ 526][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 527][0]=-0.957102074310073;
-    Leb_Grid_XYZW[ 527][1]= 0.277867319058624;
-    Leb_Grid_XYZW[ 527][2]= 0.082130215819325;
-    Leb_Grid_XYZW[ 527][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 528][0]= 0.957102074310073;
-    Leb_Grid_XYZW[ 528][1]=-0.277867319058624;
-    Leb_Grid_XYZW[ 528][2]= 0.082130215819325;
-    Leb_Grid_XYZW[ 528][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 529][0]=-0.957102074310073;
-    Leb_Grid_XYZW[ 529][1]=-0.277867319058624;
-    Leb_Grid_XYZW[ 529][2]= 0.082130215819325;
-    Leb_Grid_XYZW[ 529][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 530][0]= 0.957102074310073;
-    Leb_Grid_XYZW[ 530][1]= 0.277867319058624;
-    Leb_Grid_XYZW[ 530][2]=-0.082130215819325;
-    Leb_Grid_XYZW[ 530][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 531][0]=-0.957102074310073;
-    Leb_Grid_XYZW[ 531][1]= 0.277867319058624;
-    Leb_Grid_XYZW[ 531][2]=-0.082130215819325;
-    Leb_Grid_XYZW[ 531][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 532][0]= 0.957102074310073;
-    Leb_Grid_XYZW[ 532][1]=-0.277867319058624;
-    Leb_Grid_XYZW[ 532][2]=-0.082130215819325;
-    Leb_Grid_XYZW[ 532][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 533][0]=-0.957102074310073;
-    Leb_Grid_XYZW[ 533][1]=-0.277867319058624;
-    Leb_Grid_XYZW[ 533][2]=-0.082130215819325;
-    Leb_Grid_XYZW[ 533][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 534][0]= 0.957102074310073;
-    Leb_Grid_XYZW[ 534][1]= 0.082130215819325;
-    Leb_Grid_XYZW[ 534][2]= 0.277867319058624;
-    Leb_Grid_XYZW[ 534][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 535][0]=-0.957102074310073;
-    Leb_Grid_XYZW[ 535][1]= 0.082130215819325;
-    Leb_Grid_XYZW[ 535][2]= 0.277867319058624;
-    Leb_Grid_XYZW[ 535][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 536][0]= 0.957102074310073;
-    Leb_Grid_XYZW[ 536][1]=-0.082130215819325;
-    Leb_Grid_XYZW[ 536][2]= 0.277867319058624;
-    Leb_Grid_XYZW[ 536][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 537][0]=-0.957102074310073;
-    Leb_Grid_XYZW[ 537][1]=-0.082130215819325;
-    Leb_Grid_XYZW[ 537][2]= 0.277867319058624;
-    Leb_Grid_XYZW[ 537][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 538][0]= 0.957102074310073;
-    Leb_Grid_XYZW[ 538][1]= 0.082130215819325;
-    Leb_Grid_XYZW[ 538][2]=-0.277867319058624;
-    Leb_Grid_XYZW[ 538][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 539][0]=-0.957102074310073;
-    Leb_Grid_XYZW[ 539][1]= 0.082130215819325;
-    Leb_Grid_XYZW[ 539][2]=-0.277867319058624;
-    Leb_Grid_XYZW[ 539][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 540][0]= 0.957102074310073;
-    Leb_Grid_XYZW[ 540][1]=-0.082130215819325;
-    Leb_Grid_XYZW[ 540][2]=-0.277867319058624;
-    Leb_Grid_XYZW[ 540][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 541][0]=-0.957102074310073;
-    Leb_Grid_XYZW[ 541][1]=-0.082130215819325;
-    Leb_Grid_XYZW[ 541][2]=-0.277867319058624;
-    Leb_Grid_XYZW[ 541][3]= 0.001555213603397;
-
-    Leb_Grid_XYZW[ 542][0]= 0.503356427107512;
-    Leb_Grid_XYZW[ 542][1]= 0.089992058420749;
-    Leb_Grid_XYZW[ 542][2]= 0.859379855890721;
-    Leb_Grid_XYZW[ 542][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 543][0]=-0.503356427107512;
-    Leb_Grid_XYZW[ 543][1]= 0.089992058420749;
-    Leb_Grid_XYZW[ 543][2]= 0.859379855890721;
-    Leb_Grid_XYZW[ 543][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 544][0]= 0.503356427107512;
-    Leb_Grid_XYZW[ 544][1]=-0.089992058420749;
-    Leb_Grid_XYZW[ 544][2]= 0.859379855890721;
-    Leb_Grid_XYZW[ 544][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 545][0]=-0.503356427107512;
-    Leb_Grid_XYZW[ 545][1]=-0.089992058420749;
-    Leb_Grid_XYZW[ 545][2]= 0.859379855890721;
-    Leb_Grid_XYZW[ 545][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 546][0]= 0.503356427107512;
-    Leb_Grid_XYZW[ 546][1]= 0.089992058420749;
-    Leb_Grid_XYZW[ 546][2]=-0.859379855890721;
-    Leb_Grid_XYZW[ 546][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 547][0]=-0.503356427107512;
-    Leb_Grid_XYZW[ 547][1]= 0.089992058420749;
-    Leb_Grid_XYZW[ 547][2]=-0.859379855890721;
-    Leb_Grid_XYZW[ 547][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 548][0]= 0.503356427107512;
-    Leb_Grid_XYZW[ 548][1]=-0.089992058420749;
-    Leb_Grid_XYZW[ 548][2]=-0.859379855890721;
-    Leb_Grid_XYZW[ 548][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 549][0]=-0.503356427107512;
-    Leb_Grid_XYZW[ 549][1]=-0.089992058420749;
-    Leb_Grid_XYZW[ 549][2]=-0.859379855890721;
-    Leb_Grid_XYZW[ 549][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 550][0]= 0.503356427107512;
-    Leb_Grid_XYZW[ 550][1]= 0.859379855890721;
-    Leb_Grid_XYZW[ 550][2]= 0.089992058420749;
-    Leb_Grid_XYZW[ 550][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 551][0]=-0.503356427107512;
-    Leb_Grid_XYZW[ 551][1]= 0.859379855890721;
-    Leb_Grid_XYZW[ 551][2]= 0.089992058420749;
-    Leb_Grid_XYZW[ 551][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 552][0]= 0.503356427107512;
-    Leb_Grid_XYZW[ 552][1]=-0.859379855890721;
-    Leb_Grid_XYZW[ 552][2]= 0.089992058420749;
-    Leb_Grid_XYZW[ 552][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 553][0]=-0.503356427107512;
-    Leb_Grid_XYZW[ 553][1]=-0.859379855890721;
-    Leb_Grid_XYZW[ 553][2]= 0.089992058420749;
-    Leb_Grid_XYZW[ 553][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 554][0]= 0.503356427107512;
-    Leb_Grid_XYZW[ 554][1]= 0.859379855890721;
-    Leb_Grid_XYZW[ 554][2]=-0.089992058420749;
-    Leb_Grid_XYZW[ 554][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 555][0]=-0.503356427107512;
-    Leb_Grid_XYZW[ 555][1]= 0.859379855890721;
-    Leb_Grid_XYZW[ 555][2]=-0.089992058420749;
-    Leb_Grid_XYZW[ 555][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 556][0]= 0.503356427107512;
-    Leb_Grid_XYZW[ 556][1]=-0.859379855890721;
-    Leb_Grid_XYZW[ 556][2]=-0.089992058420749;
-    Leb_Grid_XYZW[ 556][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 557][0]=-0.503356427107512;
-    Leb_Grid_XYZW[ 557][1]=-0.859379855890721;
-    Leb_Grid_XYZW[ 557][2]=-0.089992058420749;
-    Leb_Grid_XYZW[ 557][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 558][0]= 0.089992058420749;
-    Leb_Grid_XYZW[ 558][1]= 0.503356427107512;
-    Leb_Grid_XYZW[ 558][2]= 0.859379855890721;
-    Leb_Grid_XYZW[ 558][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 559][0]=-0.089992058420749;
-    Leb_Grid_XYZW[ 559][1]= 0.503356427107512;
-    Leb_Grid_XYZW[ 559][2]= 0.859379855890721;
-    Leb_Grid_XYZW[ 559][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 560][0]= 0.089992058420749;
-    Leb_Grid_XYZW[ 560][1]=-0.503356427107512;
-    Leb_Grid_XYZW[ 560][2]= 0.859379855890721;
-    Leb_Grid_XYZW[ 560][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 561][0]=-0.089992058420749;
-    Leb_Grid_XYZW[ 561][1]=-0.503356427107512;
-    Leb_Grid_XYZW[ 561][2]= 0.859379855890721;
-    Leb_Grid_XYZW[ 561][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 562][0]= 0.089992058420749;
-    Leb_Grid_XYZW[ 562][1]= 0.503356427107512;
-    Leb_Grid_XYZW[ 562][2]=-0.859379855890721;
-    Leb_Grid_XYZW[ 562][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 563][0]=-0.089992058420749;
-    Leb_Grid_XYZW[ 563][1]= 0.503356427107512;
-    Leb_Grid_XYZW[ 563][2]=-0.859379855890721;
-    Leb_Grid_XYZW[ 563][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 564][0]= 0.089992058420749;
-    Leb_Grid_XYZW[ 564][1]=-0.503356427107512;
-    Leb_Grid_XYZW[ 564][2]=-0.859379855890721;
-    Leb_Grid_XYZW[ 564][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 565][0]=-0.089992058420749;
-    Leb_Grid_XYZW[ 565][1]=-0.503356427107512;
-    Leb_Grid_XYZW[ 565][2]=-0.859379855890721;
-    Leb_Grid_XYZW[ 565][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 566][0]= 0.089992058420749;
-    Leb_Grid_XYZW[ 566][1]= 0.859379855890721;
-    Leb_Grid_XYZW[ 566][2]= 0.503356427107512;
-    Leb_Grid_XYZW[ 566][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 567][0]=-0.089992058420749;
-    Leb_Grid_XYZW[ 567][1]= 0.859379855890721;
-    Leb_Grid_XYZW[ 567][2]= 0.503356427107512;
-    Leb_Grid_XYZW[ 567][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 568][0]= 0.089992058420749;
-    Leb_Grid_XYZW[ 568][1]=-0.859379855890721;
-    Leb_Grid_XYZW[ 568][2]= 0.503356427107512;
-    Leb_Grid_XYZW[ 568][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 569][0]=-0.089992058420749;
-    Leb_Grid_XYZW[ 569][1]=-0.859379855890721;
-    Leb_Grid_XYZW[ 569][2]= 0.503356427107512;
-    Leb_Grid_XYZW[ 569][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 570][0]= 0.089992058420749;
-    Leb_Grid_XYZW[ 570][1]= 0.859379855890721;
-    Leb_Grid_XYZW[ 570][2]=-0.503356427107512;
-    Leb_Grid_XYZW[ 570][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 571][0]=-0.089992058420749;
-    Leb_Grid_XYZW[ 571][1]= 0.859379855890721;
-    Leb_Grid_XYZW[ 571][2]=-0.503356427107512;
-    Leb_Grid_XYZW[ 571][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 572][0]= 0.089992058420749;
-    Leb_Grid_XYZW[ 572][1]=-0.859379855890721;
-    Leb_Grid_XYZW[ 572][2]=-0.503356427107512;
-    Leb_Grid_XYZW[ 572][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 573][0]=-0.089992058420749;
-    Leb_Grid_XYZW[ 573][1]=-0.859379855890721;
-    Leb_Grid_XYZW[ 573][2]=-0.503356427107512;
-    Leb_Grid_XYZW[ 573][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 574][0]= 0.859379855890721;
-    Leb_Grid_XYZW[ 574][1]= 0.503356427107512;
-    Leb_Grid_XYZW[ 574][2]= 0.089992058420749;
-    Leb_Grid_XYZW[ 574][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 575][0]=-0.859379855890721;
-    Leb_Grid_XYZW[ 575][1]= 0.503356427107512;
-    Leb_Grid_XYZW[ 575][2]= 0.089992058420749;
-    Leb_Grid_XYZW[ 575][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 576][0]= 0.859379855890721;
-    Leb_Grid_XYZW[ 576][1]=-0.503356427107512;
-    Leb_Grid_XYZW[ 576][2]= 0.089992058420749;
-    Leb_Grid_XYZW[ 576][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 577][0]=-0.859379855890721;
-    Leb_Grid_XYZW[ 577][1]=-0.503356427107512;
-    Leb_Grid_XYZW[ 577][2]= 0.089992058420749;
-    Leb_Grid_XYZW[ 577][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 578][0]= 0.859379855890721;
-    Leb_Grid_XYZW[ 578][1]= 0.503356427107512;
-    Leb_Grid_XYZW[ 578][2]=-0.089992058420749;
-    Leb_Grid_XYZW[ 578][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 579][0]=-0.859379855890721;
-    Leb_Grid_XYZW[ 579][1]= 0.503356427107512;
-    Leb_Grid_XYZW[ 579][2]=-0.089992058420749;
-    Leb_Grid_XYZW[ 579][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 580][0]= 0.859379855890721;
-    Leb_Grid_XYZW[ 580][1]=-0.503356427107512;
-    Leb_Grid_XYZW[ 580][2]=-0.089992058420749;
-    Leb_Grid_XYZW[ 580][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 581][0]=-0.859379855890721;
-    Leb_Grid_XYZW[ 581][1]=-0.503356427107512;
-    Leb_Grid_XYZW[ 581][2]=-0.089992058420749;
-    Leb_Grid_XYZW[ 581][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 582][0]= 0.859379855890721;
-    Leb_Grid_XYZW[ 582][1]= 0.089992058420749;
-    Leb_Grid_XYZW[ 582][2]= 0.503356427107512;
-    Leb_Grid_XYZW[ 582][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 583][0]=-0.859379855890721;
-    Leb_Grid_XYZW[ 583][1]= 0.089992058420749;
-    Leb_Grid_XYZW[ 583][2]= 0.503356427107512;
-    Leb_Grid_XYZW[ 583][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 584][0]= 0.859379855890721;
-    Leb_Grid_XYZW[ 584][1]=-0.089992058420749;
-    Leb_Grid_XYZW[ 584][2]= 0.503356427107512;
-    Leb_Grid_XYZW[ 584][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 585][0]=-0.859379855890721;
-    Leb_Grid_XYZW[ 585][1]=-0.089992058420749;
-    Leb_Grid_XYZW[ 585][2]= 0.503356427107512;
-    Leb_Grid_XYZW[ 585][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 586][0]= 0.859379855890721;
-    Leb_Grid_XYZW[ 586][1]= 0.089992058420749;
-    Leb_Grid_XYZW[ 586][2]=-0.503356427107512;
-    Leb_Grid_XYZW[ 586][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 587][0]=-0.859379855890721;
-    Leb_Grid_XYZW[ 587][1]= 0.089992058420749;
-    Leb_Grid_XYZW[ 587][2]=-0.503356427107512;
-    Leb_Grid_XYZW[ 587][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 588][0]= 0.859379855890721;
-    Leb_Grid_XYZW[ 588][1]=-0.089992058420749;
-    Leb_Grid_XYZW[ 588][2]=-0.503356427107512;
-    Leb_Grid_XYZW[ 588][3]= 0.001802239128009;
-
-    Leb_Grid_XYZW[ 589][0]=-0.859379855890721;
-    Leb_Grid_XYZW[ 589][1]=-0.089992058420749;
-    Leb_Grid_XYZW[ 589][2]=-0.503356427107512;
-    Leb_Grid_XYZW[ 589][3]= 0.001802239128009;
-
-  }
-
-}
 
 void EH0_TwoCenter(int Gc_AN, int h_AN, double VH0ij[4])
 { 

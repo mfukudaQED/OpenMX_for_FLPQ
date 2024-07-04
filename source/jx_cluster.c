@@ -23,10 +23,11 @@ Log of jx.c:
 // #include <malloc/malloc.h>
 // #include <assert.h>
 
+#include "mpi.h"
+#include <omp.h>
 #include "read_scfout.h"
 #include "lapack_prototypes.h"
 #include "f77func.h"
-#include "mpi.h"
 
 #include "jx.h"
 #include "jx_tools.h"

@@ -16,12 +16,15 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-#include "openmx_common.h"
 #include "mpi.h"
+#include "openmx_common.h"
+#include "lapack_prototypes.h"
 #include <omp.h>
 
 #define  measure_time   0
 
+
+void Eigen_lapack_d(double **a, double *ko, int n, int EVmax);
 
 static double DC_Col(char *mode,
                      int MD_iter,
@@ -550,8 +553,6 @@ static double DC_Col(char *mode,
       Rcv_H_Size[IDR] = 0;
     }
   }
-
-
 
   /***********************************
              data transfer
@@ -1460,7 +1461,7 @@ static double DC_Col(char *mode,
 			  NUM, is2, ie2, myid2, numprocs2,
 			  stat_send, request_send, request_recv );
     }
-	
+
     /* C to H (transposition)
        H consists of column vectors
     */ 

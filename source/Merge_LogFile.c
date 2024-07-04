@@ -44,7 +44,7 @@ void Merge_LogFile(char *file)
 
   if (myid==Host_ID){
 
-    NumFile = 18;
+    NumFile = 22;
 
     sprintf(fexn[0],"UCell");
     sprintf(fexn[1],"TRN");
@@ -55,15 +55,19 @@ void Merge_LogFile(char *file)
     sprintf(fexn[6],"OrbOpt");
     sprintf(fexn[7],"SD");
     sprintf(fexn[8],"MC");
-    sprintf(fexn[9],"OM");
-    sprintf(fexn[10],"VC");
-    sprintf(fexn[11],"DM_onsite");
-    sprintf(fexn[12],"dpm");
-    sprintf(fexn[13],"DecE");
-    sprintf(fexn[14],"crd");
-    sprintf(fexn[15],"frac");
-    sprintf(fexn[16],"wfinfo");
-    sprintf(fexn[17],"CompTime");
+    sprintf(fexn[9],"CWF_Charge");
+    sprintf(fexn[10],"CWF_Energy");
+    sprintf(fexn[11],"OM");
+    sprintf(fexn[12],"VC");
+    sprintf(fexn[13],"DM_onsite");
+    sprintf(fexn[14],"LNAO");
+    sprintf(fexn[15],"LNBO");
+    sprintf(fexn[16],"dpm");
+    sprintf(fexn[17],"DecE");
+    sprintf(fexn[18],"crd");
+    sprintf(fexn[19],"frac");
+    sprintf(fexn[20],"wfinfo");
+    sprintf(fexn[21],"CompTime");
 
     sprintf(fname,"%s%s.out",filepath,filename);
     fp = fopen(fname, "r");   

@@ -12,6 +12,7 @@
  
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <time.h>
 #include <ctype.h>
 #include <string.h>
@@ -86,6 +87,29 @@ void Make_InputFile_with_FinalCoord_Normal(char *file, int MD_iter)
     Atoms_UnitVectors_Unit_flag = 0;
     Atoms_UnitVectors_Velocity_flag = 0;
     NPT_WV_F0_flag = 0;
+
+    /* recalculate rtv */    
+
+    double CellV,tmp[4];
+
+    Cross_Product(tv[2],tv[3],tmp);
+    CellV = Dot_Product(tv[1],tmp); 
+    Cell_Volume = fabs(CellV);
+
+    Cross_Product(tv[2],tv[3],tmp);
+    rtv[1][1] = 2.0*PI*tmp[1]/CellV;
+    rtv[1][2] = 2.0*PI*tmp[2]/CellV;
+    rtv[1][3] = 2.0*PI*tmp[3]/CellV;
+  
+    Cross_Product(tv[3],tv[1],tmp);
+    rtv[2][1] = 2.0*PI*tmp[1]/CellV;
+    rtv[2][2] = 2.0*PI*tmp[2]/CellV;
+    rtv[2][3] = 2.0*PI*tmp[3]/CellV;
+  
+    Cross_Product(tv[1],tv[2],tmp);
+    rtv[3][1] = 2.0*PI*tmp[1]/CellV;
+    rtv[3][2] = 2.0*PI*tmp[2]/CellV;
+    rtv[3][3] = 2.0*PI*tmp[3]/CellV;
  
     /* the new input file */    
 

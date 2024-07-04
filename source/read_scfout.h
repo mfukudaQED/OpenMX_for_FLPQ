@@ -159,6 +159,31 @@ size: iHks[3]
 double *****iHks;
 
 /*******************************************************
+  double *****HVxc;
+  matrix elements of the exchange-correlation potential
+  w.r.t. basis orbitals
+  size: 
+  HVxc
+  [SpinP_switch+1]
+  [atomnum+1]
+  [FNAN[ct_AN]+1]
+  [Total_NumOrbs[ct_AN]]
+  [Total_NumOrbs[h_AN]] 
+
+  The first index in the collinear case means
+  [0]: real part for up-up 
+  [1]: real part for dn-dn
+
+  The first index in the non-collinear case means
+  [0]: real part for up-up 
+  [1]: real part for dn-dn
+  [2]: real part foo up-dn 
+  [3]: imaginary part for up-dn
+  The dn-up part can be deduced from the up-dn part.
+ *******************************************************/
+double *****HVxc;
+
+/*******************************************************
   double ****OLP;
   overlap matrix
 size: OLP[atomnum+1]

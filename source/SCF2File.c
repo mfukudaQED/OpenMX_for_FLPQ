@@ -29,6 +29,8 @@
 static void Output( FILE *fp, char *inputfile, double ******OLPpo, double *****OLPmo );
 static void Calc_OLPpo( double ******OLPpo );
 void Calc_OLPmo( double *****OLPmo );
+static void Calc_HVxc();
+
 
 /* YTL-New-start */
 //static void Calc_OLPpo2(); // the same as Calc_OLPpo(), but the function is declared in openmx_common.h                                                 
@@ -828,7 +830,7 @@ void Output( FILE *fp, char *inputfile, double ******OLPpo, double *****OLPmo )
   if (myid==Host_ID){
     
     /* Added by N. Yamaguchi ***/
-    if (inputfile=='\0') {
+    if (strcmp(inputfile,"\0")==0) {
       return;
     }
     /* ***/
@@ -870,8 +872,267 @@ void Output( FILE *fp, char *inputfile, double ******OLPpo, double *****OLPmo )
     }
   }
 
+  /****************************************************
+                matrix elements of Vxc     
+  ****************************************************/
+
+  Calc_HVxc();
+
+  Tmp_Vec = (double*)malloc(sizeof(double)*List_YOUSO[8]*List_YOUSO[7]*List_YOUSO[7]);
+
+  for (spin=0; spin<=SpinP_switch; spin++){
+    for (Gc_AN=1; Gc_AN<=atomnum; Gc_AN++){
+
+      ID = G2ID[Gc_AN];
+
+      if (myid==ID){
+
+        num = 0;
+
+        Mc_AN = F_G2M[Gc_AN];
+        wan1 = WhatSpecies[Gc_AN];
+        TNO1 = Spe_Total_CNO[wan1];
+        for (h_AN=0; h_AN<=FNAN[Gc_AN]; h_AN++){
+          Gh_AN = natn[Gc_AN][h_AN];
+          wan2 = WhatSpecies[Gh_AN];
+          TNO2 = Spe_Total_CNO[wan2];
+
+	  for (i=0; i<TNO1; i++){
+	    for (j=0; j<TNO2; j++){
+	      Tmp_Vec[num] = H[spin][Mc_AN][h_AN][i][j];
+	      num++;
+	    }
+	  }
+        }
+
+        if (myid!=Host_ID){
+          MPI_Isend(&num, 1, MPI_INT, Host_ID, tag, mpi_comm_level1, &request);
+          MPI_Wait(&request,&stat);
+          MPI_Isend(&Tmp_Vec[0], num, MPI_DOUBLE, Host_ID, tag, mpi_comm_level1, &request);
+          MPI_Wait(&request,&stat);
+	}
+        else{
+          fwrite(Tmp_Vec, sizeof(double), num, fp);
+        }
+      }
+
+      else if (ID!=myid && myid==Host_ID){
+        MPI_Recv(&num, 1, MPI_INT, ID, tag, mpi_comm_level1, &stat);
+        MPI_Recv(&Tmp_Vec[0], num, MPI_DOUBLE, ID, tag, mpi_comm_level1, &stat);
+        fwrite(Tmp_Vec, sizeof(double), num, fp);
+      }
+    }
+  }
+
+  free(Tmp_Vec);
+
 }
 
+
+
+void Calc_HVxc()
+{
+  int Mc_AN,Gc_AN,Mh_AN,h_AN,Gh_AN,spin;
+  int i,j,k,Cwan,Hwan,NO0,NO1,spinmax,Nc,Nh,Nog;
+  int Ng1,Ng2,Ng3,n,DN,BN;
+  double tmp0;
+  double ***ChiVxc;
+  double **tmp_ChiVxc;
+  double *tmp_Orbs_Grid;
+  double ***tmp_HVxc;
+  int numprocs,myid,tag=999,ID;
+
+  MPI_Comm_size(mpi_comm_level1,&numprocs);
+  MPI_Comm_rank(mpi_comm_level1,&myid);
+  MPI_Barrier(mpi_comm_level1);
+
+  /****************************************************
+    allocation of arrays:
+  ****************************************************/
+
+  ChiVxc = (double***)malloc(sizeof(double**)*4);
+  for (i=0; i<4; i++){
+    ChiVxc[i] = (double**)malloc(sizeof(double*)*List_YOUSO[7]);
+    for (j=0; j<List_YOUSO[7]; j++){
+      ChiVxc[i][j] = (double*)malloc(sizeof(double)*List_YOUSO[11]);
+    }
+  }
+
+  tmp_ChiVxc = (double**)malloc(sizeof(double*)*4);
+  for (i=0; i<4; i++){
+    tmp_ChiVxc[i] = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+  }
+
+  tmp_Orbs_Grid = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+
+  tmp_HVxc = (double***)malloc(sizeof(double**)*4);
+  for (i=0; i<4; i++){
+    tmp_HVxc[i] = (double**)malloc(sizeof(double*)*List_YOUSO[7]);
+    for (j=0; j<List_YOUSO[7]; j++){
+      tmp_HVxc[i][j] = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+    }
+  }
+
+  /****************************************************
+                       Vxc on grid
+  ****************************************************/
+
+  Set_XC_Grid(2,1,XC_switch,
+              Density_Grid_D[0],Density_Grid_D[1],
+              Density_Grid_D[2],Density_Grid_D[3],
+              Vxc_Grid_D[0], Vxc_Grid_D[1],
+	      Vxc_Grid_D[2], Vxc_Grid_D[3],
+              NULL,NULL);
+
+  /****************************************************
+             copy Vxc_Grid_D to Vxc_Grid_B
+  ****************************************************/
+
+  Ng1 = Max_Grid_Index_D[1] - Min_Grid_Index_D[1] + 1;
+  Ng2 = Max_Grid_Index_D[2] - Min_Grid_Index_D[2] + 1;
+  Ng3 = Max_Grid_Index_D[3] - Min_Grid_Index_D[3] + 1;
+
+  for (n=0; n<Num_Rcv_Grid_B2D[myid]; n++){
+    DN = Index_Rcv_Grid_B2D[myid][n];
+    BN = Index_Snd_Grid_B2D[myid][n];
+
+    i = DN/(Ng2*Ng3);
+    j = (DN-i*Ng2*Ng3)/Ng3;
+    k = DN - i*Ng2*Ng3 - j*Ng3; 
+
+    if ( !(i<=1 || (Ng1-2)<=i || j<=1 || (Ng2-2)<=j || k<=1 || (Ng3-2)<=k)){
+      for (spin=0; spin<=SpinP_switch; spin++){
+        Vxc_Grid_B[spin][BN] = Vxc_Grid_D[spin][DN];
+      }
+    }
+  }
+
+  /****************************************************
+             copy Vxc_Grid_B to Vxc_Grid
+  ****************************************************/
+
+  Data_Grid_Copy_B2C_2( Vxc_Grid_B, Vxc_Grid );
+
+  /*****************************************************
+         calculation of matrix elements of Vxc
+  *****************************************************/
+
+
+  for (Mc_AN=1; Mc_AN<=Matomnum; Mc_AN++){
+
+    Gc_AN = M2G[Mc_AN];    
+    Cwan = WhatSpecies[Gc_AN];
+    NO0 = Spe_Total_CNO[Cwan];
+
+    for (spin=0; spin<=SpinP_switch; spin++){
+      for (i=0; i<NO0; i++){
+	for (Nc=0; Nc<GridN_Atom[Gc_AN]; Nc++){
+	  k = MGridListAtom[Mc_AN][Nc];
+	  ChiVxc[spin][i][Nc] = Orbs_Grid[Mc_AN][Nc][i]*Vxc_Grid[spin][k];
+	}
+      }
+    }
+    
+    for (h_AN=0; h_AN<=FNAN[Gc_AN]; h_AN++){
+
+      Gh_AN = natn[Gc_AN][h_AN];
+      Mh_AN = F_G2M[Gh_AN];
+
+      Hwan = WhatSpecies[Gh_AN];
+      NO1 = Spe_Total_CNO[Hwan];
+
+      /* initialize */
+
+      for (spin=0; spin<=SpinP_switch; spin++){
+	for (i=0; i<NO0; i++){
+	  for (j=0; j<NO1; j++){
+	    tmp_HVxc[spin][i][j] = 0.0;
+	  }
+	}
+      }
+
+      /* summation of non-zero elements */
+
+      for (Nog=0; Nog<NumOLG[Mc_AN][h_AN]; Nog++){
+
+        Nc = GListTAtoms1[Mc_AN][h_AN][Nog];
+        Nh = GListTAtoms2[Mc_AN][h_AN][Nog];
+
+        /* store ChiVxc into tmp_ChiVxc */
+
+        for (spin=0; spin<=SpinP_switch; spin++){
+          for (i=0; i<NO0; i++){
+            tmp_ChiVxc[spin][i] = ChiVxc[spin][i][Nc];
+	  }
+	}
+
+        /* store Orbs_Grid in tmp_Orbs_Grid */
+
+        if (G2ID[Gh_AN]==myid){
+	  for (j=0; j<NO1; j++){
+	    tmp_Orbs_Grid[j] = Orbs_Grid[Mh_AN][Nh][j];
+	  }
+	}
+        else{
+	  for (j=0; j<NO1; j++){
+	    tmp_Orbs_Grid[j] = Orbs_Grid_FNAN[Mc_AN][h_AN][Nog][j];
+	  }
+        }
+
+        /* integration */
+
+        for (spin=0; spin<=SpinP_switch; spin++){
+	  for (i=0; i<NO0; i++){
+	    tmp0 = tmp_ChiVxc[spin][i]; 
+	    for (j=0; j<NO1; j++){
+	      tmp_HVxc[spin][i][j] += tmp0*tmp_Orbs_Grid[j];
+	    }
+	  }
+	}
+
+      }
+
+      /* HVxc */
+
+      for (spin=0; spin<=SpinP_switch; spin++){
+	for (i=0; i<NO0; i++){
+	  for (j=0; j<NO1; j++){
+            /* H is temporary used for storing HVxc. */   
+	    H[spin][Mc_AN][h_AN][i][j] = tmp_HVxc[spin][i][j]*GridVol;
+	  }
+	}
+      }
+
+    }
+  }
+  
+  /****************************************************
+    freeing of arrays:
+  ****************************************************/
+
+  for (i=0; i<4; i++){
+    for (j=0; j<List_YOUSO[7]; j++){
+      free(ChiVxc[i][j]);
+    }
+    free(ChiVxc[i]);
+  }
+  free(ChiVxc);
+
+  for (i=0; i<4; i++){
+    free(tmp_ChiVxc[i]);
+  }
+  free(tmp_ChiVxc);
+
+  free(tmp_Orbs_Grid);
+
+  for (i=0; i<4; i++){
+    for (j=0; j<List_YOUSO[7]; j++){
+      free(tmp_HVxc[i][j]);
+    }
+    free(tmp_HVxc[i]);
+  }
+  free(tmp_HVxc);
+}
 
 
 
@@ -1447,9 +1708,9 @@ void Calc_OLPpo2()
         y = Cxyz[2] + atv[GRc][2] - Gxyz[Gc_AN][2]; 
         z = Cxyz[3] + atv[GRc][3] - Gxyz[Gc_AN][3];
 
-  ChiVx[i][Nc] = x*Orbs_Grid[Mc_AN][Nc][i]; /* AITUNE */
-  ChiVy[i][Nc] = y*Orbs_Grid[Mc_AN][Nc][i]; /* AITUNE */
-  ChiVz[i][Nc] = z*Orbs_Grid[Mc_AN][Nc][i]; /* AITUNE */
+	ChiVx[i][Nc] = x*Orbs_Grid[Mc_AN][Nc][i]; /* AITUNE */
+	ChiVy[i][Nc] = y*Orbs_Grid[Mc_AN][Nc][i]; /* AITUNE */
+	ChiVz[i][Nc] = z*Orbs_Grid[Mc_AN][Nc][i]; /* AITUNE */
       }
     }
     
@@ -1465,11 +1726,11 @@ void Calc_OLPpo2()
       /* initialize */
 
       for (i=0; i<NO0; i++){
-  for (j=0; j<NO1; j++){
-    tmp_OLPpox[i][j] = 0.0;
-    tmp_OLPpoy[i][j] = 0.0;
-    tmp_OLPpoz[i][j] = 0.0;
-  }
+	for (j=0; j<NO1; j++){
+	  tmp_OLPpox[i][j] = 0.0;
+	  tmp_OLPpoy[i][j] = 0.0;
+	  tmp_OLPpoz[i][j] = 0.0;
+	}
       }
 
       /* summation of non-zero elements */
@@ -1485,19 +1746,19 @@ void Calc_OLPpo2()
           tmp_ChiVx[i] = ChiVx[i][Nc];
           tmp_ChiVy[i] = ChiVy[i][Nc];
           tmp_ChiVz[i] = ChiVz[i][Nc];
-  }
+	}
 
         /* store Orbs_Grid in tmp_Orbs_Grid */
 
         if (G2ID[Gh_AN]==myid){
-    for (j=0; j<NO1; j++){
-      tmp_Orbs_Grid[j] = Orbs_Grid[Mh_AN][Nh][j];/* AITUNE */
-    }
-  }
+	  for (j=0; j<NO1; j++){
+	    tmp_Orbs_Grid[j] = Orbs_Grid[Mh_AN][Nh][j];/* AITUNE */
+	  }
+	}
         else{
-    for (j=0; j<NO1; j++){
-      tmp_Orbs_Grid[j] = Orbs_Grid_FNAN[Mc_AN][h_AN][Nog][j];/* AITUNE */ 
-    }
+	  for (j=0; j<NO1; j++){
+	    tmp_Orbs_Grid[j] = Orbs_Grid_FNAN[Mc_AN][h_AN][Nog][j];/* AITUNE */ 
+	  }
         }
 
         /* integration */
@@ -1510,8 +1771,8 @@ void Calc_OLPpo2()
             tmp_OLPpox[i][j] += tmpx*tmp_Orbs_Grid[j];
             tmp_OLPpoy[i][j] += tmpy*tmp_Orbs_Grid[j];
             tmp_OLPpoz[i][j] += tmpz*tmp_Orbs_Grid[j];
-    }
-  }
+	  }
+	}
       }
 
       /* OLPpox,y,z */

@@ -1,0 +1,6 @@
+*.o
+*.mod
+make.log
+openmx
+source_intelmpi/
+source_old/

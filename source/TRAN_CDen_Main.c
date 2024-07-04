@@ -3,6 +3,7 @@
 #include <math.h>
 #include <fftw3.h> 
 #include <mpi.h>
+#include <unistd.h>
 #include "openmx_common.h"
 #include "lapack_prototypes.h"
 #include "tran_prototypes.h"

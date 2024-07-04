@@ -6,7 +6,7 @@
 #define S3J_0		1e-10
 #define S3J_MAX_FACT	40
 
-#define S3J_EQUAL(a,b)		(fabs((a)-(b))<S3J_0)
+#define S3J_EQUAL(a,b)		(fabs((double)(a)-(double)(b))<S3J_0)
 #define S3J_MAX(a,b,c,ris)	(((a)>(b)?(ris=(a)):(ris=(b)))>(c)?ris:(ris=(c)))
 #define S3J_MIN(a,b,c,ris)	(((a)<(b)?(ris=(a)):(ris=(b)))<(c)?ris:(ris=(c)))
 

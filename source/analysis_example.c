@@ -91,8 +91,8 @@ int main(int argc, char *argv[])
              For SpinP_switch=0 or 1, the matrix elements are given by 
 
              up-up:       Hks[0]
-             up-down:     Hks[2]
-             down-up:     Hks[2]
+             up-down:     zero 
+             down-up:     zero
              down-down:   Hks[1]
 
              For SpinP_switch=3, the matrix elements are given by 
@@ -512,7 +512,7 @@ int main(int argc, char *argv[])
   ***********************************************************************/
 
   for (spin=0; spin<=SpinP_switch; spin++){
-    printf("\n\nDensity matrix spin=%i\n",spin);
+    printf("\n\nreal density matrix spin=%i\n",spin);
     for (ct_AN=1; ct_AN<=atomnum; ct_AN++){
       TNO1 = Total_NumOrbs[ct_AN];
       for (h_AN=0; h_AN<=FNAN[ct_AN]; h_AN++){
@@ -581,7 +581,7 @@ int main(int argc, char *argv[])
   ***********************************************************************/
 
   for (spin=0; spin<2; spin++){
-    printf("\n\nDensity matrix spin=%i\n",spin);
+    printf("\n\nimaginary density matrix spin=%i\n",spin);
     for (ct_AN=1; ct_AN<=atomnum; ct_AN++){
       TNO1 = Total_NumOrbs[ct_AN];
       for (h_AN=0; h_AN<=FNAN[ct_AN]; h_AN++){
@@ -595,6 +595,83 @@ int main(int argc, char *argv[])
         for (i=0; i<TNO1; i++){
           for (j=0; j<TNO2; j++){
             printf("%10.7f ",iDM[spin][ct_AN][h_AN][i][j]); 
+	  }
+          printf("\n");
+	}
+      }
+    }
+  }
+
+  /**********************************************************************
+   Example 9:
+
+   Print matrix elements for Vxc
+
+      HVxc[spin][ct_AN][h_AN][i][j]
+
+      spin:  spin=0, real part for up-up
+             spin=1, real part for down-down 
+             spin=2, real part for up-down
+             spin=3, imaginary part for up-down
+
+             For SpinP_switch=0, spin=0 is taken into account.
+             For SpinP_switch=1, spin=0,1 are taken into account.
+             For SpinP_switch=3, spin=0,1 2,3 are taken into account.
+
+             For SpinP_switch=0 or 1, the matrix elements are given by 
+
+             up-up:       HVxc[0]
+             up-down:     zero
+             down-up:     zero
+             down-down:   HVxc[1]
+
+             For SpinP_switch=3, the matrix elements are given by 
+
+             up-up:       HVxc[0]
+             up-down:     HVxc[2] + I*HVxc[3]
+             down-up:     HVxc[2] - I*HVxc[3]
+             down-down:   HVxc[1]
+
+      ct_AN: global index of atoms
+      h_AN   local index of neighbouring atoms for the atom ct_AN
+      i:     orbital index in the atom ct_AN
+      j:     orbital index in the atom h_AN
+
+   NOTE: 
+
+      For instance, if the basis specification of the atom ct_AN is s2p2,
+      then the obital index runs in order of
+                    s, s', px, py, pz, px', py', pz'
+
+      Transformation of the local index h_AN to the global index Gh_AN
+      is made as
+
+                       Gh_AN = natn[ct_AN][h_AN];
+
+      Also, the cell index is given by
+
+                       Rn = ncn[ct_AN][h_AN];
+      
+      Each component l, m, or n (Rn = l*a + m*b + n*c) are given by
+   
+                       l = atv_ijk[Rn][1];
+                       m = atv_ijk[Rn][2];
+                       n = atv_ijk[Rn][3];
+  ***********************************************************************/
+
+  for (spin=0; spin<=SpinP_switch; spin++){
+    printf("\n\nmatrix elements for Vxc spin=%i\n",spin);
+    for (ct_AN=1; ct_AN<=atomnum; ct_AN++){
+      TNO1 = Total_NumOrbs[ct_AN];
+      for (h_AN=0; h_AN<=FNAN[ct_AN]; h_AN++){
+        Gh_AN = natn[ct_AN][h_AN];
+        Rn = ncn[ct_AN][h_AN];
+        TNO2 = Total_NumOrbs[Gh_AN];
+        printf("global index=%i  local index=%i (global=%i, Rn=%i)\n",
+                ct_AN,h_AN,Gh_AN,Rn);
+        for (i=0; i<TNO1; i++){
+          for (j=0; j<TNO2; j++){
+            printf("%10.7f ",HVxc[spin][ct_AN][h_AN][i][j]); 
 	  }
           printf("\n");
 	}

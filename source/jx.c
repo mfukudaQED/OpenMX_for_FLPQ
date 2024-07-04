@@ -23,9 +23,10 @@ Log of jx.c:
 //#include <malloc/malloc.h>
 //#include <assert.h>
 
+#include "mpi.h"
+#include <omp.h>
 #include "lapack_prototypes.h"
 #include "f77func.h"
-#include "mpi.h"
 
 #include "read_scfout.h"
 #include "jx_LNO.h"
@@ -37,6 +38,8 @@ Log of jx.c:
 //#include "jx_minimal_basis.h"
 
 #define Host_ID       0         /* ID of the host CPU in MPI */
+
+void read_scfout(char *argv[]);
 
 int main(int argc, char *argv[])
 {

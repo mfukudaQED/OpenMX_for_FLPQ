@@ -25,6 +25,7 @@
 #include "tran_prototypes.h"
 #include "tran_variables.h"
 #include "openmx_common.h"
+#include "lapack_prototypes.h"
 
 static void TRAN_Add_MAT(
     int mode,
@@ -35,44 +36,44 @@ static void TRAN_Add_MAT(
     );
 
 static double TRAN_DFT_Original(
-                /* input */
+		/* input */
                 MPI_Comm comm1,
                 int level_stdout,
-                int iter, 
-                int SpinP_switch,
-                double *****nh,    /* H */
-                double *****ImNL,  /* SO coupling */
-                double ****CntOLP, 
-                int atomnum,
-                int Matomnum,
-                int *WhatSpecies,
-                int *Spe_Total_CNO,
-                int *FNAN,
-                int **natn, 
-                int **ncn,
-                int *M2G, 
-                int *G2ID,
+		int iter, 
+		int SpinP_switch,
+		double *****nh,    /* H */
+		double *****ImNL,  /* SO coupling */
+		double ****CntOLP, 
+		int atomnum,
+		int Matomnum,
+		int *WhatSpecies,
+		int *Spe_Total_CNO,
+		int *FNAN,
+		int **natn, 
+		int **ncn,
+		int *M2G, 
+		int *G2ID,
                 int *F_G2M, 
-                int **atv_ijk,
-                int *List_YOUSO,
-                /* output */
-                double *****CDM,  /* output, density matrix */
+		int **atv_ijk,
+		int *List_YOUSO,
+		/* output */
+		double *****CDM,  /* output, density matrix */
                 double *****iCDM,
-                double *****EDM,  /* not used */
+		double *****EDM,  /* not used */
                 double ***TRAN_DecMulP, /* output, partial DecMulP */
-                double Eele0[2], double Eele1[2], 
+		double Eele0[2], double Eele1[2], 
                 double ChemP_e0[2]); 
 
 
 static void TRAN_DFT_Kdependent(
-                          /* input */
-                          MPI_Comm comm1,
+			  /* input */
+			  MPI_Comm comm1,
                           int parallel_mode,
                           int numprocs,
                           int myid,
-                          int level_stdout,
-                          int iter,
-                          int SpinP_switch,
+			  int level_stdout,
+			  int iter,
+			  int SpinP_switch,
                           double k2,
                           double k3,
                           int k_op,
@@ -82,57 +83,57 @@ static void TRAN_DFT_Kdependent(
                           double **H1,
                           double **H2,
                           double *S1,
-                          double *****nh,   /* H */
-                          double *****ImNL, /* SO coupling */
-                          double ****CntOLP, 
-                          int atomnum,
-                          int Matomnum,
-                          int *WhatSpecies,
-                          int *Spe_Total_CNO,
-                          int *FNAN,
-                          int **natn, 
-                          int **ncn,
-                          int *M2G, 
-                          int *G2ID, 
-                          int **atv_ijk,
-                          int *List_YOUSO,
-                          /* output */
-                          double *****CDM,  /* output, charge density */
-                          double *****EDM,  /* not used */
-                          double Eele0[2], double Eele1[2]); /* not used */
+			  double *****nh,   /* H */
+			  double *****ImNL, /* SO coupling */
+			  double ****CntOLP, 
+			  int atomnum,
+			  int Matomnum,
+			  int *WhatSpecies,
+			  int *Spe_Total_CNO,
+			  int *FNAN,
+			  int **natn, 
+			  int **ncn,
+			  int *M2G, 
+			  int *G2ID, 
+			  int **atv_ijk,
+			  int *List_YOUSO,
+			  /* output */
+			  double *****CDM,  /* output, charge density */
+			  double *****EDM,  /* not used */
+			  double Eele0[2], double Eele1[2]); /* not used */
 
 
 
 double TRAN_DFT_NC(
-                /* input */
+		/* input */
                 MPI_Comm comm1,
                 int SucceedReadingDMfile, 
                 int level_stdout,
-                int iter, 
-                int SpinP_switch,
-                double *****nh,   /* H */
-                double *****ImNL, /* SO coupling */
-                double ****CntOLP, 
-                int atomnum,
-                int Matomnum,
-                int *WhatSpecies,
-                int *Spe_Total_CNO,
-                int *FNAN,
-                int **natn, 
-                int **ncn,
-                int *M2G, 
-                int *G2ID,
+		int iter, 
+		int SpinP_switch,
+		double *****nh,   /* H */
+		double *****ImNL, /* SO coupling */
+		double ****CntOLP, 
+		int atomnum,
+		int Matomnum,
+		int *WhatSpecies,
+		int *Spe_Total_CNO,
+		int *FNAN,
+		int **natn, 
+		int **ncn,
+		int *M2G, 
+		int *G2ID,
                 int *F_G2M, 
-                int **atv_ijk,
-                int *List_YOUSO,
+		int **atv_ijk,
+		int *List_YOUSO,
                 double *koS,
                 dcomplex **S,
-                /* output */
-                double *****CDM,  /* output, density matrix */
+		/* output */
+		double *****CDM,  /* output, density matrix */
                 double *****iCDM,
-                double *****EDM,  /* not used */
+		double *****EDM,  /* not used */
                 double ***TRAN_DecMulP, /* output, partial DecMulP */
-                double Eele0[2], double Eele1[2], 
+		double Eele0[2], double Eele1[2], 
                 double ChemP_e0[2]) 
 {
   double TStime,TEtime,time5;
@@ -146,31 +147,31 @@ double TRAN_DFT_NC(
   if (TRAN_SCF_Iter_Band<iter || SucceedReadingDMfile==1){ 
 
     TRAN_DFT_Original( comm1,
-                       level_stdout,
-                       iter, 
-                       SpinP_switch,
-                       nh,   /* H */
-                       ImNL, /* SO coupling */
-                       CntOLP, 
-                       atomnum,
-                       Matomnum,
-                       WhatSpecies,
-                       Spe_Total_CNO,
-                       FNAN,
-                       natn, 
-                       ncn,
-                       M2G, 
-                       G2ID,
-                       F_G2M, 
-                       atv_ijk,
-                       List_YOUSO,
-                       /* output */
-                       CDM,  /* output, density matrix */
+		       level_stdout,
+		       iter, 
+		       SpinP_switch,
+		       nh,   /* H */
+		       ImNL, /* SO coupling */
+		       CntOLP, 
+		       atomnum,
+		       Matomnum,
+		       WhatSpecies,
+		       Spe_Total_CNO,
+		       FNAN,
+		       natn, 
+		       ncn,
+		       M2G, 
+		       G2ID,
+		       F_G2M, 
+		       atv_ijk,
+		       List_YOUSO,
+		       /* output */
+		       CDM,  /* output, density matrix */
                        iCDM,
-                       EDM,  /* not used */
-                       TRAN_DecMulP, /* output, partial DecMulP */
-                       Eele0, Eele1, 
-                       ChemP_e0); 
+		       EDM,  /* not used */
+		       TRAN_DecMulP, /* output, partial DecMulP */
+		       Eele0, Eele1, 
+		       ChemP_e0); 
   }
 
   /*************************************************************
@@ -252,35 +253,35 @@ double TRAN_DFT_NC(
     for (i=0;i<Kspace_grid1; i++) {
       k_op[i] = (int**)malloc(sizeof(int*)*Kspace_grid2);
       for (j=0;j<Kspace_grid2; j++) {
-        k_op[i][j] = (int*)malloc(sizeof(int)*Kspace_grid3);
+	k_op[i][j] = (int*)malloc(sizeof(int)*Kspace_grid3);
       }
     }
 
     for (i=0; i<Kspace_grid1; i++) {
       for (j=0; j<Kspace_grid2; j++) {
-        for (k=0; k<Kspace_grid3; k++) {
-          k_op[i][j][k] = -999;
-        }
+	for (k=0; k<Kspace_grid3; k++) {
+	  k_op[i][j][k] = -999;
+	}
       }
     }
 
     for (i=0; i<Kspace_grid1; i++) {
       for (j=0; j<Kspace_grid2; j++) {
-        for (k=0; k<Kspace_grid3; k++) {
+	for (k=0; k<Kspace_grid3; k++) {
 
-          if ( k_op[i][j][k]==-999 ) {
+	  if ( k_op[i][j][k]==-999 ) {
 
-            k_inversion(i,j,k,Kspace_grid1,Kspace_grid2,Kspace_grid3,&ii,&ij,&ik);
+	    k_inversion(i,j,k,Kspace_grid1,Kspace_grid2,Kspace_grid3,&ii,&ij,&ik);
 
-            if ( i==ii && j==ij && k==ik ) {
-              k_op[i][j][k]    = 1;
-            }
-            else {
-              k_op[i][j][k]    = 1;
-              k_op[ii][ij][ik] = 1;
-            }
-          }
-        } /* k */
+	    if ( i==ii && j==ij && k==ik ) {
+	      k_op[i][j][k]    = 1;
+	    }
+	    else {
+	      k_op[i][j][k]    = 1;
+	      k_op[ii][ij][ik] = 1;
+	    }
+	  }
+	} /* k */
       } /* j */
     } /* i */
   
@@ -289,11 +290,11 @@ double TRAN_DFT_NC(
     T_knum = 0;
     for (i=0; i<Kspace_grid1; i++) {
       for (j=0; j<Kspace_grid2; j++) {
-        for (k=0; k<Kspace_grid3; k++) {
-          if (0<k_op[i][j][k]){
-            T_knum++;
-          }
-        }
+	for (k=0; k<Kspace_grid3; k++) {
+	  if (0<k_op[i][j][k]){
+	    T_knum++;
+	  }
+	}
       }
     }
 
@@ -311,8 +312,8 @@ double TRAN_DFT_NC(
     for (i=0; i<spinmax; i++){
       EIGEN_Band[i] = (double**)malloc(sizeof(double*)*T_knum);
       for (j=0; j<T_knum; j++){
-        EIGEN_Band[i][j] = (double*)malloc(sizeof(double)*(n2+1));
-        for (k=0; k<(n+1); k++) EIGEN_Band[i][j][k] = 1.0e+5;
+	EIGEN_Band[i][j] = (double*)malloc(sizeof(double)*(n2+1));
+	for (k=0; k<(n+1); k++) EIGEN_Band[i][j][k] = 1.0e+5;
       }
     }
 
@@ -329,7 +330,7 @@ double TRAN_DFT_NC(
     MPI_CommWD1 = (MPI_Comm*)malloc(sizeof(MPI_Comm)*Num_Comm_World1);
 
     Make_Comm_Worlds(mpi_comm_level1, myid0, numprocs0, Num_Comm_World1, &myworld1, MPI_CommWD1, 
-                     NPROCS_ID1, Comm_World1, NPROCS_WD1, Comm_World_StartID1);
+		     NPROCS_ID1, Comm_World1, NPROCS_WD1, Comm_World_StartID1);
 
     MPI_Comm_size(MPI_CommWD1[myworld1],&numprocs1);
     MPI_Comm_rank(MPI_CommWD1[myworld1],&myid1);
@@ -350,8 +351,8 @@ double TRAN_DFT_NC(
     MPI_CommWD2 = (MPI_Comm*)malloc(sizeof(MPI_Comm)*Num_Comm_World2);
 
     Make_Comm_Worlds(MPI_CommWD1[myworld1], myid1, numprocs1, Num_Comm_World2, 
-                     &myworld2, MPI_CommWD2, NPROCS_ID2, Comm_World2, 
-                     NPROCS_WD2, Comm_World_StartID2);
+		     &myworld2, MPI_CommWD2, NPROCS_ID2, Comm_World2, 
+		     NPROCS_WD2, Comm_World_StartID2);
 
     MPI_Comm_size(MPI_CommWD2[myworld2],&numprocs2);
     MPI_Comm_rank(MPI_CommWD2[myworld2],&myid2);
@@ -402,7 +403,7 @@ double TRAN_DFT_NC(
     bhandle2 = Csys2blacs_handle(MPI_CommWD2[myworld2]);
     ictxt2 = bhandle2;
     Cblacs_gridinit(&ictxt2, "Row", np_rows, np_cols);
-        
+	
     Ss_Cx = (dcomplex*)malloc(sizeof(dcomplex)*na_rows*na_cols);
     Hs_Cx = (dcomplex*)malloc(sizeof(dcomplex)*na_rows*na_cols);
 
@@ -466,28 +467,28 @@ double TRAN_DFT_NC(
     ***********************************************/
 
     time5 += Band_DFT_NonCol(1,
-                             Kspace_grid1,Kspace_grid2,Kspace_grid3,
-                             SpinP_switch,H,iHNL,OLP[0],DM[0],EDM,Eele0,Eele1, 
-                             MP,order_GA,ko_noncol,koS,EIGEN_Band,
-                             H1,S1,
-                             rHs11_Cx,rHs22_Cx,rHs12_Cx,iHs11_Cx,iHs22_Cx,iHs12_Cx,
-                             EVec1_Cx,
-                             Ss_Cx,Cs_Cx,Hs_Cx,
-                             Ss2_Cx,Cs2_Cx,Hs2_Cx,
-                             k_op,T_k_op,T_k_ID,
-                             T_KGrids1,T_KGrids2,T_KGrids3,
-                             myworld1,
-                             NPROCS_ID1,
-                             Comm_World1,
-                             NPROCS_WD1,
-                             Comm_World_StartID1,
-                             MPI_CommWD1,
-                             myworld2,
-                             NPROCS_ID2,
-                             NPROCS_WD2,
-                             Comm_World2,
-                             Comm_World_StartID2,
-                             MPI_CommWD2);
+			     Kspace_grid1,Kspace_grid2,Kspace_grid3,
+			     SpinP_switch,H,iHNL,OLP[0],DM[0],EDM,Eele0,Eele1, 
+			     MP,order_GA,ko_noncol,koS,EIGEN_Band,
+			     H1,S1,
+			     rHs11_Cx,rHs22_Cx,rHs12_Cx,iHs11_Cx,iHs22_Cx,iHs12_Cx,
+			     EVec1_Cx,
+			     Ss_Cx,Cs_Cx,Hs_Cx,
+			     Ss2_Cx,Cs2_Cx,Hs2_Cx,
+			     k_op,T_k_op,T_k_ID,
+			     T_KGrids1,T_KGrids2,T_KGrids3,
+			     myworld1,
+			     NPROCS_ID1,
+			     Comm_World1,
+			     NPROCS_WD1,
+			     Comm_World_StartID1,
+			     MPI_CommWD1,
+			     myworld2,
+			     NPROCS_ID2,
+			     NPROCS_WD2,
+			     Comm_World2,
+			     Comm_World_StartID2,
+			     MPI_CommWD2);
 
 
     Eele0[0] = 0.0;
@@ -527,7 +528,7 @@ double TRAN_DFT_NC(
 
     for (i=0;i<Kspace_grid1; i++) {
       for (j=0;j<Kspace_grid2; j++) {
-        free(k_op[i][j]);
+	free(k_op[i][j]);
       }
       free(k_op[i]);
     }
@@ -545,7 +546,7 @@ double TRAN_DFT_NC(
 
     for (i=0; i<spinmax; i++){
       for (j=0; j<T_knum; j++){
-        free(EIGEN_Band[i][j]);
+	free(EIGEN_Band[i][j]);
       }
       free(EIGEN_Band[i]);
     }
@@ -623,32 +624,32 @@ double TRAN_DFT_NC(
 
 
 double TRAN_DFT_Original(
-                /* input */
+		/* input */
                 MPI_Comm comm1,
                 int level_stdout,
-                int iter, 
-                int SpinP_switch,
-                double *****nh,   /* H */
-                double *****ImNL, /* SO coupling */
-                double ****CntOLP, 
-                int atomnum,
-                int Matomnum,
-                int *WhatSpecies,
-                int *Spe_Total_CNO,
-                int *FNAN,
-                int **natn, 
-                int **ncn,
-                int *M2G, 
-                int *G2ID,
+		int iter, 
+		int SpinP_switch,
+		double *****nh,   /* H */
+		double *****ImNL, /* SO coupling */
+		double ****CntOLP, 
+		int atomnum,
+		int Matomnum,
+		int *WhatSpecies,
+		int *Spe_Total_CNO,
+		int *FNAN,
+		int **natn, 
+		int **ncn,
+		int *M2G, 
+		int *G2ID,
                 int *F_G2M, 
-                int **atv_ijk,
-                int *List_YOUSO,
-                /* output */
-                double *****CDM,  /* output, density matrix */
+		int **atv_ijk,
+		int *List_YOUSO,
+		/* output */
+		double *****CDM,  /* output, density matrix */
                 double *****iCDM,
-                double *****EDM,  /* not used */
+		double *****EDM,  /* not used */
                 double ***TRAN_DecMulP, /* output, partial DecMulP */
-                double Eele0[2], double Eele1[2], 
+		double Eele0[2], double Eele1[2], 
                 double ChemP_e0[2]) 
 {
   int numprocs0,myid0,ID;
@@ -708,17 +709,17 @@ double TRAN_DFT_Original(
       wanA = WhatSpecies[GA_AN];
       tnoA = Spe_Total_CNO[wanA];
       for (LB_AN=0; LB_AN<=FNAN[GA_AN]; LB_AN++){
-        GB_AN = natn[GA_AN][LB_AN];
-        wanB = WhatSpecies[GB_AN];
-        tnoB = Spe_Total_CNO[wanB];
-        for (i=0; i<tnoA; i++){
-          for (j=0; j<tnoB; j++){
-            CDM[spin][MA_AN][LB_AN][i][j] = 0.0;
+	GB_AN = natn[GA_AN][LB_AN];
+	wanB = WhatSpecies[GB_AN];
+	tnoB = Spe_Total_CNO[wanB];
+	for (i=0; i<tnoA; i++){
+	  for (j=0; j<tnoB; j++){
+	    CDM[spin][MA_AN][LB_AN][i][j] = 0.0;
             if(spin<2) {
              iCDM[spin][MA_AN][LB_AN][i][j] = 0.0;
             }
-          }
-        }
+	  }
+	}
      } 
     }
   }
@@ -847,7 +848,7 @@ double TRAN_DFT_Original(
     MPI_CommWD1 = (MPI_Comm*)malloc(sizeof(MPI_Comm)*Num_Comm_World1);
 
     Make_Comm_Worlds(comm1, myid0, numprocs0, Num_Comm_World1, &myworld1, MPI_CommWD1, 
-                     NPROCS_ID1, Comm_World1, NPROCS_WD1, Comm_World_StartID1);
+		     NPROCS_ID1, Comm_World1, NPROCS_WD1, Comm_World_StartID1);
 
     MPI_Comm_size(MPI_CommWD1[myworld1],&numprocs1);
     MPI_Comm_rank(MPI_CommWD1[myworld1],&myid1);
@@ -931,22 +932,22 @@ double TRAN_DFT_Original(
     if (parallel_mode){
 
       TRAN_DFT_Kdependent(MPI_CommWD1[myworld1],
-                          parallel_mode, numprocs1, myid1,
-                          level_stdout, iter, SpinP_switch, k2, k3, k_op, order_GA,
+			  parallel_mode, numprocs1, myid1,
+			  level_stdout, iter, SpinP_switch, k2, k3, k_op, order_GA,
                           DM1,DM2,H1,H2,S1,
                           nh, ImNL, CntOLP,
-                          atomnum, Matomnum, WhatSpecies, Spe_Total_CNO, FNAN,
-                          natn, ncn, M2G, G2ID, atv_ijk, List_YOUSO, CDM, EDM, Eele0, Eele1);
+			  atomnum, Matomnum, WhatSpecies, Spe_Total_CNO, FNAN,
+			  natn, ncn, M2G, G2ID, atv_ijk, List_YOUSO, CDM, EDM, Eele0, Eele1);
     }
     else{
 
       TRAN_DFT_Kdependent(comm1,
-                          parallel_mode, 1, 0,
-                          level_stdout, iter, SpinP_switch, k2, k3, k_op, order_GA,
+			  parallel_mode, 1, 0,
+			  level_stdout, iter, SpinP_switch, k2, k3, k_op, order_GA,
                           DM1,DM2,H1,H2,S1,
                           nh, ImNL, CntOLP,
-                          atomnum, Matomnum, WhatSpecies, Spe_Total_CNO, FNAN,
-                          natn, ncn, M2G, G2ID, atv_ijk, List_YOUSO, CDM, EDM, Eele0, Eele1);
+			  atomnum, Matomnum, WhatSpecies, Spe_Total_CNO, FNAN,
+			  natn, ncn, M2G, G2ID, atv_ijk, List_YOUSO, CDM, EDM, Eele0, Eele1);
     }
 
   } /* kloop0 */
@@ -977,27 +978,27 @@ double TRAN_DFT_Original(
 
       for (LB_AN=0; LB_AN<=FNAN[GA_AN]; LB_AN++){
 
-        GB_AN = natn[GA_AN][LB_AN];
-        RnB = ncn[GA_AN][LB_AN];
-        wanB = WhatSpecies[GB_AN];
-        tnoB = Spe_Total_CNO[wanB];
+	GB_AN = natn[GA_AN][LB_AN];
+	RnB = ncn[GA_AN][LB_AN];
+	wanB = WhatSpecies[GB_AN];
+	tnoB = Spe_Total_CNO[wanB];
 
-        for (i=0;i<tnoA;i++) {
-          for (j=0;j<tnoB;j++) {
+	for (i=0;i<tnoA;i++) {
+	  for (j=0;j<tnoB;j++) {
 
-            if (1<=MA_AN && MA_AN<=Matomnum){   
+	    if (1<=MA_AN && MA_AN<=Matomnum){   
               CDM[k][MA_AN][LB_AN][i][j] = TDM1[itot0]*tmp;
               /* for iCDM */
               if (k<2) {
                iCDM[k][MA_AN][LB_AN][i][j] = TDM2[itot0]*tmp;
               }
               /* until here */
-            }
+	    }
 
             itot0++;        
 
-          }
-        }
+	  }
+	}
       }
     }
 
@@ -1016,10 +1017,10 @@ double TRAN_DFT_Original(
 
       for (LB_AN=0; LB_AN<=FNAN[GA_AN]; LB_AN++){
 
-        GB_AN = natn[GA_AN][LB_AN];
+	GB_AN = natn[GA_AN][LB_AN];
         RnB = ncn[GA_AN][LB_AN];
-        wanB = WhatSpecies[GB_AN];
-        tnoB = Spe_Total_CNO[wanB];
+	wanB = WhatSpecies[GB_AN];
+	tnoB = Spe_Total_CNO[wanB];
         l1 = atv_ijk[RnB][1];
         l2 = atv_ijk[RnB][2];
         l3 = atv_ijk[RnB][3];
@@ -1027,15 +1028,15 @@ double TRAN_DFT_Original(
         /* DM between C-L or C-R */
 
         if (l1==-1 || l1==1){
-          for (i=0; i<tnoA; i++){
-            for (j=0; j<tnoB; j++){
-              CDM[spin][MA_AN][LB_AN][i][j] = 0.0;  
+	  for (i=0; i<tnoA; i++){
+	    for (j=0; j<tnoB; j++){
+	      CDM[spin][MA_AN][LB_AN][i][j] = 0.0;  
               /* for iCDM */
               if (spin<2) {
-                  iCDM[spin][MA_AN][LB_AN][i][j] = 0.0;
+              iCDM[spin][MA_AN][LB_AN][i][j] = 0.0;
               }
-            }
-          }
+	    }
+	  }
         }
 
       }
@@ -1063,9 +1064,9 @@ double TRAN_DFT_Original(
       tnoA = Spe_Total_CNO[wanA];
 
       for (spin=0; spin<=SpinP_switch; spin++) {
-        for (i=0; i<tnoA; i++){
+	for (i=0; i<tnoA; i++){
           TRAN_DecMulP[spin][MA_AN][i] = 0.0;
-        }
+	}
       }
     }
 
@@ -1085,34 +1086,34 @@ double TRAN_DFT_Original(
         GA_AN_e =  TRAN_Original_Id[GA_AN];
 
         for (spin=0; spin<=SpinP_switch; spin++) {
-          for (i=0; i<tnoA; i++){
+	  for (i=0; i<tnoA; i++){
 
-            sum = 0.0;
+	    sum = 0.0;
 
-            for (LB_AN_e=0; LB_AN_e<=FNAN_e[iside][GA_AN_e]; LB_AN_e++){
+	    for (LB_AN_e=0; LB_AN_e<=FNAN_e[iside][GA_AN_e]; LB_AN_e++){
 
-              GB_AN_e = natn_e[iside][GA_AN_e][LB_AN_e];
-              Rn_e = ncn_e[iside][GA_AN_e][LB_AN_e];
-              wanB = WhatSpecies_e[iside][GB_AN_e];
-              tnoB = Spe_Total_CNO_e[iside][wanB];
-              l1 = atv_ijk_e[iside][Rn_e][1];
+	      GB_AN_e = natn_e[iside][GA_AN_e][LB_AN_e];
+	      Rn_e = ncn_e[iside][GA_AN_e][LB_AN_e];
+	      wanB = WhatSpecies_e[iside][GB_AN_e];
+	      tnoB = Spe_Total_CNO_e[iside][wanB];
+	      l1 = atv_ijk_e[iside][Rn_e][1];
 
-              if (l1==direction) {
-                for (j=0; j<tnoB; j++){
-                  sum += OLP_e[iside][0][GA_AN_e][LB_AN_e][i][j]*
+	      if (l1==direction) {
+		for (j=0; j<tnoB; j++){
+		  sum += OLP_e[iside][0][GA_AN_e][LB_AN_e][i][j]*
                          DM_e[iside][0][spin][GA_AN_e][LB_AN_e][i][j]; 
-                }
-              }
-            }
+		}
+	      }
+	    }
             
             if(spin==3) {
-               TRAN_DecMulP[spin][MA_AN][i] = -sum;
+	       TRAN_DecMulP[spin][MA_AN][i] = -sum;
             } else {
                TRAN_DecMulP[spin][MA_AN][i] = sum;
             }
 
-          } /* i */
-        } /* spin */
+	  } /* i */
+	} /* spin */
       }
 
     } /* MA_AN */
@@ -1133,25 +1134,25 @@ double TRAN_DFT_Original(
         GA_AN_e = TRAN_Original_Id[GA_AN];
 
         for (spin=0; spin<=SpinP_switch; spin++) {
-          for (i=0; i<tnoA; i++){
+	  for (i=0; i<tnoA; i++){
 
-            sum = 0.0;
+	    sum = 0.0;
 
-            for (LB_AN_e=0; LB_AN_e<=FNAN_e[iside][GA_AN_e]; LB_AN_e++){
+	    for (LB_AN_e=0; LB_AN_e<=FNAN_e[iside][GA_AN_e]; LB_AN_e++){
 
-              GB_AN_e = natn_e[iside][GA_AN_e][LB_AN_e];
-              Rn_e = ncn_e[iside][GA_AN_e][LB_AN_e];
-              wanB = WhatSpecies_e[iside][GB_AN_e];
-              tnoB = Spe_Total_CNO_e[iside][wanB];
-              l1 = atv_ijk_e[iside][Rn_e][1];
+	      GB_AN_e = natn_e[iside][GA_AN_e][LB_AN_e];
+	      Rn_e = ncn_e[iside][GA_AN_e][LB_AN_e];
+	      wanB = WhatSpecies_e[iside][GB_AN_e];
+	      tnoB = Spe_Total_CNO_e[iside][wanB];
+	      l1 = atv_ijk_e[iside][Rn_e][1];
 
-              if (l1==direction) {
-                for (j=0; j<tnoB; j++){
-                  sum += OLP_e[iside][0][GA_AN_e][LB_AN_e][i][j]*
+	      if (l1==direction) {
+		for (j=0; j<tnoB; j++){
+		  sum += OLP_e[iside][0][GA_AN_e][LB_AN_e][i][j]*
                          DM_e[iside][0][spin][GA_AN_e][LB_AN_e][i][j]; 
-                }
-              }
-            }
+		}
+	      }
+	    }
 
             if(spin==3) {
                TRAN_DecMulP[spin][MA_AN][i] = -sum;
@@ -1159,8 +1160,8 @@ double TRAN_DFT_Original(
                TRAN_DecMulP[spin][MA_AN][i] = sum;
             }
 
-          } /* i */
-        } /* spin */
+	  } /* i */
+	} /* spin */
       } 
     } /* MA_AN */
 
@@ -1254,14 +1255,14 @@ double TRAN_DFT_Original(
 
 
 static void TRAN_DFT_Kdependent(
-                          /* input */
-                          MPI_Comm comm1,
+			  /* input */
+			  MPI_Comm comm1,
                           int parallel_mode,
                           int numprocs,
                           int myid,
-                          int level_stdout,
-                          int iter,
-                          int SpinP_switch,
+			  int level_stdout,
+			  int iter,
+			  int SpinP_switch,
                           double k2,
                           double k3,
                           int k_op,
@@ -1271,24 +1272,24 @@ static void TRAN_DFT_Kdependent(
                           double **H1,
                           double **H2,
                           double *S1,
-                          double *****nh,    /* H */
-                          double *****ImNL,  /* SO-coupling */
-                          double ****CntOLP, 
-                          int atomnum,
-                          int Matomnum,
-                          int *WhatSpecies,
-                          int *Spe_Total_CNO,
-                          int *FNAN,
-                          int **natn, 
-                          int **ncn,
-                          int *M2G, 
-                          int *G2ID, 
-                          int **atv_ijk,
-                          int *List_YOUSO,
-                          /* output */
-                          double *****CDM,  /* output, charge density */
-                          double *****EDM,  /* not used */
-                          double Eele0[2], double Eele1[2]) /* not used */
+			  double *****nh,    /* H */
+			  double *****ImNL,  /* SO-coupling */
+			  double ****CntOLP, 
+			  int atomnum,
+			  int Matomnum,
+			  int *WhatSpecies,
+			  int *Spe_Total_CNO,
+			  int *FNAN,
+			  int **natn, 
+			  int **ncn,
+			  int *M2G, 
+			  int *G2ID, 
+			  int **atv_ijk,
+			  int *List_YOUSO,
+			  /* output */
+			  double *****CDM,  /* output, charge density */
+			  double *****EDM,  /* not used */
+			  double Eele0[2], double Eele1[2]) /* not used */
 {
   int i,j,k,iside,spinsize; 
   int *MP;
@@ -1342,9 +1343,9 @@ static void TRAN_DFT_Kdependent(
                           nh,      /* input */
                           CntOLP,  /* input */
                           atomnum,
-                          Matomnum,
-                          M2G,
-                          G2ID,
+			  Matomnum,
+			  M2G,
+			  G2ID,
                           WhatSpecies,
                           Spe_Total_CNO,
                           FNAN,
@@ -1412,8 +1413,8 @@ static void TRAN_DFT_Kdependent(
     iside = 0;
 
     TRAN_Calc_SurfGreen_direct(w, NUM_e[iside], H00_nc_e[iside], H01_nc_e[iside],
-                               S00_nc_e[iside], S01_nc_e[iside], tran_surfgreen_iteration_max,
-                               tran_surfgreen_eps, GRL);
+			       S00_nc_e[iside], S01_nc_e[iside], tran_surfgreen_iteration_max,
+			       tran_surfgreen_eps, GRL);
 
     TRAN_Calc_SelfEnergy(w, NUM_e[iside], GRL, NUM_c, HCL_nc, SCL_nc, SigmaL);
 
@@ -1422,8 +1423,8 @@ static void TRAN_DFT_Kdependent(
     iside = 1;
 
     TRAN_Calc_SurfGreen_direct(w, NUM_e[iside], H00_nc_e[iside], H01_nc_e[iside],
-                               S00_nc_e[iside], S01_nc_e[iside], tran_surfgreen_iteration_max,
-                               tran_surfgreen_eps, GRR);
+			       S00_nc_e[iside], S01_nc_e[iside], tran_surfgreen_iteration_max,
+			       tran_surfgreen_eps, GRR);
 
     TRAN_Calc_SelfEnergy(w, NUM_e[iside], GRR, NUM_c, HCR_nc, SCR_nc, SigmaR);
 
@@ -1443,12 +1444,12 @@ static void TRAN_DFT_Kdependent(
       /* calculation of central lesser Green's function */
 
       TRAN_Calc_CentGreenLesser( w, ChemP_e, NUM_c, 
-                                 Order_Lead_Side, 
-                                 SigmaL, 
-                                 SigmaR, 
-                                 GC, 
-                                 HCC_nc, SCC_nc,
-                                 work1, work2, Gless);
+				 Order_Lead_Side, 
+				 SigmaL, 
+				 SigmaR, 
+				 GC, 
+				 HCC_nc, SCC_nc,
+				 work1, work2, Gless);
 
     } /* if (iw_method==2) */
 
@@ -1533,19 +1534,19 @@ static void TRAN_DFT_Kdependent(
 
       for (LB_AN=0; LB_AN<=FNAN[GA_AN]; LB_AN++){
 
-        GB_AN = natn[GA_AN][LB_AN];
-        wanB = WhatSpecies[GB_AN];
-        tnoB = Spe_Total_CNO[wanB];
-        Bnum = MP[GB_AN];
+	GB_AN = natn[GA_AN][LB_AN];
+	wanB = WhatSpecies[GB_AN];
+	tnoB = Spe_Total_CNO[wanB];
+	Bnum = MP[GB_AN];
 
-        for (i=0; i<tnoA; i++) {
-          for (j=0; j<tnoB; j++) {
-            size_v3++;
-            size_v3++;
+	for (i=0; i<tnoA; i++) {
+	  for (j=0; j<tnoB; j++) {
+	    size_v3++;
+	    size_v3++;
    
             size_temp++;
-          }
-        }
+	  }
+	}
       }
     }  
 
@@ -1570,24 +1571,24 @@ static void TRAN_DFT_Kdependent(
 
       for (GA_AN=1; GA_AN<=atomnum; GA_AN++) {
 
-        wanA = WhatSpecies[GA_AN];
-        tnoA = Spe_Total_CNO[wanA];
-        Anum = MP[GA_AN];
+	wanA = WhatSpecies[GA_AN];
+	tnoA = Spe_Total_CNO[wanA];
+	Anum = MP[GA_AN];
 
         for (LB_AN=0; LB_AN<=FNAN[GA_AN]; LB_AN++){
 
-          GB_AN = natn[GA_AN][LB_AN];
-          wanB = WhatSpecies[GB_AN];
-          tnoB = Spe_Total_CNO[wanB];
-          Bnum = MP[GB_AN];
+	  GB_AN = natn[GA_AN][LB_AN];
+	  wanB = WhatSpecies[GB_AN];
+	  tnoB = Spe_Total_CNO[wanB];
+	  Bnum = MP[GB_AN];
 
-          for (i=0; i<tnoA; i++) {
-            for (j=0; j<tnoB; j++) {
-              my_v3[itot++] = v2[k][ v_idx( Anum+i, Bnum+j) ].r;
-              my_v3[itot++] = v2[k][ v_idx( Anum+i, Bnum+j) ].i;
-            }
-          }
-        }
+	  for (i=0; i<tnoA; i++) {
+	    for (j=0; j<tnoB; j++) {
+	      my_v3[itot++] = v2[k][ v_idx( Anum+i, Bnum+j) ].r;
+	      my_v3[itot++] = v2[k][ v_idx( Anum+i, Bnum+j) ].i;
+	    }
+	  }
+	}
       }  
 
       if (parallel_mode){
@@ -1596,7 +1597,7 @@ static void TRAN_DFT_Kdependent(
       else {
         for (i=0; i<itot; i++) {
           v3[i] = my_v3[i]; 
-        }
+	}
       }
 
       /* v3 -> CDM */
@@ -1606,38 +1607,38 @@ static void TRAN_DFT_Kdependent(
 
       for (GA_AN=1; GA_AN<=atomnum; GA_AN++) {
 
-        wanA = WhatSpecies[GA_AN];
-        tnoA = Spe_Total_CNO[wanA];
-        Anum = MP[GA_AN];
+	wanA = WhatSpecies[GA_AN];
+	tnoA = Spe_Total_CNO[wanA];
+	Anum = MP[GA_AN];
 
-        for (LB_AN=0; LB_AN<=FNAN[GA_AN]; LB_AN++){
+	for (LB_AN=0; LB_AN<=FNAN[GA_AN]; LB_AN++){
 
-          GB_AN = natn[GA_AN][LB_AN];
-          RnB = ncn[GA_AN][LB_AN];
-          wanB = WhatSpecies[GB_AN];
-          tnoB = Spe_Total_CNO[wanB];
-          Bnum = MP[GB_AN];
-          l1 = atv_ijk[RnB][1];
-          l2 = atv_ijk[RnB][2];
-          l3 = atv_ijk[RnB][3];
+	  GB_AN = natn[GA_AN][LB_AN];
+	  RnB = ncn[GA_AN][LB_AN];
+	  wanB = WhatSpecies[GB_AN];
+	  tnoB = Spe_Total_CNO[wanB];
+	  Bnum = MP[GB_AN];
+	  l1 = atv_ijk[RnB][1];
+	  l2 = atv_ijk[RnB][2];
+	  l3 = atv_ijk[RnB][3];
 
-          kRn = k2*(double)l2 + k3*(double)l3;
-          si = (double)k_op*sin(2.0*PI*kRn);
-          co = (double)k_op*cos(2.0*PI*kRn);
+	  kRn = k2*(double)l2 + k3*(double)l3;
+	  si = (double)k_op*sin(2.0*PI*kRn);
+	  co = (double)k_op*cos(2.0*PI*kRn);
 
-          for (i=0; i<tnoA; i++) {
-            for (j=0; j<tnoB; j++) {
-              re = v3[itot++];
-              im = v3[itot++];
+	  for (i=0; i<tnoA; i++) {
+	    for (j=0; j<tnoB; j++) {
+	      re = v3[itot++];
+	      im = v3[itot++];
 
               /* divided by numprocs due to the later MPI_Allreduce  */
               DM1_temp[k][itot0].r += (re*co + im*si)/(double)numprocs; 
               DM1_temp[k][itot0].i += (im*co - re*si)/(double)numprocs;
               itot0++;
 
-            }
-          }
-        }
+	    }
+	  }
+	}
       }
 
     } /* k */

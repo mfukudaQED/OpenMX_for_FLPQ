@@ -6,7 +6,7 @@
 void Allocate_Arrays(int wherefrom)
 {
   int i,j,k,ii,L,ct_AN,wan,p,l,al,so,spin;
-  int Lmax,num,m,n,spe;
+  int Lmax,num,m,n,spe,Ndim;
 
   switch(wherefrom){  
 
@@ -180,6 +180,7 @@ void Allocate_Arrays(int wherefrom)
       } 
 
       time_per_atom = (double*)malloc(sizeof(double)*(atomnum+1));
+      for (i=1; i<=atomnum; i++) time_per_atom[i] = 0.0;
 
       if (Solver==1 || Solver==5 || Solver==6 || Solver==8 || Solver==11){
         orderN_FNAN = (int*)malloc(sizeof(int)*(atomnum+1)); 
@@ -224,6 +225,7 @@ void Allocate_Arrays(int wherefrom)
       /* arrays for LDA+U added by MJ */
 
       if (Hub_U_switch==1 || 1<=Constraint_NCS_switch || Zeeman_NCS_switch==1 || Zeeman_NCO_switch==1){
+
 	Hub_U_Basis =  (double***)malloc(sizeof(double**)*SpeciesNum);
 	for (i=0; i<SpeciesNum; i++){
 	  Hub_U_Basis[i] = (double**)malloc(sizeof(double*)*(Spe_MaxL_Basis[i]+1));
@@ -320,6 +322,24 @@ void Allocate_Arrays(int wherefrom)
       if (LNO_flag==1){
         LNO_Num = (int*)malloc(sizeof(int)*(atomnum+1)); 
         LNOs_Num_predefined = (int*)malloc(sizeof(int)*SpeciesNum);
+      }
+
+      if (CWF_Calc==1){
+	CWF_Guiding_AO =  (int***)malloc(sizeof(int**)*SpeciesNum);
+	for (i=0; i<SpeciesNum; i++){
+	  CWF_Guiding_AO[i] = (int**)malloc(sizeof(int*)*(Spe_MaxL_Basis[i]+1));
+	  for (l=0; l<(Spe_MaxL_Basis[i]+1); l++){
+	    CWF_Guiding_AO[i][l] = (int*)malloc(sizeof(int)*Spe_Num_Basis[i][l]);
+            for (k=0; k<Spe_Num_Basis[i][l]; k++){
+  	      CWF_Guiding_AO[i][l][k] = 0;
+	    }
+	  }
+	}
+
+        CWF_Num_predefined = (int*)malloc(sizeof(int)*SpeciesNum);
+        for (k=0; k<SpeciesNum; k++){
+          CWF_Num_predefined[k] = 1;
+	}
       }
 
     break;
@@ -895,6 +915,48 @@ void Allocate_Arrays(int wherefrom)
     Snd_HFS_Size_NAO = (int*)malloc(sizeof(int)*Num_Procs);
     Rcv_HFS_Size_NAO = (int*)malloc(sizeof(int)*Num_Procs);
 
+    break;
+
+    case 12: /* COHP */
+
+    COHP_AtomA = (int*)malloc(sizeof(int)*COHP_num_pairs);
+    COHP_AtomB = (int*)malloc(sizeof(int)*COHP_num_pairs);
+    COHP_CellB1 = (int*)malloc(sizeof(int)*COHP_num_pairs);
+    COHP_CellB2 = (int*)malloc(sizeof(int)*COHP_num_pairs);
+    COHP_CellB3 = (int*)malloc(sizeof(int)*COHP_num_pairs);
+
+    break;
+
+    case 13: /* LNAO */
+
+    LNAO_Atoms = (int*)malloc(sizeof(int)*LNAO_num);
+
+    break;
+
+    case 14: /* LNBO */
+
+    LNBO_Atoms = (int**)malloc(sizeof(int*)*LNBO_num);
+    for (i=0; i<LNBO_num; i++){
+      LNBO_Atoms[i] = (int*)malloc(sizeof(int)*5);
+    }
+
+    break;
+
+    /* efficient exchange methods */
+    
+    case 15:
+
+      Ndim = Ng1_Rec_Coulomb*Ng1_Rec_Coulomb*Ng1_Rec_Coulomb;
+      
+      SVals_Rec_Coulomb = (double*)malloc(sizeof(double)*Ndim);
+  
+      SVecs_Rec_Coulomb = (double**)malloc(sizeof(double*)*Nrank_Rec_Coulomb);
+      for (i=0; i<Nrank_Rec_Coulomb; i++){
+        SVecs_Rec_Coulomb[i] = (double*)malloc(sizeof(double)*Ndim);
+      }
+
+      xgrid_Rec_Coulomb = (double*)malloc(sizeof(double)*Ng1_Rec_Coulomb);
+      
     break;
 
   }

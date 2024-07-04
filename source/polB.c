@@ -20,10 +20,10 @@
 #include <sys/types.h>
 #include <sys/times.h>
 #include <sys/time.h> 
+#include "mpi.h"
 #include "read_scfout.h"
 #include "lapack_prototypes.h"
 #include "f77func.h"
-#include "mpi.h"
 
 #define Host_ID       0         /* ID of the host CPU in MPI */
 
@@ -38,6 +38,8 @@ struct timeval2 {
   long tv_sec;    /* second */
   long tv_usec;   /* microsecond */
 };
+
+void read_scfout(char *argv[]);
 
 /* Added by N. Yamaguchi ***/
 dcomplex ****expOLP;
@@ -892,12 +894,9 @@ int main(int argc, char *argv[])
 
     printf("               Background        Core             Electron          Total\n\n"); fflush(stdout);
 
-    //printf(" Px     %17.8f %17.8f %17.8f %17.8f\n",Pbx,Pcx,Pex,Ptx);fflush(stdout);
-    //printf(" Py     %17.8f %17.8f %17.8f %17.8f\n",Pby,Pcy,Pey,Pty);fflush(stdout);
-    //printf(" Pz     %17.8f %17.8f %17.8f %17.8f\n",Pbz,Pcz,Pez,Ptz);fflush(stdout);
-    printf(" Px     %23.14f %23.14f %23.14f %23.14f\n",Pbx,Pcx,Pex,Ptx);fflush(stdout);
-    printf(" Py     %23.14f %23.14f %23.14f %23.14f\n",Pby,Pcy,Pey,Pty);fflush(stdout);
-    printf(" Pz     %23.14f %23.14f %23.14f %23.14f\n",Pbz,Pcz,Pez,Ptz);fflush(stdout);
+    printf(" Px     %17.8f %17.8f %17.8f %17.8f\n",Pbx,Pcx,Pex,Ptx);fflush(stdout);
+    printf(" Py     %17.8f %17.8f %17.8f %17.8f\n",Pby,Pcy,Pey,Pty);fflush(stdout);
+    printf(" Pz     %17.8f %17.8f %17.8f %17.8f\n",Pbz,Pcz,Pez,Ptz);fflush(stdout);
     printf("\n\n");
 
     /*

@@ -34,7 +34,7 @@ void FT_NLP()
   int RestartRead_Succeed;
   double dk,norm_k;
   double rmin,rmax,r,r2,h,sum[2];
-  double **SphB;
+  double **SphB,***TmpNRF;
   double *tmp_SphB,*tmp_SphBp;
   double TStime, TEtime;
   /* for MPI */
@@ -116,9 +116,28 @@ void FT_NLP()
       rmax = Spe_Atom_Cut1[spe] + 0.5;
       h = (rmax - rmin)/(double)OneD_Grid;
 
+      /* calculation of Nonlocal_RadialF */
+
+      TmpNRF = (double***)malloc(sizeof(double**)*2);
+      for (so=0; so<2; so++){
+        TmpNRF[so] = (double**)malloc(sizeof(double*)*(Spe_Num_RVPS[spe]+1));
+        for (L=0; L<(Spe_Num_RVPS[spe]+1); L++){
+          TmpNRF[so][L] = (double*)malloc(sizeof(double)*(OneD_Grid+1));
+	}
+      }
+
+      for (so=0; so<=VPS_j_dependency[spe]; so++){
+        for (L=1; L<=Spe_Num_RVPS[spe]; L++){
+          for (i=0; i<=OneD_Grid; i++){
+            r = rmin + (double)i*h;
+            TmpNRF[so][L][i] = Nonlocal_RadialF(spe,L-1,so,r); 
+	  }
+        }
+      }
+
       /* kj loop */
 
-#pragma omp parallel shared(Spe_VPS_List,spe,Spe_Num_RVPS,num_k,dk,OneD_Grid,rmin,h,VPS_j_dependency,Spe_NLRF_Bessel)  private(MaxGL,L,GL,SphB,tmp_SphB,tmp_SphBp,OMPID,Nthrds,Nprocs,norm_k,i,r,r2,sum,so,kj)
+#pragma omp parallel shared(Spe_VPS_List,spe,Spe_Num_RVPS,num_k,dk,OneD_Grid,rmin,h,VPS_j_dependency,Spe_NLRF_Bessel,TmpNRF)  private(MaxGL,L,GL,SphB,tmp_SphB,tmp_SphBp,OMPID,Nthrds,Nprocs,norm_k,i,r,r2,sum,so,kj)
       {
 
 	/* allocate SphB */
@@ -179,10 +198,9 @@ void FT_NLP()
 	    sum[0] = 0.0;
 	    sum[1] = 0.0;
 
-	    for (i=0; i<=OneD_Grid; i++){
-	      r = rmin + (double)i*h;
-	      for (so=0; so<=VPS_j_dependency[spe]; so++){
-		sum[so] += Nonlocal_RadialF(spe,L-1,so,r)*SphB[GL][i];
+            for (so=0; so<=VPS_j_dependency[spe]; so++){
+	      for (i=0; i<=OneD_Grid; i++){
+		sum[so] += TmpNRF[so][L][i]*SphB[GL][i];
 	      }
 	    }
 
@@ -206,6 +224,16 @@ void FT_NLP()
 #pragma omp flush(Spe_NLRF_Bessel)
 
       } /* #pragma omp parallel */
+
+      /* freeing TmpNRF */
+
+      for (so=0; so<2; so++){
+        for (L=0; L<(Spe_Num_RVPS[spe]+1); L++){
+          free(TmpNRF[so][L]);
+	}
+        free(TmpNRF[so]);
+      }
+      free(TmpNRF);
 
     } /* Lspe */
 
@@ -270,7 +298,7 @@ void FT_NLP()
   dtime(&TEtime);
 
   /*
-  printf("myid=%2d Elapsed Time (s) = %15.12f\n",myid,TEtime-TStime);
+  printf("FT_NLP: myid=%2d Elapsed Time (s) = %15.12f\n",myid,TEtime-TStime);
   MPI_Finalize();
   exit(0);
   */

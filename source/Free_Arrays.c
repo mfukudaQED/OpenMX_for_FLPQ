@@ -1,8 +1,12 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <complex.h>
 #include "openmx_common.h"
 #include "mpi.h"
+
+double complex ******CWF_Coef_NC;
+double complex ***CWF_Guiding_MOs_NC;
 
 
 void array0();
@@ -150,6 +154,7 @@ void array0()
 
     free(ADensity_Grid_B);
     free(PCCDensity_Grid_B[1]); free(PCCDensity_Grid_B[0]);
+    free(PCCDensity_Grid_B);/*AITUNE fix memory leak*/
     free(dVHart_Grid_B);
     free(RefVxc_Grid_B);
 
@@ -231,6 +236,7 @@ void array0()
     /* arrays for the partition D */
 
     free(PCCDensity_Grid_D[1]); free(PCCDensity_Grid_D[0]);
+    free(PCCDensity_Grid_D);/*AITUNE fix memory leak*/
 
     if (SpinP_switch==3){ /* spin non-collinear */
       for (k=0; k<=3; k++){
@@ -319,18 +325,16 @@ void array0()
 	    Mh_AN = F_G2M[Gh_AN];
 	    Hwan = WhatSpecies[Gh_AN];
 	    NO1 = Spe_Total_NO[Hwan];
-            num = NumOLG[Mc_AN][h_AN];  
+            num = NumOLG[Mc_AN][h_AN] + 1; /*AITUNE fix memory leak*/
 	  }
 	  else {
             num = 1;
 	  }
 
-          if (0<NumOLG[Mc_AN][h_AN]){
-            for (Nc=0; Nc<num; Nc++){
-              free(Orbs_Grid_FNAN[Mc_AN][h_AN][Nc]);
-            }
-            free(Orbs_Grid_FNAN[Mc_AN][h_AN]);
+	  for (Nc=0; Nc<num; Nc++){  
+	    free(Orbs_Grid_FNAN[Mc_AN][h_AN][Nc]);
 	  }
+	  free(Orbs_Grid_FNAN[Mc_AN][h_AN]);
 
 	} /* h_AN */
       } /* else */
@@ -580,6 +584,49 @@ void array0()
 	}
 	free(iHCH);
       }
+    }
+
+    if (xmcd_calc==1){
+
+      // ASK, S. An
+      free(pre_spin_moment);
+
+      for (k=0; k<=SpinP_switch; k++){
+
+	FNAN[0] = 0;
+	for (Mc_AN=0; Mc_AN<=Matomnum; Mc_AN++){
+
+	  if (Mc_AN==0){
+	    Gc_AN = 0;
+	    tno0 = 1;
+	  }
+	  else{
+	    Gc_AN = M2G[Mc_AN];
+	    Cwan = WhatSpecies[Gc_AN];
+	    tno0 = Spe_Total_NO[Cwan];
+	  }
+
+	  for (h_AN=0; h_AN<=FNAN[Gc_AN]; h_AN++){
+
+	    if (Mc_AN==0){
+	      tno1 = 1;
+	    }
+	    else{
+	      Gh_AN = natn[Gc_AN][h_AN];
+	      Hwan = WhatSpecies[Gh_AN];
+	      tno1 = Spe_Total_NO[Hwan];
+	    }
+
+	    for (i=0; i<tno0; i++){
+	      free(H_XMCD[k][Mc_AN][h_AN][i]);
+	    }
+            free(H_XMCD[k][Mc_AN][h_AN]);
+	  }
+          free(H_XMCD[k][Mc_AN]);
+	}
+        free(H_XMCD[k]);
+      }
+      free(H_XMCD);
     }
 
     /* H_Hub  --- added by MJ */  
@@ -2326,7 +2373,7 @@ void array0()
 
   /* arrays for DFTD-vdW okuno */
 
-  if (dftD_switch==1 && version_dftD==2){
+  if (dftD_switch==1 && version_dftD==2 && alloc_first[36]==0){
 
     for(i=0; i<SpeciesNum; i++){
       free(C6ij_dftD[i]);
@@ -2342,22 +2389,26 @@ void array0()
   /* okuno */
 
   /* arrays for DFTD3_vdW Ellner */
-
-  if(dftD_switch==1 && version_dftD==3){
+  
+  if (dftD_switch==1 && version_dftD==3 && alloc_first[37]==0){
 
     free(maxcn_dftD);
+
     for(i=0; i<SpeciesNum; i++){
       free(r0ab_dftD[i]);
     }
     free(r0ab_dftD);
+
     for(i=0; i<SpeciesNum; i++){
       free(r2r4ab_dftD[i]);
     }
     free(r2r4ab_dftD);
+
     for(i=0; i<SpeciesNum; i++){
       free(rcovab_dftD[i]);
     }
     free(rcovab_dftD);
+
     for(i=0; i<SpeciesNum; i++){
       for(j=0; j<SpeciesNum; j++){
         for(k=0; k<5; k++){
@@ -2419,6 +2470,161 @@ void array0()
 	free(Arho_EH0_Orb);
       }
     }
+  }
+
+  if ( CWF_Calc==1 && CWF_fileout_flag==1 ){
+
+    if ( SpinP_switch==0 || SpinP_switch==1 ){
+
+      int wan1,l1,l2,l3,pnum,gidx;
+
+      for (spin=0; spin<(SpinP_switch+1); spin++){
+	for (k=0; k<CWF_fileout_Num; k++){
+
+	  if (CWF_Guiding_Orbital==1 || CWF_Guiding_Orbital==2){
+	    Gc_AN = CWF_file_Atoms[k];
+	    wan1 = WhatSpecies[Gc_AN];
+	    pnum = CWF_Num_predefined[wan1];
+	  }
+	  else if (CWF_Guiding_Orbital==3){
+	    gidx = CWF_file_MOs[k];
+	    pnum = Num_CWF_MOs_Group[gidx];
+	  }
+
+	  for (p=0; p<pnum; p++){
+	    for (l1=0; l1<(2*CWF_Plot_SuperCells[0]+1); l1++){
+	      for (l2=0; l2<(2*CWF_Plot_SuperCells[1]+1); l2++){
+		for (l3=0; l3<(2*CWF_Plot_SuperCells[2]+1); l3++){
+		  free(CWF_Coef[spin][k][p][l1][l2][l3]);
+		}
+		free(CWF_Coef[spin][k][p][l1][l2]);
+	      }
+	      free(CWF_Coef[spin][k][p][l1]);
+	    }
+	    free(CWF_Coef[spin][k][p]);
+	  }
+	  free(CWF_Coef[spin][k]);
+	}
+	free(CWF_Coef[spin]);
+      } 
+      free(CWF_Coef);
+    }
+
+    else if ( SpinP_switch==3 ){
+
+      int Gc_AN,wan1,p,spin,l1,l2,l3,pnum,gidx;
+
+      j = 0;
+      for (i=1; i<=atomnum; i++){
+	wanA  = WhatSpecies[i];
+	j += Spe_Total_CNO[wanA];
+      }
+
+      for (k=0; k<CWF_fileout_Num; k++){
+
+	if (CWF_Guiding_Orbital==1 || CWF_Guiding_Orbital==2){
+	  Gc_AN = CWF_file_Atoms[k];
+	  wan1 = WhatSpecies[Gc_AN];
+	  pnum = 2*CWF_Num_predefined[wan1];
+	}
+	else if (CWF_Guiding_Orbital==3){
+	  gidx = CWF_file_MOs[k];
+	  pnum = Num_CWF_MOs_Group[gidx];
+	}
+
+	for (p=0; p<pnum; p++){
+	  for (l1=0; l1<(2*CWF_Plot_SuperCells[0]+1); l1++){
+	    for (l2=0; l2<(2*CWF_Plot_SuperCells[1]+1); l2++){
+	      for (l3=0; l3<(2*CWF_Plot_SuperCells[2]+1); l3++){
+		free(CWF_Coef_NC[k][p][l1][l2][l3]);
+	      }
+    	      free(CWF_Coef_NC[k][p][l1][l2]);
+	    }
+            free(CWF_Coef_NC[k][p][l1]);
+	  }
+          free(CWF_Coef_NC[k][p]);
+	}
+        free(CWF_Coef_NC[k]);
+      }
+      free(CWF_Coef_NC);
+    }
+  }
+
+  if (CWF_Calc==1){
+
+    int spinsize;
+
+    if (SpinP_switch==3) spinsize = 1; else spinsize = 2;
+
+    for (spin=0; spin<spinsize; spin++){
+      free(CWF_Charge[spin]);
+    }
+    free(CWF_Charge);
+
+    for (spin=0; spin<spinsize; spin++){
+      free(CWF_Energy[spin]);
+    }
+    free(CWF_Energy);
+
+    for (i=0; i<SpeciesNum; i++){
+      for (l=0; l<(Spe_MaxL_Basis[i]+1); l++){
+	free(CWF_Guiding_AO[i][l]);
+      }
+      free(CWF_Guiding_AO[i]);
+    }
+    free(CWF_Guiding_AO);
+
+    free(CWF_Num_predefined);
+
+    if (CWF_fileout_flag==1 && (CWF_Guiding_Orbital==1 || CWF_Guiding_Orbital==2)){
+      free(CWF_file_Atoms);
+    }
+    else if (CWF_fileout_flag==1 && CWF_Guiding_Orbital==3){
+      free(CWF_file_MOs);
+    }
+  }
+
+  if ( CWF_Calc==1 && CWF_Guiding_Orbital==3 ){
+
+    for (i=0; i<Num_CWF_Grouped_Atoms; i++){
+      free(CWF_Grouped_Atoms[i]);
+    }
+    free(CWF_Grouped_Atoms);
+
+    free(CWF_Grouped_Atoms_EachNum);
+
+    int gidx;  
+
+    if (SpinP_switch==0 || SpinP_switch==1){
+
+      for (gidx=0; gidx<Num_CWF_Grouped_Atoms; gidx++){
+	for (i=0; i<Num_CWF_MOs_Group[gidx]; i++){
+	  free(CWF_Guiding_MOs[gidx][i]);
+	}
+	free(CWF_Guiding_MOs[gidx]);
+      }
+      free(CWF_Guiding_MOs);
+
+      free(Num_CWF_MOs_Group);
+    }
+
+    else if (SpinP_switch==3){
+
+      for (gidx=0; gidx<Num_CWF_Grouped_Atoms; gidx++){
+	for (i=0; i<Num_CWF_MOs_Group[gidx]; i++){
+	  free(CWF_Guiding_MOs_NC[gidx][i]);
+	}
+	free(CWF_Guiding_MOs_NC[gidx]);
+      }
+      free(CWF_Guiding_MOs_NC);
+
+      free(Num_CWF_MOs_Group);
+    }
+
+    for (i=0; i<Num_CWF_Grouped_Atoms; i++){
+      free(CWF_MO_Selection[i]);
+    }
+    free(CWF_MO_Selection);
   }
 
   for (i=0; i<SpeciesNum; i++){
@@ -2688,6 +2894,7 @@ void array0()
 
   if (LNO_flag==1){
     free(LNO_Num);
+    free(LNOs_Num_predefined);
   }
 
   /* for MD_VS4 */
@@ -3458,6 +3665,93 @@ void array0()
     alloc_first[35] = 1;
   }
 
+  /* COHP */
+
+  if (COHP_calc_flag==1){
+
+    free(COHP_AtomA);
+    free(COHP_AtomB);
+    free(COHP_CellB1);
+    free(COHP_CellB2);
+    free(COHP_CellB3);
+  }
+
+  /* LNAO */
+
+  if (LNAO_calc_flag==1 && alloc_first[38]==0){
+    free(LNAO_Atoms);
+
+    for (p=0; p<LNAO_num; p++){
+      for (spin=0; spin<=SpinP_switch; spin++){
+        free(LNAO_coes[p][spin]);
+      }
+      free(LNAO_coes[p]);
+    }  
+    free(LNAO_coes);
+
+    for (p=0; p<LNAO_num; p++){
+      for (spin=0; spin<=SpinP_switch; spin++){
+        free(LNAO_pops[p][spin]);
+      }
+      free(LNAO_pops[p]);
+    }  
+    free(LNAO_pops);
+
+    for (p=0; p<LNAO_num; p++){
+      for (spin=0; spin<=SpinP_switch; spin++){
+        free(LNAO_H[p][spin]);
+      }
+      free(LNAO_H[p]);
+    }  
+    free(LNAO_H);
+  }
+
+  /* LNBO */
+
+  if (LNBO_calc_flag==1 && alloc_first[39]==0){
+
+    for (i=0; i<LNBO_num; i++){
+      free(LNBO_Atoms[i]);
+    }
+    free(LNBO_Atoms);
+
+    LNBO_coes = (double***)malloc(sizeof(double**)*LNBO_num);
+    for (p=0; p<LNBO_num; p++){
+      LNBO_coes[p] = (double**)malloc(sizeof(double*)*(SpinP_switch+1));
+      for (spin=0; spin<=SpinP_switch; spin++){
+        LNBO_coes[p][spin] = (double*)malloc(sizeof(double)*List_YOUSO[7]*List_YOUSO[7]*4);
+      }
+    }  
+
+    LNBO_pops = (double***)malloc(sizeof(double**)*LNBO_num);
+    for (p=0; p<LNBO_num; p++){
+      LNBO_pops[p] = (double**)malloc(sizeof(double*)*(SpinP_switch+1));
+      for (spin=0; spin<=SpinP_switch; spin++){
+        LNBO_pops[p][spin] = (double*)malloc(sizeof(double)*List_YOUSO[7]*2);
+      }
+    }  
+
+    LNBO_H = (double***)malloc(sizeof(double**)*LNBO_num);
+    for (p=0; p<LNBO_num; p++){
+      LNBO_H[p] = (double**)malloc(sizeof(double*)*(SpinP_switch+1));
+      for (spin=0; spin<=SpinP_switch; spin++){
+        LNBO_H[p][spin] = (double*)malloc(sizeof(double)*List_YOUSO[7]*2);
+      }
+    }  
+  }
+
+  if (XC_switch==4){
+
+    free(SVals_Rec_Coulomb);
+  
+    for (i=0; i<Nrank_Rec_Coulomb; i++){
+      free(SVecs_Rec_Coulomb[i]);
+    }
+    free(SVecs_Rec_Coulomb);
+
+    free(xgrid_Rec_Coulomb);
+  }
+  
 }
 
 void array1()

@@ -15,15 +15,21 @@
 #include <stdlib.h> 
 #include <math.h>
 #include <string.h>
-
+#include "mpi.h"
 #include "openmx_common.h"
 #include "lapack_prototypes.h"
-#include "mpi.h"
 #include <omp.h>
 #include "f77func.h"
 
  
 #define  measure_time   0
+
+
+void solve_evp_real_( int *n1, int *n2, double *Cs, int *na_rows1, double *a, double *Ss, int *na_rows2, int *nblk, 
+                      int *mpi_comm_rows_int, int *mpi_comm_cols_int);
+
+void elpa_solve_evp_real_2stage_double_impl_( int *n1, int *n2, double *Cs, int *na_rows1, double *a, double *Ss, int *na_rows2, 
+                                              int *nblk, int *na_cols1, int *mpi_comm_rows_int, int *mpi_comm_cols_int, int *mpiworld);
 
  
 static void Eigen_Original_PReHH(MPI_Comm MPI_Current_Comm_WD, 
@@ -55,10 +61,11 @@ static int numrocC(int N, int NB, int IPROC, int ISRCPROC, int NPROCS);
 void Eigen_PReHH(MPI_Comm MPI_Current_Comm_WD, 
                  double **ac, double *ko, int n, int EVmax, int bcast_flag)
 {
+  int numprocs;
 
-  /*
-  printf("%d\n",scf_eigen_lib_flag);
-  */
+  MPI_Comm_size(MPI_Current_Comm_WD,&numprocs);
+
+  //printf("scf_eigen_lib_flag=%d n=%2d\n",scf_eigen_lib_flag,n);fflush(stdout); 
 
   if (n<20){
     Eigen_lapack(ac,ko,n,EVmax);
@@ -72,9 +79,11 @@ void Eigen_PReHH(MPI_Comm MPI_Current_Comm_WD,
     Eigen_Improved_PReHH(MPI_Current_Comm_WD, ac, ko, n, EVmax, bcast_flag); 
   }
 
-  else if (scf_eigen_lib_flag==1){
+  /* ELPA1 is used in case of numprocs=1 since ELPA2 seems to be unstable when numprocs=1. */
+  else if (scf_eigen_lib_flag==1 || numprocs==1){ 
     Eigen_ELPA1_Re(MPI_Current_Comm_WD, ac, ko, n, EVmax, bcast_flag); 
   }
+
 #ifndef kcomp
   else if (scf_eigen_lib_flag==2){
     Eigen_ELPA2_Re(MPI_Current_Comm_WD, ac, ko, n, EVmax, bcast_flag); 
@@ -182,16 +191,24 @@ void Eigen_ELPA2_Re(MPI_Comm MPI_Current_Comm_WD,
     }
   }
 
-  /* Calculate eigenvalues/eigenvectors with ELPA */
+  /* Calculate eigenvalues/eigenvectors with ELPA2 */
 
   mpi_comm_rows_int = MPI_Comm_c2f(mpi_comm_rows);
   mpi_comm_cols_int = MPI_Comm_c2f(mpi_comm_cols);
 
   F77_NAME(elpa_solve_evp_real_2stage_double_impl,ELPA_SOLVE_EVP_REAL_2STAGE_DOUBLE_IMPL)(&na, &nev, a, &na_rows, &ko[1], z, &na_rows, &nblk, &na_cols, &mpi_comm_rows_int, &mpi_comm_cols_int, &mpiworld);
 
-  /*
-  printf("ZZZ2 n=%2d bcast_flag=%2d\n",n,bcast_flag);fflush(stdout);
-  return;  
+  /* 
+  {
+    int myid0;
+    MPI_Comm_rank(mpi_comm_level1,&myid0);
+    printf("QQQ4 scf_eigen_lib_flag=%d n=%2d numprocs=%2d myid=%2d myid0=%2d\n",scf_eigen_lib_flag,n,numprocs,myid,myid0);fflush(stdout); 
+
+    if (Yukawa_on==3){
+      MPI_Finalize();
+      exit(0);
+    }
+  }
   */
 
   MPI_Comm_free(&mpi_comm_rows);

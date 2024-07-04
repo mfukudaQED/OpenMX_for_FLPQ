@@ -15,15 +15,17 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include "mpi.h"
 #include "openmx_common.h"
 #include "lapack_prototypes.h"
-#include "mpi.h"
 #include <omp.h>
+
+void solve_evp_complex_( int *n2, int *MaxN, dcomplex *Hs2, int *na_rows2_1, double *a, dcomplex *Cs2, int *na_rows2_2, 
+                         int *nblk2, int *mpi_comm_rows_int, int *mpi_comm_cols_int );
+
 
 
 #define  measure_time  0
-
-
 
 double Band_DFT_Col_Optical_ScaLAPACK(
                     int SCF_iter,
@@ -192,6 +194,8 @@ double Band_DFT_Col_Optical_ScaLAPACK(
     n += Spe_Total_CNO[wanA];
   }
 
+  fd_dist = (double*)malloc(sizeof(double)*n);
+
   /****************************************************
    find TZ
   ****************************************************/
@@ -231,15 +235,15 @@ double Band_DFT_Col_Optical_ScaLAPACK(
     }
   }
 
-/*
-  if (firsttime) {
-  PrintMemory("Band_DFT: ko", sizeof(double)*(n+1),NULL);
-  PrintMemory("Band_DFT: koS",sizeof(double)*(n+1),NULL);
-  PrintMemory("Band_DFT: H",  sizeof(dcomplex)*(n+1)*(n+1),NULL);
-  PrintMemory("Band_DFT: S",  sizeof(dcomplex)*(n+1)*(n+1),NULL);
-  PrintMemory("Band_DFT: C",  sizeof(dcomplex)*(n+1)*(n+1),NULL);
-  }
-*/
+  /*
+    if (firsttime) {
+    PrintMemory("Band_DFT: ko", sizeof(double)*(n+1),NULL);
+    PrintMemory("Band_DFT: koS",sizeof(double)*(n+1),NULL);
+    PrintMemory("Band_DFT: H",  sizeof(dcomplex)*(n+1)*(n+1),NULL);
+    PrintMemory("Band_DFT: S",  sizeof(dcomplex)*(n+1)*(n+1),NULL);
+    PrintMemory("Band_DFT: C",  sizeof(dcomplex)*(n+1)*(n+1),NULL);
+    }
+  */
   /***********************************************
               k-points by regular mesh 
   ***********************************************/
@@ -342,7 +346,6 @@ double Band_DFT_Col_Optical_ScaLAPACK(
 		     &myworld2, MPI_CommWD2, NPROCS_ID2, Comm_World2, 
 		     NPROCS_WD2, Comm_World_StartID2);
 
-
     MPI_Comm_size(MPI_CommWD2[myworld2],&numprocs2);
     MPI_Comm_rank(MPI_CommWD2[myworld2],&myid2);
 
@@ -396,7 +399,6 @@ double Band_DFT_Col_Optical_ScaLAPACK(
     Make_Comm_Worlds(MPI_CommWD1[myworld1], myid1, numprocs1, Num_Comm_World2,
 		     &myworld2, MPI_CommWD2, 
 		     NPROCS_ID2, Comm_World2, NPROCS_WD2, Comm_World_StartID2);
-
 
     MPI_Comm_size(MPI_CommWD2[myworld2],&numprocs2);
     MPI_Comm_rank(MPI_CommWD2[myworld2],&myid2);
@@ -707,7 +709,7 @@ double Band_DFT_Col_Optical_ScaLAPACK(
     size_H1 = Get_OneD_HS_Col(1, CntOLP,   S1, MP, order_GA, My_NZeros, SP_NZeros, SP_Atoms);
   }
 
-diagonalize1:
+ diagonalize1:
 
   /* set H1 */
 
@@ -877,15 +879,15 @@ diagonalize1:
     time2 += Etime - Stime;
 
     if (SCF_iter==1 || all_knum!=1){
-/*
-      if (3<=level_stdout){
+      /*
+	if (3<=level_stdout){
 	printf(" myid0=%2d spin=%2d kloop %2d  k1 k2 k3 %10.6f %10.6f %10.6f\n",
-	       myid0,spin,kloop,T_KGrids1[kloop],T_KGrids2[kloop],T_KGrids3[kloop]);
+	myid0,spin,kloop,T_KGrids1[kloop],T_KGrids2[kloop],T_KGrids3[kloop]);
 	for (i1=1; i1<=n; i1++){
-	  printf("  Eigenvalues of OLP  %2d  %15.12f\n",i1,ko[i1]);
+	printf("  Eigenvalues of OLP  %2d  %15.12f\n",i1,ko[i1]);
 	}
-      }
-*/
+	}
+      */
 
       /* minus eigenvalues to 1.0e-14 */
 
@@ -1097,20 +1099,20 @@ diagonalize1:
     for (l=1; l<=MaxN; l++){
       EIGEN[spin][kloop][l] = ko[l];
     }
-/*
-    if (3<=level_stdout && 0<=kloop){
+    /*
+      if (3<=level_stdout && 0<=kloop){
       printf(" myid0=%2d spin=%2d kloop %i, k1 k2 k3 %10.6f %10.6f %10.6f\n",
-	     myid0,spin,kloop,T_KGrids1[kloop],T_KGrids2[kloop],T_KGrids3[kloop]);
+      myid0,spin,kloop,T_KGrids1[kloop],T_KGrids2[kloop],T_KGrids3[kloop]);
       for (i1=1; i1<=n; i1++){
-	if (SpinP_switch==0)
-	  printf("  Eigenvalues of Kohn-Sham %2d %15.12f %15.12f\n",
-		 i1,EIGEN[0][kloop][i1],EIGEN[0][kloop][i1]);
-	else 
-	  printf("  Eigenvalues of Kohn-Sham %2d %15.12f %15.12f\n",
-		 i1,EIGEN[0][kloop][i1],EIGEN[1][kloop][i1]);
+      if (SpinP_switch==0)
+      printf("  Eigenvalues of Kohn-Sham %2d %15.12f %15.12f\n",
+      i1,EIGEN[0][kloop][i1],EIGEN[0][kloop][i1]);
+      else 
+      printf("  Eigenvalues of Kohn-Sham %2d %15.12f %15.12f\n",
+      i1,EIGEN[0][kloop][i1],EIGEN[1][kloop][i1]);
       }
-    }
-*/
+      }
+    */
     /* calculation of wave functions */
 
     dtime(&Stime);
@@ -1267,7 +1269,6 @@ diagonalize1:
   *************************************************/
 
   /* YTL-start */
-  fd_dist = (double*)malloc(sizeof(double)*n);
   for (i=0; i<n; i++) fd_dist[i] = 0.0; /* initialize fermi-dirac distribution */
   /* YTL-end */
 
@@ -1282,7 +1283,7 @@ diagonalize1:
   double ChemP_ori=ChemP;
   ChemP=ChemP_ori+CDDF_Shift_ChemP;
   if (myid0==Host_ID){ printf(" Chemical Potential + Shifted Chemical Potential = %8.5lf + %8.5lf = %8.5lf (eV)\n",
-                                ChemP_ori*eV2Hartree,CDDF_Shift_ChemP*eV2Hartree,ChemP*eV2Hartree); fflush(stdout); }
+			      ChemP_ori*eV2Hartree,CDDF_Shift_ChemP*eV2Hartree,ChemP*eV2Hartree); fflush(stdout); }
   /* YTL-New-end */
 
   j = 0;
@@ -1291,27 +1292,27 @@ diagonalize1:
 
       if (0<T_k_op[kloop]){
 
-  for (i=0; i<MaxN; i++){ /* occupied state */
+	for (i=0; i<MaxN; i++){ /* occupied state */
 
           eig = EIGEN[spin][kloop][i+1];
           x = (eig - ChemP)*Beta;
-    if      (x<-x_cut)  FDFi = 1.0;
-    else if (x>x_cut)   FDFi = 0.0;
-    else                FDFi = 1.0/(1.0 + exp(x));
+	  if      (x<-x_cut)  FDFi = 1.0;
+	  else if (x>x_cut)   FDFi = 0.0;
+	  else                FDFi = 1.0/(1.0 + exp(x));
 
-    for (l=i+1; l<MaxN; l++){ /* unoccupied state */
+	  for (l=i+1; l<MaxN; l++){ /* unoccupied state */
 
-      eig = EIGEN[spin][kloop][l+1];
-      x = (eig - ChemP)*Beta;
-      if      (x<-x_cut)  FDFl = 1.0;
-      else if (x>x_cut)   FDFl = 0.0;
-      else                FDFl = 1.0/(1.0 + exp(x));
+	    eig = EIGEN[spin][kloop][l+1];
+	    x = (eig - ChemP)*Beta;
+	    if      (x<-x_cut)  FDFl = 1.0;
+	    else if (x>x_cut)   FDFl = 0.0;
+	    else                FDFl = 1.0/(1.0 + exp(x));
 
-      k2 = FDFi - FDFl; /* dFE */
+	    k2 = FDFi - FDFl; /* dFE */
             k3 = fabs( EIGEN[spin][kloop][i+1] - EIGEN[spin][kloop][l+1] ) ; /* dE */
-        if ( k2!=0 && k3 <= range_Ha + p1 && l > j) j = l; /* update the highest state */
-    }
-  }
+	    if ( k2!=0 && k3 <= range_Ha + p1 && l > j) j = l; /* update the highest state */
+	  }
+	}
       }
     }
   }
@@ -1399,8 +1400,8 @@ diagonalize1:
   /****************************************************
    ****************************************************
      diagonalization for calculating density matrix
-   ****************************************************
-  ****************************************************/
+     ****************************************************
+     ****************************************************/
 
   if (all_knum!=1){
 
@@ -1564,15 +1565,15 @@ diagonalize1:
 
       dtime(&Etime);
       time9 += Etime - Stime;
-/*
-      if (3<=level_stdout){
+      /*
+	if (3<=level_stdout){
 	printf(" myid0=%2d kloop %2d  k1 k2 k3 %10.6f %10.6f %10.6f\n",
-	       myid0,kloop,T_KGrids1[kloop],T_KGrids2[kloop],T_KGrids3[kloop]);
+	myid0,kloop,T_KGrids1[kloop],T_KGrids2[kloop],T_KGrids3[kloop]);
 	for (i1=1; i1<=n; i1++){
-	  printf("  Eigenvalues of OLP  %2d  %15.12f\n",i1,ko[i1]);
+	printf("  Eigenvalues of OLP  %2d  %15.12f\n",i1,ko[i1]);
 	}
-      }
-*/
+	}
+      */
       /* minus eigenvalues to 1.0e-14 */
 
       for (l=1; l<=n; l++){
@@ -1587,116 +1588,144 @@ diagonalize1:
       /* S * 1.0/sqrt(ko[l])  */
 
 
-    for(i=0;i<na_rows;i++){
-      for(j=0;j<na_cols;j++){
-	jg = np_cols*nblk*((j)/nblk) + (j)%nblk + ((np_cols+my_pcol)%np_cols)*nblk + 1;
-	Ss[j*na_rows+i].r = Ss[j*na_rows+i].r*ko[jg];
-	Ss[j*na_rows+i].i = Ss[j*na_rows+i].i*ko[jg];
+      for(i=0;i<na_rows;i++){
+	for(j=0;j<na_cols;j++){
+	  jg = np_cols*nblk*((j)/nblk) + (j)%nblk + ((np_cols+my_pcol)%np_cols)*nblk + 1;
+	  Ss[j*na_rows+i].r = Ss[j*na_rows+i].r*ko[jg];
+	  Ss[j*na_rows+i].i = Ss[j*na_rows+i].i*ko[jg];
+	}
       }
-    }
 
-    /****************************************************
+      /****************************************************
           1/sqrt(ko) * U^t * H * U * 1/sqrt(ko)
-    ****************************************************/
+      ****************************************************/
 
-    /* pzgemm */
+      /* pzgemm */
 
-    /* H * U * 1/sqrt(ko) */
+      /* H * U * 1/sqrt(ko) */
     
-    for(i=0;i<na_rows_max*na_cols_max;i++){
-      Cs[i].r = 0.0;
-      Cs[i].i = 0.0;
-    }
+      for(i=0;i<na_rows_max*na_cols_max;i++){
+	Cs[i].r = 0.0;
+	Cs[i].i = 0.0;
+      }
 
-    Cblacs_barrier(ictxt2,"A");
+      Cblacs_barrier(ictxt2,"A");
 
-    F77_NAME(pzgemm,PZGEMM)("N","N",&n,&n,&n,&alpha,Hs,&ONE,&ONE,descH,Ss,&ONE,&ONE,descS,&beta,Cs,&ONE,&ONE,descC);
+      F77_NAME(pzgemm,PZGEMM)("N","N",&n,&n,&n,&alpha,Hs,&ONE,&ONE,descH,Ss,&ONE,&ONE,descS,&beta,Cs,&ONE,&ONE,descC);
 
-    /* 1/sqrt(ko) * U^+ H * U * 1/sqrt(ko) */
+      /* 1/sqrt(ko) * U^+ H * U * 1/sqrt(ko) */
 
-    for(i=0;i<na_rows*na_cols;i++){
-      Hs[i].r = 0.0;
-      Hs[i].i = 0.0;
-    }
+      for(i=0;i<na_rows*na_cols;i++){
+	Hs[i].r = 0.0;
+	Hs[i].i = 0.0;
+      }
 
-    Cblacs_barrier(ictxt2,"C");
+      Cblacs_barrier(ictxt2,"C");
 
-    F77_NAME(pzgemm,PZGEMM)("C","N",&n,&n,&n,&alpha,Ss,&ONE,&ONE,descS,Cs,&ONE,&ONE,descC,&beta,Hs,&ONE,&ONE,descH);
+      F77_NAME(pzgemm,PZGEMM)("C","N",&n,&n,&n,&alpha,Ss,&ONE,&ONE,descS,Cs,&ONE,&ONE,descC,&beta,Hs,&ONE,&ONE,descH);
 
-    /* penalty for ill-conditioning states */
+      /* penalty for ill-conditioning states */
 
-    EV_cut0 = Threshold_OLP_Eigen;
+      EV_cut0 = Threshold_OLP_Eigen;
 
-    for (i1=1; i1<=n; i1++){
+      for (i1=1; i1<=n; i1++){
 
-      ig = i1;
-      jg = i1;
+	ig = i1;
+	jg = i1;
               
-      brow = (ig-1)/nblk;
-      bcol = (jg-1)/nblk;
+	brow = (ig-1)/nblk;
+	bcol = (jg-1)/nblk;
     
-      prow = brow%np_rows;
-      pcol = bcol%np_cols;
+	prow = brow%np_rows;
+	pcol = bcol%np_cols;
 
-      if(my_prow==prow && my_pcol==pcol){
-	il = (brow/np_rows+1)*nblk+1;
-	jl = (bcol/np_cols+1)*nblk+1;
-	if(((my_prow+np_rows)%np_rows) >= (brow%np_rows)){
-	  if(my_prow==prow){
-	    il = il+(ig-1)%nblk;
+	if(my_prow==prow && my_pcol==pcol){
+	  il = (brow/np_rows+1)*nblk+1;
+	  jl = (bcol/np_cols+1)*nblk+1;
+	  if(((my_prow+np_rows)%np_rows) >= (brow%np_rows)){
+	    if(my_prow==prow){
+	      il = il+(ig-1)%nblk;
+	    }
+	    il = il-nblk;
 	  }
-	  il = il-nblk;
-	}
-	if(((my_pcol+np_cols)%np_cols) >= (bcol%np_cols)){
-	  if(my_pcol==pcol){
-	    jl = jl+(jg-1)%nblk;
+	  if(((my_pcol+np_cols)%np_cols) >= (bcol%np_cols)){
+	    if(my_pcol==pcol){
+	      jl = jl+(jg-1)%nblk;
+	    }
+	    jl = jl-nblk;
 	  }
-	  jl = jl-nblk;
+	  if(koS[i1]<EV_cut0){
+	    Hs[(jl-1)*na_rows+il-1].r += pow((koS[i1]/EV_cut0),-2.0) - 1.0;
+	  }
+	  mC_spin_i1 = Hs[(jl-1)*na_rows+il-1].r;
 	}
-	if(koS[i1]<EV_cut0){
-	  Hs[(jl-1)*na_rows+il-1].r += pow((koS[i1]/EV_cut0),-2.0) - 1.0;
+	else{
+	  mC_spin_i1 = 0.0;
 	}
-	mC_spin_i1 = Hs[(jl-1)*na_rows+il-1].r;
-      }
-      else{
-	mC_spin_i1 = 0.0;
-      }
 
-      MPI_Allreduce(&mC_spin_i1, &C_spin_i1, 1, MPI_DOUBLE, MPI_SUM, MPI_CommWD2[myworld2]);
+	MPI_Allreduce(&mC_spin_i1, &C_spin_i1, 1, MPI_DOUBLE, MPI_SUM, MPI_CommWD2[myworld2]);
  
-      /* cutoff the interaction between the ill-conditioned state */
+	/* cutoff the interaction between the ill-conditioned state */
 
-      if (1.0e+3<C_spin_i1){
-	for (j1=1; j1<=n; j1++){
+	if (1.0e+3<C_spin_i1){
+	  for (j1=1; j1<=n; j1++){
+
+	    ig = i1;
+	    jg = j1;
+              
+	    brow = (ig-1)/nblk;
+	    bcol = (jg-1)/nblk;
+
+	    prow = brow%np_rows;
+	    pcol = bcol%np_cols;
+
+	    if(my_prow==prow && my_pcol==pcol){
+	      il = (brow/np_rows+1)*nblk+1;
+	      jl = (bcol/np_cols+1)*nblk+1;
+	      if(((my_prow+np_rows)%np_rows) >= (brow%np_rows)){
+		if(my_prow==prow){
+		  il = il+(ig-1)%nblk;
+		}
+		il = il-nblk;
+	      }
+	      if(((my_pcol+np_cols)%np_cols) >= (bcol%np_cols)){
+		if(my_pcol==pcol){
+		  jl = jl+(jg-1)%nblk;
+		}
+		jl = jl-nblk;
+	      }
+	      Hs[(jl-1)*na_rows+il-1] = Complex(0.0,0.0);
+	    }
+
+	    ig = j1;
+	    jg = i1;
+              
+	    brow = (ig-1)/nblk;
+	    bcol = (jg-1)/nblk;
+
+	    prow = brow%np_rows;
+	    pcol = bcol%np_cols;
+
+	    if(my_prow==prow && my_pcol==pcol){
+	      il = (brow/np_rows+1)*nblk+1;
+	      jl = (bcol/np_cols+1)*nblk+1;
+	      if(((my_prow+np_rows)%np_rows) >= (brow%np_rows)){
+		if(my_prow==prow){
+		  il = il+(ig-1)%nblk;
+		}
+		il = il-nblk;
+	      }
+	      if(((my_pcol+np_cols)%np_cols) >= (bcol%np_cols)){
+		if(my_pcol==pcol){
+		  jl = jl+(jg-1)%nblk;
+		}
+		jl = jl-nblk;
+	      }
+	      Hs[(jl-1)*na_rows+il-1] = Complex(0.0,0.0);
+	    }
+	  }
 
 	  ig = i1;
-	  jg = j1;
-              
-	  brow = (ig-1)/nblk;
-	  bcol = (jg-1)/nblk;
-
-	  prow = brow%np_rows;
-	  pcol = bcol%np_cols;
-
-	  if(my_prow==prow && my_pcol==pcol){
-	    il = (brow/np_rows+1)*nblk+1;
-	    jl = (bcol/np_cols+1)*nblk+1;
-	    if(((my_prow+np_rows)%np_rows) >= (brow%np_rows)){
-	      if(my_prow==prow){
-		il = il+(ig-1)%nblk;
-	      }
-	      il = il-nblk;
-	    }
-	    if(((my_pcol+np_cols)%np_cols) >= (bcol%np_cols)){
-	      if(my_pcol==pcol){
-		jl = jl+(jg-1)%nblk;
-	      }
-	      jl = jl-nblk;
-	    }
-	    Hs[(jl-1)*na_rows+il-1] = Complex(0.0,0.0);
-	  }
-
-	  ig = j1;
 	  jg = i1;
               
 	  brow = (ig-1)/nblk;
@@ -1720,39 +1749,11 @@ diagonalize1:
 	      }
 	      jl = jl-nblk;
 	    }
-	    Hs[(jl-1)*na_rows+il-1] = Complex(0.0,0.0);
+	    Hs[(jl-1)*na_rows+il-1].r = 1.0e+4;
 	  }
 	}
-
-	ig = i1;
-	jg = i1;
-              
-	brow = (ig-1)/nblk;
-	bcol = (jg-1)/nblk;
-
-	prow = brow%np_rows;
-	pcol = bcol%np_cols;
-
-	if(my_prow==prow && my_pcol==pcol){
-	  il = (brow/np_rows+1)*nblk+1;
-	  jl = (bcol/np_cols+1)*nblk+1;
-	  if(((my_prow+np_rows)%np_rows) >= (brow%np_rows)){
-	    if(my_prow==prow){
-	      il = il+(ig-1)%nblk;
-	    }
-	    il = il-nblk;
-	  }
-	  if(((my_pcol+np_cols)%np_cols) >= (bcol%np_cols)){
-	    if(my_pcol==pcol){
-	      jl = jl+(jg-1)%nblk;
-	    }
-	    jl = jl-nblk;
-	  }
-	  Hs[(jl-1)*na_rows+il-1].r = 1.0e+4;
-	}
-      }
       
-    }
+      }
 
       /* diagonalize H' */
 
@@ -1772,16 +1773,16 @@ diagonalize1:
 
       dtime(&Etime);
       time10 += Etime - Stime;
-/*
-      if (3<=level_stdout && 0<=kloop){
+      /*
+	if (3<=level_stdout && 0<=kloop){
 	printf("  kloop %i, k1 k2 k3 %10.6f %10.6f %10.6f\n",
-	       kloop,T_KGrids1[kloop],T_KGrids2[kloop],T_KGrids3[kloop]);
+	kloop,T_KGrids1[kloop],T_KGrids2[kloop],T_KGrids3[kloop]);
 	for (i1=1; i1<=n; i1++){
-	  printf("  Eigenvalues of Kohn-Sham(DM) spin=%2d i1=%2d %15.12f\n",
-		 spin,i1,ko[i1]);
+	printf("  Eigenvalues of Kohn-Sham(DM) spin=%2d i1=%2d %15.12f\n",
+	spin,i1,ko[i1]);
 	}
-      }
-*/
+	}
+      */
       /****************************************************
         transformation to the original eigenvectors.
 	     NOTE JRCAT-244p and JAIST-2122p 
@@ -1795,8 +1796,7 @@ diagonalize1:
       F77_NAME(pzgemm,PZGEMM)("N","N",&n,&n,&n,&alpha,Ss,&ONE,&ONE,descS,Cs,&ONE,&ONE,descC,&beta,Hs,&ONE,&ONE,descH);
       Cblacs_barrier(ictxt2,"A");
 
-
-      if(myid2==0){
+      if (myid2==0){
 
 	for(node=0;node<numprocs2;node++){
 
@@ -1849,7 +1849,6 @@ diagonalize1:
       }
 
       /* YTL-start */
-      fd_dist = (double*)malloc(sizeof(double)*n); /* num_kloop0 = number of kloop at each CPU */
       for (i=0; i<n; i++) fd_dist[i] = 0.0; /* initialize fermi-dirac distribution */
       /* YTL-end */
 
@@ -1895,9 +1894,9 @@ diagonalize1:
 
       if (po==0) lmax = MaxN;
 
-/* YTL-start */
+      /* YTL-start */
       Calc_band_optical_col_1(T_KGrids1[kloop],T_KGrids2[kloop],T_KGrids3[kloop],spin,n,EIGEN[spin][kloop],H,fd_dist,ChemP);
-/* YTL-end */
+      /* YTL-end */
 
       dtime(&Etime);
       time11 += Etime - Stime;
@@ -1992,18 +1991,15 @@ diagonalize1:
   free(Comm_World1);
   free(NPROCS_ID1);
 
-  if (T_knum<=numprocs1){
-
-    if (Num_Comm_World2<=numprocs1){
-      MPI_Comm_free(&MPI_CommWD2[myworld2]);
-    }
-
-    free(MPI_CommWD2);
-    free(Comm_World_StartID2);
-    free(NPROCS_WD2);
-    free(Comm_World2);
-    free(NPROCS_ID2);
+  if (Num_Comm_World2<=numprocs1){
+    MPI_Comm_free(&MPI_CommWD2[myworld2]);
   }
+
+  free(MPI_CommWD2);
+  free(Comm_World_StartID2);
+  free(NPROCS_WD2);
+  free(Comm_World2);
+  free(NPROCS_ID2);
 
   free(Ss);
   free(Hs);

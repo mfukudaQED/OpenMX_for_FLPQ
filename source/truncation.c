@@ -50,24 +50,24 @@ double truncation(int MD_iter,int UCell_flag)
   int tno0,tno1,tno2,Cwan,Hwan,N,so,spin;
   int num,n2,wanA,wanB,Gi,NO1;
   int Anum,Bnum,fan,csize,NUM;
-  int size_Orbs_Grid,size_COrbs_Grid;
-  int size_Orbs_Grid_FNAN;
-  int size_H0,size_CntH0,size_H,size_CntH;
-  int size_HNL,size_HisH1,size_HisH2;
-  int size_iHNL,size_iHNL0,size_iCntHNL;
-  int size_DS_NL,size_CntDS_NL;
-  int size_NumOLG,size_OLP,size_OLP_CH,size_CntOLP;
-  int size_OLP_L,size_OLP_p;
-  int size_HVNA,size_DS_VNA,size_CntDS_VNA;
-  int size_HVNA2,size_CntHVNA2;
-  int size_HVNA3,size_CntHVNA3;
-  int size_H_Hub,size_DM_onsite,size_DM0;
-  int size_v_eff,size_NC_OcpN,size_NC_v_eff;
-  int size_S12,size_iDM;
-  int size_ResidualDM,size_iResidualDM;
-  int size_Krylov_U,size_EC_matrix;
-  int size_H_Zeeman_NCO;
-  int size_TRAN_DecMulP,size_DecEkin,size_SubSpace_EC;
+  int size_Orbs_Grid=0,size_COrbs_Grid=0;
+  int size_Orbs_Grid_FNAN=0;
+  int size_H0=0,size_CntH0=0,size_H=0,size_CntH=0;
+  int size_HNL=0,size_HisH1=0,size_HisH2=0;
+  int size_iHNL=0,size_iHNL0=0,size_iCntHNL=0;
+  int size_DS_NL=0,size_CntDS_NL=0;
+  int size_NumOLG=0,size_OLP=0,size_OLP_CH=0,size_CntOLP=0;
+  int size_OLP_L=0,size_OLP_p=0;
+  int size_HVNA=0,size_DS_VNA=0,size_CntDS_VNA=0;
+  int size_HVNA2=0,size_CntHVNA2=0;
+  int size_HVNA3=0,size_CntHVNA3=0;
+  int size_H_Hub=0,size_DM_onsite=0,size_DM0=0;
+  int size_v_eff=0,size_NC_OcpN=0,size_NC_v_eff=0;
+  int size_S12,size_iDM=0;
+  int size_ResidualDM=0,size_iResidualDM=0;
+  int size_Krylov_U=0,size_EC_matrix=0;
+  int size_H_Zeeman_NCO=0;
+  int size_TRAN_DecMulP=0,size_DecEkin=0,size_SubSpace_EC=0;
   int My_Max_GridN_Atom,My_Max_OneD_Grids,My_Max_NumOLG;
   int numprocs,myid,ID;
   double r0,scale_rc0;
@@ -110,10 +110,15 @@ double truncation(int MD_iter,int UCell_flag)
 
   if (measure_time) dtime(&stime); 
 
-  for (Gc_AN=1; Gc_AN<=atomnum; Gc_AN++){
-    ID = G2ID[Gc_AN];
-    MPI_Bcast(&time_per_atom[Gc_AN], 1, MPI_DOUBLE, ID, mpi_comm_level1);
+  if (MD_iter==1){
+    for (Gc_AN=1; Gc_AN<=atomnum; Gc_AN++) time_per_atom[Gc_AN] = 1.0;
   }
+  else{
+    for (Gc_AN=1; Gc_AN<=atomnum; Gc_AN++){
+      ID = G2ID[Gc_AN];
+      MPI_Bcast(&time_per_atom[Gc_AN], 1, MPI_DOUBLE, ID, mpi_comm_level1);
+    }
+  } 
 
   free_arrays_truncation0();
 
@@ -742,6 +747,7 @@ double truncation(int MD_iter,int UCell_flag)
 	  iCntHNL[k][Mc_AN][h_AN] = (double**)malloc(sizeof(double*)*tno0); 
 	  for (i=0; i<tno0; i++){
 	    iCntHNL[k][Mc_AN][h_AN][i] = (double*)malloc(sizeof(double)*tno1); 
+            for (j=0; j<tno1; j++) iCntHNL[k][Mc_AN][h_AN][i][j] = 0.0;
             size_iCntHNL += tno1;  
 	  }
 	}
@@ -827,6 +833,49 @@ double truncation(int MD_iter,int UCell_flag)
 	      iHCH[k][Mc_AN][h_AN][i] = (double*)malloc(sizeof(double)*tno1); 
 	      for (j=0; j<tno1; j++) iHCH[k][Mc_AN][h_AN][i][j] = 0.0;
 	    }
+	  }
+	}
+      }
+    }
+  }
+
+  if (xmcd_calc==1){
+
+    // ASK, S. An
+    pre_spin_moment = (double*)malloc(sizeof(double)*(3));
+
+    H_XMCD = (double*****)malloc(sizeof(double****)*(SpinP_switch+1));
+    for (k=0; k<=SpinP_switch; k++){
+      H_XMCD[k] = (double****)malloc(sizeof(double***)*(Matomnum+1));
+      FNAN[0] = 0;
+      for (Mc_AN=0; Mc_AN<=Matomnum; Mc_AN++){
+
+	if (Mc_AN==0){
+	  Gc_AN = 0;
+	  tno0 = 1;
+	}
+	else{
+	  Gc_AN = M2G[Mc_AN];
+	  Cwan = WhatSpecies[Gc_AN];
+	  tno0 = Spe_Total_NO[Cwan];
+	}
+
+	H_XMCD[k][Mc_AN] = (double***)malloc(sizeof(double**)*(FNAN[Gc_AN]+1));
+	for (h_AN=0; h_AN<=FNAN[Gc_AN]; h_AN++){
+
+	  if (Mc_AN==0){
+	    tno1 = 1;
+	  }
+	  else{
+	    Gh_AN = natn[Gc_AN][h_AN];
+	    Hwan = WhatSpecies[Gh_AN];
+	    tno1 = Spe_Total_NO[Hwan];
+	  }
+
+	  H_XMCD[k][Mc_AN][h_AN] = (double**)malloc(sizeof(double*)*tno0);
+	  for (i=0; i<tno0; i++){
+	    H_XMCD[k][Mc_AN][h_AN][i] = (double*)malloc(sizeof(double)*tno1);
+	    for (j=0; j<tno1; j++) H_XMCD[k][Mc_AN][h_AN][i][j] = 0.0;
 	  }
 	}
       }
@@ -1065,6 +1114,7 @@ double truncation(int MD_iter,int UCell_flag)
         OLP[k][Mc_AN][h_AN] = (double**)malloc(sizeof(double*)*tno0); 
         for (i=0; i<tno0; i++){
           OLP[k][Mc_AN][h_AN][i] = (double*)malloc(sizeof(double)*tno1); 
+          for (j=0; j<tno1; j++) OLP[k][Mc_AN][h_AN][i][j] = 0.0;
           size_OLP += tno1;
         }
       }
@@ -1261,6 +1311,7 @@ double truncation(int MD_iter,int UCell_flag)
 	  CntH[k][Mc_AN][h_AN] = (double**)malloc(sizeof(double*)*tno0); 
 	  for (i=0; i<tno0; i++){
 	    CntH[k][Mc_AN][h_AN][i] = (double*)malloc(sizeof(double)*tno1); 
+            for (j=0; j<tno1; j++) CntH[k][Mc_AN][h_AN][i][j] = 0.0;
 	    size_CntH += tno1;  
 	  }
 	}
@@ -3524,13 +3575,9 @@ void Trn_System(int MD_iter, int CpyCell, int TCpyCell)
     ID = G2ID[ct_AN];
     MPI_Bcast(&FNAN[ct_AN], 1, MPI_INT, ID, mpi_comm_level1);
     MPI_Bcast(&SNAN[ct_AN], 1, MPI_INT, ID, mpi_comm_level1);
-
-    MPI_Bcast(&natn[ct_AN][0], FNAN[ct_AN]+SNAN[ct_AN]+1,
-              MPI_INT, ID, mpi_comm_level1);
-    MPI_Bcast(&ncn[ct_AN][0], FNAN[ct_AN]+SNAN[ct_AN]+1,
-              MPI_INT, ID, mpi_comm_level1);
-    MPI_Bcast(&Dis[ct_AN][0], FNAN[ct_AN]+SNAN[ct_AN]+1,
-              MPI_DOUBLE, ID, mpi_comm_level1);
+    MPI_Bcast(&natn[ct_AN][0], FNAN[ct_AN]+SNAN[ct_AN]+1, MPI_INT, ID, mpi_comm_level1);
+    MPI_Bcast(&ncn[ct_AN][0], FNAN[ct_AN]+SNAN[ct_AN]+1, MPI_INT, ID, mpi_comm_level1);
+    MPI_Bcast(&Dis[ct_AN][0], FNAN[ct_AN]+SNAN[ct_AN]+1, MPI_DOUBLE, ID, mpi_comm_level1);
   }
 
   if (Solver==11){
@@ -5670,6 +5717,49 @@ void free_arrays_truncation0()
 	}
 	free(iHCH);
       }
+    }
+
+    if (xmcd_calc==1){
+
+      // ASK, S. An
+      free(pre_spin_moment);
+
+      for (k=0; k<=SpinP_switch; k++){
+
+	FNAN[0] = 0;
+	for (Mc_AN=0; Mc_AN<=Matomnum; Mc_AN++){
+
+	  if (Mc_AN==0){
+	    Gc_AN = 0;
+	    tno0 = 1;
+	  }
+	  else{
+	    Gc_AN = M2G[Mc_AN];
+	    Cwan = WhatSpecies[Gc_AN];
+	    tno0 = Spe_Total_NO[Cwan];
+	  }
+
+	  for (h_AN=0; h_AN<=FNAN[Gc_AN]; h_AN++){
+
+	    if (Mc_AN==0){
+	      tno1 = 1;
+	    }
+	    else{
+	      Gh_AN = natn[Gc_AN][h_AN];
+	      Hwan = WhatSpecies[Gh_AN];
+	      tno1 = Spe_Total_NO[Hwan];
+	    }
+            
+	    for (i=0; i<tno0; i++){
+	      free(H_XMCD[k][Mc_AN][h_AN][i]);
+	    }
+            free(H_XMCD[k][Mc_AN][h_AN]);
+	  }
+          free(H_XMCD[k][Mc_AN]);
+	}
+        free(H_XMCD[k]);
+      }
+      free(H_XMCD);
     }
 
     /* H_Hub  --- added by MJ */  

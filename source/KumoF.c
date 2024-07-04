@@ -6,7 +6,7 @@
 
   Log of KumoF.c:
 
-     26/Feb./2012  Released by T.Ozaki
+     26/Feb./2012  Released by T. Ozaki
 
 ***********************************************************************/
 

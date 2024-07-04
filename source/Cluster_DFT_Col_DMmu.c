@@ -22,6 +22,12 @@
 
 #define  measure_time   0
 
+void solve_evp_real_( int *n1, int *n2, double *Cs, int *na_rows1, double *a, double *Ss, int *na_rows2, int *nblk, 
+                      int *mpi_comm_rows_int, int *mpi_comm_cols_int);
+
+void elpa_solve_evp_real_2stage_double_impl_( int *n1, int *n2, double *Cs, int *na_rows1, double *a, double *Ss, int *na_rows2, 
+                                              int *nblk, int *na_cols1, int *mpi_comm_rows_int, int *mpi_comm_cols_int, int *mpiworld);
+
 static double Calc_DMmu_Cluster_collinear(int myid0,
                                         int numprocs0,
                                         int myid1,

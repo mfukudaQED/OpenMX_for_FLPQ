@@ -4296,8 +4296,8 @@ void make_NC_v_eff(int SCF_iter, int SucceedReadingDMfile, double dUele, double 
       dSy[1][1].r = 0.0;
 
       dSy[0][0].i = 0.0;
-      dSy[0][1].i =-0.5;  /* causion for the sign */
-      dSy[1][0].i = 0.5;  /* causion for the sign */
+      dSy[0][1].i =-0.5;  /* caution for the sign */
+      dSy[1][0].i = 0.5;  /* caution for the sign */
       dSy[1][1].i = 0.0;
       
       dSz[0][0].r = 0.5;

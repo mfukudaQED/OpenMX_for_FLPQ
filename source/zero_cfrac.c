@@ -20,10 +20,9 @@
 #include <math.h>
 #include <search.h>
 #include <string.h>
-
+#include "mpi.h"
 #include "openmx_common.h"
 #include "lapack_prototypes.h"
-#include "mpi.h"
 
 
 static void Eigen_DGGEVX( int n, double **a, double **s, double *eval,

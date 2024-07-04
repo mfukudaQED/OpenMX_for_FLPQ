@@ -18,7 +18,6 @@
 
 #define  measure_time   0
 
-static void Eigen_HH3(double *ac, int csize, double *ko, int n, int EVmax);
 static int Eigen_lapack_x3(double *a, double *ko, int n0, int EVmax);
 
 void Eigen_lapack3(double *a, double *ko, int n, int EVmax)

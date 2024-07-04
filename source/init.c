@@ -24,7 +24,7 @@ static void Matsubara();
 static void MM();
 static dcomplex G(dcomplex z);
 static void Set_Poles_Residues_EGAC();
-
+static void Low_Rank_Reciprocal_Coulomb_Kernel();
 
 void init()
 {
@@ -215,7 +215,300 @@ void init()
     Set_Poles_Residues_EGAC();
   }
 
+  /****************************************************
+      CP expansion of 1/(|r1+r2|^2 + c) using SVD
+  ****************************************************/
+
+  //Low_Rank_Reciprocal_Coulomb_Kernel();
+  
 }
+
+
+
+void Low_Rank_Reciprocal_Coulomb_Kernel()
+{
+  int i,j,k,p,i1,j1,k1,i2,j2,k2,Ng1,Nrank,Ndim,n,m;
+  int *jun_sv,ii1,jj1,kk1,ii2,jj2,kk2;
+  double x1,y1,z1,x2,y2,z2,anal,r2;
+  double dx,xmin,xmax,c,sx,sy,sz,max_diff,tensor;
+  double *A,*ko,*xgrid;
+
+  /* set parameters */
+  
+  Ng1 = Ng1_Rec_Coulomb;
+  Nrank = Nrank_Rec_Coulomb;
+  Ndim = Ng1*Ng1*Ng1;
+  xmin = xmin_Rec_Coulomb;
+  xmax = xmax_Rec_Coulomb;
+  dx = (2.0*xmax-xmin)/(double)(Ng1-1);
+  c = Yukawa_Exponent_Rec_Coulomb;
+    
+  /* allocation of arrays */
+
+  A = (double*)malloc(sizeof(double)*Ndim*Ndim);
+  ko = (double*)malloc(sizeof(double)*Ndim);
+  jun_sv = (int*)malloc(sizeof(int)*Ndim);
+  xgrid = (double*)malloc(sizeof(double)*Ng1);
+
+  /* set xgrid_Rec_Coulomb */
+  
+  for (i1=0; i1<Ng1; i1++){
+
+    xgrid_Rec_Coulomb[i1] = dx*(double)i1 - xmax;
+    xgrid[i1] = xgrid_Rec_Coulomb[i1];
+    
+    if ((0.50*xmax-1.0e-10)<=xgrid[i1]){
+      xgrid[i1] = xgrid[i1] - xmax;
+    }
+    
+    if (xgrid[i1]<(-0.50*xmax)){
+      xgrid[i1] = xgrid[i1] + xmax;
+    }
+  }
+
+  /* construct the matrix by the discretization of 1/(|r1+r2|^2 + c) */
+
+  n = 0;
+  for (i1=0; i1<Ng1; i1++){
+    x1 = xgrid[i1];
+    for (j1=0; j1<Ng1; j1++){
+      y1 = xgrid[j1];
+      for (k1=0; k1<Ng1; k1++){
+        z1 = xgrid[k1];
+
+	m = 0;
+	for (i2=0; i2<Ng1; i2++){
+          x2 = xgrid[i2];
+	  sx = x1 + x2;
+	  for (j2=0; j2<Ng1; j2++){
+            y2 = xgrid[j2];
+	    sy = y1 + y2;
+	    for (k2=0; k2<Ng1; k2++){
+              z2 = xgrid[k2];
+              sz = z1 + z2;
+
+	      A[m*Ndim+n] = 1.0/(sx*sx+sy*sy+sz*sz+c);
+	      
+	      m++;  
+	    }
+	  }
+	}
+
+	n++;
+      }
+    }
+  }
+
+  /* singular value decomposition (SVD) of A */
+
+  /*
+  printf("Original\n");
+  for (i=0; i<Ndim; i++){
+    for (j=0; j<Ndim; j++){
+      printf("%8.4f ",A[i*Ndim+j]);
+    }
+    printf("\n");
+  }
+  */
+  
+  Eigen_lapack3(A, ko, Ndim, Ndim);
+
+  /*
+  printf("Tensor\n");
+  for (i=0; i<Ndim; i++){
+    for (j=0; j<Ndim; j++){
+
+      tensor = 0.0;
+      for (k=0; k<Ndim; k++){
+        tensor += ko[k]*A[k*Ndim+i]*A[k*Ndim+j];
+      }
+      printf("%8.4f ",tensor);
+    }
+    printf("\n");
+  }
+  */
+
+  
+  for (i=0; i<Ndim; i++){
+    SVals_Rec_Coulomb[i] = fabs(ko[i]);
+    jun_sv[i] = i; 
+  }
+
+  qsort_double_int2(Ndim, SVals_Rec_Coulomb, jun_sv);
+
+  /*
+  for (i=0; i<Ndim; i++){
+    printf("ABC1 i=%2d sv=%15.12f jun=%2d\n",i,SVals_Rec_Coulomb[i],jun_sv[i]);
+  }
+  */
+
+
+  /*
+  for (i=0; i<Ndim; i++){
+    printf("ABC2 i=%2d ko=%15.12f jun=%2d\n",i,ko[i],jun_sv[i]);
+  }
+  */
+
+  /* the sign is attached to the singular value */
+  for (i=0; i<Ndim; i++){
+    k = jun_sv[i];
+    SVals_Rec_Coulomb[i] = ko[k];
+  }
+
+  /* store singular vectors */ 
+
+  for (i=0; i<Nrank; i++){
+    k = jun_sv[i];
+    for (j=0; j<Ndim; j++){
+      SVecs_Rec_Coulomb[i][j] = A[k*Ndim+j];
+    }
+  }
+
+  /* update singular vectors */ 
+
+    
+
+  
+
+
+  
+  /* check the accuracy of the approximation */ 
+  
+  max_diff = -1.0;
+  
+  m = 0;
+  for (i1=0; i1<Ng1; i1++){
+    x1 = xgrid[i1];
+    for (j1=0; j1<Ng1; j1++){
+      y1 = xgrid[j1];
+      for (k1=0; k1<Ng1; k1++){
+        z1 = xgrid[k1];
+
+	n = 0;
+	for (i2=0; i2<Ng1; i2++){
+          x2 = xgrid[i2];
+	  sx = x1 + x2;
+	  for (j2=0; j2<Ng1; j2++){
+            y2 = xgrid[j2];
+	    sy = y1 + y2;
+	    for (k2=0; k2<Ng1; k2++){
+              z2 = xgrid[k2];
+              sz = z1 + z2;
+
+    	      r2 = sx*sx+sy*sy+sz*sz;
+	      anal = 1.0/(r2+c);
+
+	      tensor = 0.0;
+              for (p=0; p<Nrank; p++){
+                tensor += SVals_Rec_Coulomb[p]*SVecs_Rec_Coulomb[p][m]*SVecs_Rec_Coulomb[p][n];
+	      }
+	      
+              if (max_diff<fabs(anal-tensor) && 1.0e-8<r2){
+		max_diff = fabs(anal-tensor);
+		ii1 = i1; jj1 = j1; kk1 = k1;
+		ii2 = i2; jj2 = j2; kk2 = k2;
+	      }
+	      
+	      n++;  
+	    }
+	  }
+	}
+
+	m++;
+      }
+    }
+  }
+
+  printf("Nrank=%2d ijk1=%2d %2d %2d ijk2=%2d %2d %2d max_diff=%15.12f r2=%15.12f\n",
+	 Nrank,ii1,jj1,kk1,ii2,jj2,kk2,max_diff,r2);
+
+  /*
+  for (i1=0; i1<Ng1; i1++){
+    printf("VVV1 %2d %15.12f\n",i1,xgrid_Rec_Coulomb[i1]);
+  }
+  */
+
+  
+  double *IntVecs1,*IntVecs2;
+  double sum;
+  
+  IntVecs1 = (double*)malloc(sizeof(double)*Nrank_Rec_Coulomb);
+  IntVecs2 = (double*)malloc(sizeof(double)*Nrank_Rec_Coulomb);
+
+  //Vecs_Rec_Coulomb(0.0, -3.0, 6.0, IntVecs);
+  
+  /*
+  Vecs_Rec_Coulomb(0.0, -3.0, 6.0, IntVecs);
+  for (i1=0; i1<Nrank; i1++){
+    printf("ABC2 %2d Vecs=%15.12f %15.12f\n",i1,IntVecs[i1],SVecs_Rec_Coulomb[i1][4*Ng1*Ng1+3*Ng1+6]);
+  }
+  */
+
+  /*
+  for (i=0; i<200; i++){
+    x1 = (double)i*0.1 - 12.0;
+    Vecs_Rec_Coulomb(x1, -3.0, 6.0, IntVecs);
+
+    printf("%15.12f ",x1);
+
+    for (j=0; j<Nrank; j++){
+      printf("%15.12f ",IntVecs[j]);
+    }
+    printf("\n");
+  }
+  */
+
+  
+  /*
+  Vecs_Rec_Coulomb_Cubic_Hermite( -3.0, -3.0,  0.0, IntVecs1);
+  Vecs_Rec_Coulomb_Cubic_Hermite(  3.0,  3.0,  5.0, IntVecs2);
+
+  m = 3*Ng1*Ng1 + 3*Ng1 + 4;
+  n = 5*Ng1*Ng1 + 5*Ng1 + 7;
+  
+  sum = 0.0;
+  for (i1=0; i1<Nrank; i1++){
+    sum += SVals_Rec_Coulomb[i1]*SVecs_Rec_Coulomb[i1][m]*SVecs_Rec_Coulomb[i1][n];
+  }
+  printf("VVV1 %15.12f\n",sum);
+  */
+  
+
+  for (i=0; i<140; i++){
+    x1 = (double)i*0.1 - 6.0;
+
+    /*
+    Vecs_Rec_Coulomb_Cubic_Hermite( x1,   0.0, 0.0, IntVecs1);
+    Vecs_Rec_Coulomb_Cubic_Hermite( 0.0,  0.0, 0.0, IntVecs2);
+    */
+
+    Vecs_Rec_Coulomb_Tricubic( x1,   0.0, 0.0, IntVecs1);
+    Vecs_Rec_Coulomb_Tricubic( 0.0,  0.0, 0.0, IntVecs2);
+    
+    sum = 0.0;
+    for (i1=0; i1<Nrank; i1++){
+      sum += SVals_Rec_Coulomb[i1]*IntVecs1[i1]*IntVecs2[i1];
+    }
+
+    printf("VVV2 %15.12f %15.12f %15.12f\n",x1,sum,1.0/((x1+0.0)*(x1+0.0)+0.0+0.0*0.0+0.1));
+    
+  }
+    
+
+  
+  MPI_Finalize();
+  exit(0);
+
+  
+  /* freeing of arrays */
+
+  free(A);
+  free(ko);
+  free(jun_sv);
+  free(xgrid);
+  
+}
+
 
 
 

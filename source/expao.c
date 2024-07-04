@@ -469,13 +469,13 @@ int input_errorCount() {
 int input_logical(const char *key, int *ret,const  int defval)
 {
   const int size=BUFSIZE;
-  char buf[BUFSIZE];
+  char buf[BUFSIZE] = "";
   int keylen,buflen,nread;
 
    char *strval[SIZE_LOGICAL_DEFAULT]={"on","yes","true",".true.","ok","off","no","false",".false.","ng"};
    int ival[SIZE_LOGICAL_DEFAULT]={1,1,1,1,1,0,0,0,0,0};
 
-  char key_inbuf[BUFSIZE],val_inbuf[BUFSIZE];
+  char key_inbuf[BUFSIZE] = "",val_inbuf[BUFSIZE] = "";
 
   keylen=strlen_trim(key);
   
@@ -512,9 +512,9 @@ int input_logical(const char *key, int *ret,const  int defval)
 int input_int(const char *key, int *ret, const int defval)
 {
   const int size=BUFSIZE;
-  char buf[BUFSIZE];
+  char buf[BUFSIZE] = "";
   int keylen,buflen, nread;
-  char key_inbuf[BUFSIZE],val_inbuf[BUFSIZE];
+  char key_inbuf[BUFSIZE] = "",val_inbuf[BUFSIZE] = "";
 
 
   keylen=strlen_trim(key);
@@ -550,9 +550,9 @@ int input_int(const char *key, int *ret, const int defval)
 int input_double(const char *key, double *ret, const double defval)
 {
   const int size=BUFSIZE;
-  char buf[BUFSIZE];
+  char buf[BUFSIZE] = "";
   int keylen,buflen,nread;
-  char key_inbuf[BUFSIZE],val_inbuf[BUFSIZE];
+  char key_inbuf[BUFSIZE] = "",val_inbuf[BUFSIZE] = "";
 
 
   keylen=strlen_trim(key); 
@@ -588,9 +588,9 @@ int input_double(const char *key, double *ret, const double defval)
 int input_string(const char *key, char *ret,const char *defval)
 {
   const int size=BUFSIZE;
-  char buf[BUFSIZE];
+  char buf[BUFSIZE] = "";
   int keylen,buflen,nread;
-  char key_inbuf[BUFSIZE],val_inbuf[BUFSIZE];
+  char key_inbuf[BUFSIZE] = "",val_inbuf[BUFSIZE] = "";
 
   keylen=strlen_trim(key);
 
@@ -625,9 +625,9 @@ int input_string2int(const char *key, int *ret, int nvals,
                      char **strval,  int *ivals)
 {
   const int size=BUFSIZE;
-  char buf[BUFSIZE];
+  char buf[BUFSIZE] = "";
   int keylen,buflen,iret,nread;
-  char key_inbuf[BUFSIZE],val_inbuf[BUFSIZE];
+  char key_inbuf[BUFSIZE] = "",val_inbuf[BUFSIZE] = "";
 
   keylen=strlen_trim(key);
 
@@ -663,9 +663,9 @@ int input_string2int(const char *key, int *ret, int nvals,
 int input_stringv(const char *key,const int nret, char **ret, char  **defval)
 {
   const int size=BUFSIZE;
-  char buf[BUFSIZE], *c;
+  char buf[BUFSIZE] = "", *c;
   int keylen,buflen;
-  char key_inbuf[BUFSIZE];
+  char key_inbuf[BUFSIZE] = "";
   int i;
 
 
@@ -708,9 +708,9 @@ int input_doublev(const char *key,const int nret,
 double *ret, double *defval)
 {
   const int size=BUFSIZE;
-  char buf[BUFSIZE], *c;
+  char buf[BUFSIZE] = "", *c;
   int keylen,buflen;
-  char key_inbuf[BUFSIZE];
+  char key_inbuf[BUFSIZE] = "";
   int i;
 
   keylen=strlen_trim(key);
@@ -755,9 +755,9 @@ double *ret, double *defval)
 int input_intv(const char *key, int nret, int *ret, int *defval)
 {
   const int size=BUFSIZE;
-  char buf[BUFSIZE], *c;
+  char buf[BUFSIZE] = "", *c;
   int keylen,buflen;
-  char key_inbuf[BUFSIZE];
+  char key_inbuf[BUFSIZE] = "";
   int i;
 
   keylen=strlen_trim(key);
@@ -802,8 +802,8 @@ int input_intv(const char *key, int nret, int *ret, int *defval)
 FILE *input_find(const char *key)
 {
   const int size=BUFSIZE;
-  char buf[BUFSIZE] ;
-  char key_inbuf[BUFSIZE];
+  char buf[BUFSIZE] = "" ;
+  char key_inbuf[BUFSIZE] = "";
   int keylen,buflen;
 
   keylen=strlen_trim(key);
@@ -823,8 +823,8 @@ FILE *input_find(const char *key)
 int input_last(const char *key) 
 {
   const int size=BUFSIZE;
-  char buf[BUFSIZE];
-  char key_inbuf[BUFSIZE];
+  char buf[BUFSIZE] = "";
+  char key_inbuf[BUFSIZE] = "";
   int keylen,buflen;
 
   keylen=strlen_trim(key);

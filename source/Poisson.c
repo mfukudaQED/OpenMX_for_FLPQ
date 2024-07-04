@@ -21,7 +21,6 @@
 #include "mpi.h"
 #include <fftw3.h> 
 
-
 void Inverse_FFT_Poisson(double *ReRhor, double *ImRhor, 
                          double *ReRhok, double *ImRhok);
 
@@ -62,11 +61,24 @@ double Poisson(int fft_charge_flag,
   }
   else if (fft_charge_flag==1 || fft_charge_flag==2){
     etime = FFT_Density(0,ReRhok,ImRhok);
-  }  
+  }
 
   /****************************************************
                        4*PI/G2/N^3
   ****************************************************/
+
+  /*
+  sk1 = (double)Ngrid1;
+  sk2 = (double)Ngrid2;
+  sk3 = (double)Ngrid3;
+  Gx = sk1*rtv[1][1] + sk2*rtv[2][1] + sk3*rtv[3][1];
+  Gy = sk1*rtv[1][2] + sk2*rtv[2][2] + sk3*rtv[3][2]; 
+  Gz = sk1*rtv[1][3] + sk2*rtv[2][3] + sk3*rtv[3][3];
+  printf("ABC1 %15.12f %15.12f %15.12f\n",Gx,Gy,Gz);
+  */
+
+  //double Gxmin=1000.0,Gxmax=-1000.0;
+
 
   tmp0 = 4.0*PI/(double)(Ngrid1*Ngrid2*Ngrid3);
 
@@ -88,10 +100,15 @@ double Poisson(int fft_charge_flag,
 
     if (k3<Ngrid3/2) sk3 = (double)k3;
     else             sk3 = (double)(k3 - Ngrid3);
-
+    
     Gx = sk1*rtv[1][1] + sk2*rtv[2][1] + sk3*rtv[3][1];
     Gy = sk1*rtv[1][2] + sk2*rtv[2][2] + sk3*rtv[3][2]; 
     Gz = sk1*rtv[1][3] + sk2*rtv[2][3] + sk3*rtv[3][3];
+
+    /*
+    if (Gx<Gxmin) Gxmin = Gx;
+    if (Gxmax<Gx) Gxmax = Gx;
+    */
 
     /* spherical Coulomb cutoff */ 
 
@@ -127,6 +144,8 @@ double Poisson(int fft_charge_flag,
     }
   }  
 
+  //printf("ABC1 %15.12f %15.12f\n",Gxmin,Gxmax);
+
   /****************************************************
         find the Hartree potential in real space
   ****************************************************/
@@ -146,7 +165,7 @@ double Poisson(int fft_charge_flag,
     }
   }
   */
-  
+
   /****************************************************
     if (fft_charge_flag==2),
     copy the difference charge Hartree potential
@@ -938,12 +957,12 @@ double FFT_Density(int den_flag,
   switch(den_flag) {
 
     case 0:
-
+       
       for (BN_AB=0; BN_AB<My_NumGridB_AB; BN_AB++){
         ReRhor[BN_AB] = Density_Grid_B[0][BN_AB] + Density_Grid_B[1][BN_AB] - 2.0*ADensity_Grid_B[BN_AB]; 
         ImRhor[BN_AB] = 0.0;
       }
-
+      
     break;
 
     case 1:

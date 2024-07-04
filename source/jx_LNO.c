@@ -16,11 +16,11 @@
 #include <math.h>
 #include <time.h>
 
+#include "mpi.h"
+#include <omp.h>
 #include "read_scfout.h"
 #include "lapack_prototypes.h"
 #include "f77func.h"
-#include "mpi.h"
-#include <omp.h>
 
 #include "jx_config.h"
 #include "jx_LNO.h"

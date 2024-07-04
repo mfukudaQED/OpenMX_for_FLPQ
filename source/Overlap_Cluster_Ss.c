@@ -194,6 +194,7 @@ void Overlap_Cluster_Ss(double ****OLP0, double *Ss, int *MP, int myworld1)
 	      }
 	      jl = jl-nblk;
 	    }
+
 	    Ss[(jl-1)*na_rows+il-1] += S1[k];
 	  }
 	    

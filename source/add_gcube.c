@@ -7,7 +7,7 @@
 
       Usage:
 
-         ./add_density input1.cube input2.cube output.cube 
+         ./add_gcube input1.cube input2.cube output.cube 
 
       Definition of the sum:
 
@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 
   if (argc!=4){
     printf("Usage:\n");
-    printf("  ./diff_density input1.cube input2.cube output.cube\n");
+    printf("  ./add_gcube input1.cube input2.cube output.cube\n");
     exit(0);
   }
 

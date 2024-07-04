@@ -33506,7 +33506,7 @@ void DFTD3vdW_init(int MD_iter)
     free(C6ab_dftD);
   }
 
-  maxcn_dftD=(int*)malloc(sizeof(double)*SpeciesNum);
+  maxcn_dftD=(int*)malloc(sizeof(int)*SpeciesNum);
   
   rcovab_dftD=(double**)malloc(sizeof(double*)*SpeciesNum);
   for(iat=0; iat<SpeciesNum; iat++){
@@ -33540,10 +33540,13 @@ void DFTD3vdW_init(int MD_iter)
   alloc_first[37] = 0;
      
   /* setting of parameters for single atoms */
-  memset( maxcn_dftD, -1, sizeof( maxcn_dftD) );
-  memset( rcov_dftD, -1.0, sizeof( rcov_dftD) );
-  memset( r2r4_dftD, -1.0, sizeof( r2r4_dftD) );
 
+  for (i=0; i<SpeciesNum; i++){
+    maxcn_dftD[i] = -1;
+    rcov_dftD[i] = -1.0;
+    r2r4_dftD[i] = -1.0;
+  }
+  
   /* EMPTY ATOM SCHEME */
   /*
   rcov[0]=1.0;

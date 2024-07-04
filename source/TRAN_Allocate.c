@@ -22,6 +22,7 @@
 #include <mpi.h>
 #include "tran_prototypes.h"
 #include "tran_variables.h"
+#include "openmx_common.h"
 
 
 /* (de)allocate memory used in TRAN_Input_std_Atoms */
@@ -32,8 +33,15 @@ void TRAN_Allocate_Atoms(int atomnum)
   TRAN_Original_Id = (int*)malloc(sizeof(int)*(atomnum+1));
 }
 
+#pragma optimization_level 0
 void TRAN_Deallocate_Atoms( void )
 {
+  /* allocated in TRAN_Set_IntegPath.c */    
+  free(tran_omega_scf);
+  free(tran_omega_weight_scf);
+  free(tran_integ_method_scf);  
+
+  /* allocated in TRAN_Allocate_Atoms() */    
   free(TRAN_region);
   free(TRAN_Original_Id);
 }

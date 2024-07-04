@@ -361,6 +361,9 @@ void neb(int argc, char *argv[])
       MD_Opt_OK = 0;
       dtime(&f0time);
       do {
+#ifdef LEAK_DETECT
+	leak_detect_init();
+#endif
 
 	/* if iter==1, generate an input file for restarting  */
 	
@@ -474,6 +477,10 @@ void neb(int argc, char *argv[])
       
 	iter++;
       
+#ifdef LEAK_DETECT
+	leak_detect_check();
+#endif
+
       } while (MD_Opt_OK==0 && iter<=MD_IterNumber);
 
       MPI_Barrier(MPI_COMM_WORLD1);
@@ -515,6 +522,10 @@ void neb(int argc, char *argv[])
   
       printf("\nThe calculation was normally finished. (proc=%3d) TIME=%lf (s) flat time=%lf \n",
                myid,(TEtime-TStime),sumtime/(iter-1));
+
+#ifdef LEAK_DETECT
+     leak_detect_check();
+#endif
 
       MPI_Finalize();
       exit(0);
@@ -885,6 +896,10 @@ void neb(int argc, char *argv[])
       dtime(&TEtime);
       
       printf("\nThe calculation was normally finished. (proc=%3d) TIME=%lf (s)\n",myid,(TEtime-TStime));
+
+#ifdef LEAK_DETECT
+     leak_detect_check();
+#endif
 
       MPI_Finalize();
       exit(0); 
@@ -1293,6 +1308,10 @@ void neb(int argc, char *argv[])
     dtime(&TEtime);
     
     printf("\nThe calculation was normally finished. (proc=%3d) TIME=%lf (s)\n",myid,(TEtime-TStime));
+
+#ifdef LEAK_DETECT
+     leak_detect_check();
+#endif
 
     MPI_Finalize();
     exit(0); 
@@ -2927,7 +2946,7 @@ void read_input(char *file)
 
   unitvectors_flag = 0; 
 
-  if (fp=input_find("<Atoms.Unitvectors")) {
+  if ( (fp=input_find("<Atoms.Unitvectors")) != NULL ) {
 
     unitvectors_flag = 1; 
 
@@ -2998,7 +3017,7 @@ void read_input(char *file)
   input_string2int("Atoms.SpeciesAndCoordinates.Unit",
                      &coordinates_unit,3,s_vec,i_vec);
 
-  if (fp=input_find("<Atoms.SpeciesAndCoordinates") ) {
+  if ( (fp=input_find("<Atoms.SpeciesAndCoordinates")) != NULL ) {
 
     for (i=1; i<=atomnum; i++){
 
@@ -3150,7 +3169,7 @@ void read_input(char *file)
    read atomic coodinates given by NEB.Atoms.SpeciesAndCoordinates
   *****************************************************************/
 
-  if (fp=input_find("<NEB.Atoms.SpeciesAndCoordinates") ) {
+  if ( (fp=input_find("<NEB.Atoms.SpeciesAndCoordinates")) != NULL ) {
 
     for (i=1; i<=atomnum; i++){
 
@@ -3309,18 +3328,58 @@ void read_input(char *file)
 
       sprintf(keyword,"<NEB%d.Atoms.SpeciesAndCoordinates",p);
     
-      if (fp=input_find(keyword)) {
+      if ( (fp=input_find(keyword)) != NULL ) {
 
         for (i=1; i<=atomnum; i++){
 
+          fgets(buf,MAXBUF,fp);
+
+          /* spin non-collinear case */ 
+          if (SpinP_switch==3){
+
+	    sscanf(buf,"%i %s %lf %lf %lf %lf %lf %lf %lf %lf %lf %d %s",
+		   &j, Species,
+                   &neb_atom_coordinates[p][i][1],
+  	  	   &neb_atom_coordinates[p][i][2],
+		   &neb_atom_coordinates[p][i][3],
+		   &dtmp1,&dtmp2,
+		   &dtmp3,&dtmp4,
+		   &dtmp5,&dtmp6,
+		   &itmp2,
+		   OrbPol );
+          }
+
+          /* collinear case */ 
+          else{ 
+
+	    sscanf(buf,"%i %s %lf %lf %lf %lf %lf %s",
+		   &j, Species,
+                   &neb_atom_coordinates[p][i][1],
+  		   &neb_atom_coordinates[p][i][2],
+		   &neb_atom_coordinates[p][i][3],
+		   &dtmp1, &dtmp2, OrbPol );
+	  }
+
+
+	  /*
           fscanf(fp,"%i %s %lf %lf %lf %lf %lf",
   	         &j, Species,
                  &neb_atom_coordinates[p][i][1],
 		 &neb_atom_coordinates[p][i][2],
 		 &neb_atom_coordinates[p][i][3],
 		 &dtmp1,&dtmp2);
-	}
+	  */
 
+	  if (i!=j){
+	    if (myid==Host_ID){
+	      printf("Format error of the sequential number %i in <NEB%i.Atoms.SpeciesAndCoordinates\n",j,p);
+	    }
+	    MPI_Finalize();
+	    exit(0);
+	  }
+        }
+
+        ungetc('\n',fp);
         sprintf(keyword,"NEB%d.Atoms.SpeciesAndCoordinates>",p);
 
 	if (!input_last(keyword)) {
@@ -3449,7 +3508,7 @@ void read_input(char *file)
       0: relaxed
   *****************************************************************/
 
-  if (fp=input_find("<MD.Fixed.XYZ")) {
+  if ( (fp=input_find("<MD.Fixed.XYZ")) != NULL ) {
 
     for (i=1; i<=atomnum; i++){  
       fscanf(fp,"%d %d %d %d",

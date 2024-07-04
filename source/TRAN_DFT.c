@@ -23,6 +23,7 @@
 #include "openmx_common.h"
 #include "tran_prototypes.h"
 #include "tran_variables.h"
+#include "lapack_prototypes.h"
 
 
 
@@ -861,15 +862,6 @@ double TRAN_DFT_Original(
 
   TDM1 = (double*)malloc(sizeof(double)*size_H1);
 
-  DM2 = (double**)malloc(sizeof(double*)*(SpinP_switch+1));
-  for (k=0; k<(SpinP_switch+1); k++){
-    DM2[k] = (double*)malloc(sizeof(double)*size_H1);
-    for (i=0; i<size_H1; i++) DM2[k][i] = 0.0;
-  }
-
-  TDM2 = (double*)malloc(sizeof(double)*size_H1);
-
-
   H1 = (double**)malloc(sizeof(double*)*(SpinP_switch+1));
   for (k=0; k<(SpinP_switch+1); k++){
     H1[k] = (double*)malloc(sizeof(double)*size_H1);
@@ -1525,12 +1517,9 @@ static void TRAN_DFT_Kdependent(
               im = v3[itot++];
 
               /* divided by numprocs due to the later MPI_Allreduce  */
-              //DM1[k][itot0++] += (re*co + im*si)/(double)numprocs; 
-          /* added by fukuda */
               DM1[k][itot0] += (re*co + im*si)/(double)numprocs; 
               DM2[k][itot0] += (im*co - re*si)/(double)numprocs; 
               itot0++;
-          /* */
 
             }
           }

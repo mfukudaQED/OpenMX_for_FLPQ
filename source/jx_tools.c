@@ -13,10 +13,11 @@ Useful functions and subroutines optimized for jx.
 //#include <malloc/malloc.h>
 //#include <assert.h>
 
+#include "mpi.h"
+#include <omp.h>
 #include "read_scfout.h"
 #include "lapack_prototypes.h"
 #include "f77func.h"
-#include "mpi.h"
 
 #include "jx_tools.h"
 

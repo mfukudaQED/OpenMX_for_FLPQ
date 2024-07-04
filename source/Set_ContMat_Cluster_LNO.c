@@ -149,7 +149,6 @@ void Set_ContMat_Cluster_LNO(double ****OLP0, double *****nh, double ***S, doubl
       tnoA = LNO_Num[GA_AN];
 
       for (LB_AN=0; LB_AN<=FNAN[GA_AN]; LB_AN++){
-
 	GB_AN = natn[GA_AN][LB_AN];
 	MB_AN = S_G2M[GB_AN];
 

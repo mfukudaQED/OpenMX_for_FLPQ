@@ -14,11 +14,24 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-#include "openmx_common.h"
 #include "mpi.h"
+#include "openmx_common.h"
+#include "lapack_prototypes.h"
 #include <omp.h>
-
+#include <fftw3.h> 
+ 
 #define  measure_time   0
+
+double *Hex0;
+double *Hex;
+
+void solve_evp_real_( int *n1, int *n2, double *Cs, int *na_rows1, double *a, double *Ss, int *na_rows2, int *nblk, 
+                      int *mpi_comm_rows_int, int *mpi_comm_cols_int);
+
+void elpa_solve_evp_real_2stage_double_impl_( int *n1, int *n2, double *Cs, int *na_rows1, double *a, double *Ss, int *na_rows2, 
+                                              int *nblk, int *na_cols1, int *mpi_comm_rows_int, int *mpi_comm_cols_int, int *mpiworld);
+
+
 
 static double Lapack_LU_Dinverse(int n, double *A);
 static double Calc_Oscillator_Strength( int n, int UMOmax, int Nocc[2], int *MP,
@@ -61,8 +74,9 @@ static void Save_LCAO_Col( int n, int MaxN, int myid1, int *is2, int *ie2,
 			   double **ko, int *NPROCS_WD1, int *Comm_World_StartID1 );
 
 static void Save_DOS_Col( int n, int MaxN, int myid1, int *is2, int *ie2, 
-			  int *MP, double ****OLP0, double **EVec1, 
+			  int *MP, double *****nh, double ****OLP0, double **EVec1, 
 			  double **ko, int *NPROCS_WD1, int *Comm_World_StartID1 );
+
 
 
 static double Calc_DM_Cluster_collinear(int myid0,
@@ -87,6 +101,60 @@ static double Calc_DM_Cluster_collinear(int myid0,
 					double **EVec1, 
 					int *SP_NZeros,
 					int *SP_Atoms );
+
+
+static double Calc_KS_orbitals_on_grid_single(
+                                        int myid0,
+					int numprocs0,
+					int myid1,
+					int numprocs1,
+					int myworld1,
+					int size_H1,
+					int *is2,
+					int *ie2,
+					int *MP,
+					int n,
+					MPI_Comm *MPI_CommWD1,
+					int *Comm_World_StartID1,
+					double *****CDM,
+					double *****EDM,
+					double **ko,
+					double *DM1,
+					double *EDM1,
+					double *PDM1,
+					double *Work1,
+					double **EVec1, 
+					int *SP_NZeros,
+					int *SP_Atoms );
+
+
+static double Calc_HF_Vx_single(
+    int myid0,
+    int numprocs0,
+    int myid1,
+    int numprocs1,
+    int myworld1,
+    int size_H1,
+    int *is2,
+    int *ie2,
+    int *MP,
+    int n,
+    MPI_Comm *MPI_CommWD1,
+    int *Comm_World_StartID1,
+    double *****CDM,
+    double *****EDM,
+    double **ko,
+    double *DM1,
+    double *EDM1,
+    double *PDM1,
+    double *Work1,
+    double **EVec1, 
+    int *SP_NZeros,
+    int *SP_Atoms );
+
+
+
+static double Exchange_Poisson( double *work1_on_grid, double *work2_on_grid );
 
 
 double Cluster_DFT_Col(
@@ -131,7 +199,6 @@ double Cluster_DFT_Col(
   int *is1,*ie1;
   double time0,lumos,av_num;
   double *OneD_Mat1;
-  double ***H;
   double TZ,my_sum,sum,sumE,max_x=60.0;
   double sum0,sum1,sum2,sum3;
   double My_Eele1[2],tmp1,tmp2;
@@ -152,7 +219,7 @@ double Cluster_DFT_Col(
   char buf[fp_bsize];          /* setvbuf */
   FILE *fp_EV;
   double stime, etime;
-  double time1,time2,time3,time4,time5,time6,time7;
+  double time1,time2,time3,time4,time5,time6,time7,time8;
 
   /* for OpenMP */
   int OMPID,Nthrds,Nprocs;
@@ -195,10 +262,19 @@ double Cluster_DFT_Col(
   }
   n2 = n + 2;
 
+  /*
+  if (firsttime){
+    Hex0 = (double*)malloc(sizeof(double)*n*n);
+    Hex = (double*)malloc(sizeof(double)*n*n);
+    for (i=0; i<(n*n); i++){
+      Hex0[i] = 0.0;
+      Hex[i] = 0.0;
+    }
+  }
+  */
+  
   /****************************************************
-   Allocation
-
-   double  H[List_YOUSO[23]][n2][n2]  
+                 Allocation of arrays
   ****************************************************/
 
   is1 = (int*)malloc(sizeof(int)*numprocs1);
@@ -215,6 +291,7 @@ double Cluster_DFT_Col(
     time5 = 0.0;
     time6 = 0.0;
     time7 = 0.0;
+    time8 = 0.0;
   }
 
   if      (SpinP_switch==0) spin_degeneracy = 2.0;
@@ -229,7 +306,7 @@ double Cluster_DFT_Col(
     wan = WhatSpecies[i];
     TZ = TZ + Spe_Core_Charge[wan];
   }
-
+ 
   /****************************************************
          find the numbers of partions for MPI
   ****************************************************/
@@ -261,8 +338,8 @@ double Cluster_DFT_Col(
   }
 
   /****************************************************
-       1. diagonalize the overlap matrix     
-       2. search negative eigenvalues
+         1. diagonalize the overlap matrix     
+         2. search negative eigenvalues
   ****************************************************/
 
   MPI_Barrier(mpi_comm_level1);
@@ -371,6 +448,8 @@ double Cluster_DFT_Col(
     else if ( strcasecmp(mode,"xanes")==0 )
       lumos = (double)n*0.200;      
     else if ( strcasecmp(mode,"diag")==0 )
+      lumos = (double)n*0.200;      
+    else 
       lumos = (double)n*0.200;      
 
     if (lumos<400.0) lumos = 400.0;
@@ -556,9 +635,7 @@ double Cluster_DFT_Col(
 
   if (measure_time) dtime(&stime);
 
-  for(i=0;i<na_rows*na_cols;i++){
-    Hs[i] = 0.0;
-  }
+  for (i=0; i<na_rows*na_cols; i++) Hs[i] = 0.0;
 
   Cblacs_barrier(ictxt1,"A");
   F77_NAME(pdgemm,PDGEMM)("T","T",&n,&n,&n,&alpha,Cs,&ONE,&ONE,descC,Ss,&ONE,&ONE,descS,&beta,Hs,&ONE,&ONE,descH);
@@ -645,6 +722,16 @@ double Cluster_DFT_Col(
     goto diagonalize; 
   }
 
+  /*
+  printf("EVec1\n");
+  for (i=0; i<n; i++){
+    for (j=0; j<8; j++){
+      printf("%8.5f ",EVec1[0][i*MaxN+j]);
+    } 
+    printf("\n");
+  } 
+  */
+
   /*********************************************** 
     MPI: ko
   ***********************************************/
@@ -667,7 +754,7 @@ double Cluster_DFT_Col(
 		 i1,ko[0][i1],ko[1][i1]);
       }
     }
-
+    
     /* for XANES */
     if (xanes_calc==1){
 
@@ -699,7 +786,7 @@ double Cluster_DFT_Col(
 	  Dnum = HOMO_XANES[spin] - Num_State;
 	  if (0.0<=Dnum) ChemP_MIN = ChemP;
 	  else           ChemP_MAX = ChemP;
-	  if (fabs(Dnum)<1.0e-14) po = 1;
+	  if (fabs(Dnum)<1.0e-12) po = 1;
 
 	  if (myid1==Host_ID && 2<=level_stdout){
 	    printf("spin=%2d ChemP=%15.12f HOMO_XANES=%2d Num_state=%15.12f\n",spin,ChemP,HOMO_XANES[spin],Num_State); 
@@ -728,7 +815,11 @@ double Cluster_DFT_Col(
               searching of chemical potential
       ****************************************************/
 
-      /* first, find ChemP at five times large temperatue */
+      double Beta_trial1;
+
+      /* first, find ChemP at 1200 K */
+
+      Beta_trial1 = 1.0/kB/(1200.0/eV2Hartree);
 
       po = 0;
       loopN = 0;
@@ -743,11 +834,10 @@ double Cluster_DFT_Col(
 
 	for (spin=0; spin<=SpinP_switch; spin++){
 	  for (i1=1; i1<=MaxN; i1++){
-	    x = (ko[spin][i1] - ChemP)*Beta*0.2;
+	    x = (ko[spin][i1] - ChemP)*Beta_trial1;
 	    if (x<=-max_x) x = -max_x;
 	    if (max_x<=x)  x = max_x;
 	    FermiF = 1.0/(1.0 + exp(x));
-
 	    Num_State = Num_State + spin_degeneracy*FermiF;
 	    if (0.5<FermiF) Cluster_HOMO[spin] = i1;
 	  }
@@ -756,7 +846,7 @@ double Cluster_DFT_Col(
 	Dnum = (TZ - Num_State) - system_charge;
 	if (0.0<=Dnum) ChemP_MIN = ChemP;
 	else           ChemP_MAX = ChemP;
-	if (fabs(Dnum)<1.0e-14) po = 1;
+	if (fabs(Dnum)<1.0e-12) po = 1;
 
 	if (myid1==Host_ID && 2<=level_stdout){
 	  printf("ChemP=%15.12f TZ=%15.12f Num_state=%15.12f\n",ChemP,TZ,Num_State); 
@@ -797,7 +887,7 @@ double Cluster_DFT_Col(
 	Dnum = (TZ - Num_State) - system_charge;
 	if (0.0<=Dnum) ChemP_MIN = ChemP;
 	else           ChemP_MAX = ChemP;
-	if (fabs(Dnum)<1.0e-14) po = 1;
+	if (fabs(Dnum)<1.0e-12) po = 1;
 
 	if (myid1==Host_ID && 2<=level_stdout){
 	  printf("ChemP=%15.12f TZ=%15.12f Num_state=%15.12f\n",ChemP,TZ,Num_State); 
@@ -1114,6 +1204,22 @@ double Cluster_DFT_Col(
     }
 
     /****************************************************
+            calculation of KS orbitals on grid
+    ****************************************************/
+
+    /*
+    time7 += Calc_KS_orbitals_on_grid_single( myid0,numprocs0,myid1,numprocs1,myworld1,
+				              size_H1,is2,ie2,MP,n,MPI_CommWD1,Comm_World_StartID1,
+    				              CDM,EDM,ko,CDM1,EDM1,PDM1,Work1,EVec1,SP_NZeros,SP_Atoms);
+    */
+
+    /*
+    time7 += Calc_HF_Vx_single( myid0,numprocs0,myid1,numprocs1,myworld1,
+ 		                size_H1,is2,ie2,MP,n,MPI_CommWD1,Comm_World_StartID1,
+		                CDM,EDM,ko,CDM1,EDM1,PDM1,Work1,EVec1,SP_NZeros,SP_Atoms);
+    */
+    
+    /****************************************************
                            Output
     ****************************************************/
 
@@ -1405,13 +1511,13 @@ double Cluster_DFT_Col(
 
     if (measure_time){
       dtime(&etime);
-      time7 += etime - stime;
+      time8 += etime - stime;
     }
 
   } /* if ( strcasecmp(mode,"scf")==0 ) */
 
   else if ( strcasecmp(mode,"dos")==0 ){
-    Save_DOS_Col(n,MaxN,myid1,is2,ie2,MP,CntOLP,EVec1,ko,NPROCS_WD1,Comm_World_StartID1);
+    Save_DOS_Col(n,MaxN,myid1,is2,ie2,MP,nh,CntOLP,EVec1,ko,NPROCS_WD1,Comm_World_StartID1);
   }
 
   else if ( strcasecmp(mode,"lcaoout")==0 ){
@@ -1429,8 +1535,8 @@ double Cluster_DFT_Col(
   }
 
   if (measure_time){
-    printf("Cluster_DFT myid=%2d time1=%7.3f time2=%7.3f time3=%7.3f time4=%7.3f time5=%7.3f time6=%7.3f time7=%7.3f\n",
-            myid0,time1,time2,time3,time4,time5,time6,time7);fflush(stdout); 
+    printf("Cluster_DFT myid=%2d time1=%7.3f time2=%7.3f time3=%7.3f time4=%7.3f time5=%7.3f time6=%7.3f time7=%7.3f time8=%7.3f\n",
+	   myid0,time1,time2,time3,time4,time5,time6,time7,time8);fflush(stdout); 
   }
 
   /****************************************************
@@ -1456,7 +1562,6 @@ double Cluster_DFT_Col(
   time0 = TEtime - TStime;
   return time0;
 }
-
 
 
 
@@ -1495,13 +1600,27 @@ double Calc_DM_Cluster_collinear(
   MPI_Status stat;
   MPI_Request request;
   double *FF,*dFF;
+  double **TmpEVec0,**TmpEVec1;
 
   dtime(&stime);
+
+  kmin = is2[myid1];
+  kmax = ie2[myid1];
 
   /* allocation of arrays */
 
   FF = (double*)malloc(sizeof(double)*(n+1));
   dFF = (double*)malloc(sizeof(double)*(n+1));
+
+  TmpEVec0 = (double**)malloc(sizeof(double*)*List_YOUSO[7]);
+  for (i=0; i<List_YOUSO[7]; i++){
+    TmpEVec0[i] = (double*)malloc(sizeof(double)*(kmax-kmin+1));
+  }
+
+  TmpEVec1 = (double**)malloc(sizeof(double*)*List_YOUSO[7]);
+  for (i=0; i<List_YOUSO[7]; i++){
+    TmpEVec1[i] = (double*)malloc(sizeof(double)*(kmax-kmin+1));
+  }
 
   /* spin=myworld1 */
 
@@ -1522,9 +1641,7 @@ double Calc_DM_Cluster_collinear(
   /* pre-calculation of Fermi Function */ 
 
   po = 0;
-  kmin = is2[myid1];
-  kmax = ie2[myid1];
-  
+
   for (k=is2[myid1]; k<=ie2[myid1]; k++){
 
     if (xanes_calc==1) 
@@ -1561,22 +1678,44 @@ double Calc_DM_Cluster_collinear(
     wanA = WhatSpecies[GA_AN];
     tnoA = Spe_Total_CNO[wanA];
     Anum = MP[GA_AN];
+
+    /* store EVec1 to a temporal array */
+
+    for (i=0; i<tnoA; i++){
+      i0 = (Anum + i - 1)*(ie2[myid1]-is2[myid1]+1) - is2[myid1];
+      for (k=kmin; k<=kmax; k++){
+        TmpEVec0[i][k-kmin] = EVec1[spin][i0+k];
+      }        
+    }
+
+    /* loop for LB_AN */
+
     for (LB_AN=0; LB_AN<=FNAN[GA_AN]; LB_AN++){
+
       GB_AN = natn[GA_AN][LB_AN];
       wanB = WhatSpecies[GB_AN];
       tnoB = Spe_Total_CNO[wanB];
       Bnum = MP[GB_AN];
+
+      /* store EVec1 to a temporal array */
+
+      for (j=0; j<tnoB; j++){
+        j0 = (Bnum + j - 1)*(ie2[myid1]-is2[myid1]+1) - is2[myid1];
+	for (k=kmin; k<=kmax; k++){
+	  TmpEVec1[j][k-kmin] = EVec1[spin][j0+k];
+	}        
+      }
+
+      /* loops for i and j */
+
       for (i=0; i<tnoA; i++){
 	for (j=0; j<tnoB; j++){
-
-	  i0 = (Anum + i - 1)*(ie2[myid1]-is2[myid1]+1) - is2[myid1];
-	  j0 = (Bnum + j - 1)*(ie2[myid1]-is2[myid1]+1) - is2[myid1];
 
           sum1 = 0.0;
           sum2 = 0.0;
 
 	  for (k=kmin; k<=kmax; k++){
-	    dum = FF[k]*EVec1[spin][i0+k]*EVec1[spin][j0+k];
+	    dum = FF[k]*TmpEVec0[i][k-kmin]*TmpEVec1[j][k-kmin];
 	    sum1 += dum;
 	    sum2 += dum*ko[spin][k];
 	  }
@@ -1588,7 +1727,7 @@ double Calc_DM_Cluster_collinear(
 
             sum1 = 0.0;
 	    for (k=kmin; k<=kmax; k++){
-	      sum1 += dFF[k]*EVec1[spin][i0+k]*EVec1[spin][j0+k];
+	      sum1 += dFF[k]*TmpEVec0[i][k-kmin]*TmpEVec1[j][k-kmin];
 	    }
             PDM1[p] = sum1;
 	  }
@@ -1755,8 +1894,9 @@ double Calc_DM_Cluster_collinear(
 
               CDM[spin][MA_AN][LB_AN][i][j] = DM1[p];
               EDM[spin][MA_AN][LB_AN][i][j] = EDM1[p];
+	      
               if (cal_partial_charge){
-                PDM[spin][MA_AN][LB_AN][i][j] = PDM1[p];
+                Partial_DM[spin][MA_AN][LB_AN][i][j] = PDM1[p];
 	      }
 
 	      /* increment of p */
@@ -1782,30 +1922,45 @@ double Calc_DM_Cluster_collinear(
   free(dFF);
   free(FF);
 
+  for (i=0; i<List_YOUSO[7]; i++){
+    free(TmpEVec0[i]);
+  }
+  free(TmpEVec0);
+
+  for (i=0; i<List_YOUSO[7]; i++){
+    free(TmpEVec1[i]);
+  }
+  free(TmpEVec1);
+
   dtime(&etime);
   return (etime-stime);
 
 }
 
 
+  
+
+
 
 
 void Save_DOS_Col( int n, int MaxN, int myid1, int *is2, int *ie2, 
-                   int *MP, double ****OLP0, double **EVec1, 
+                   int *MP, double *****nh, double ****OLP0, double **EVec1, 
                    double **ko, int *NPROCS_WD1, int *Comm_World_StartID1 )
 {
   int spin,i,j,iemin,iemax,GA_AN,k,l;
+  int i3,l1,l2,l3,RnB;
   int Anum,Bnum,tnoA,tnoB,wanA,wanB;
   int MA_AN,LB_AN,GB_AN,MaxL,num,m,p,po;
   int numprocs,myid,ID,tag,ID0;
   int i_vec[10];  
   double dum,tmp,av_num;
-  char file_eig[YOUSO10],file_ev[YOUSO10];
-  FILE *fp_eig, *fp_ev;
+  char file_eig[YOUSO10],file_ev[YOUSO10],file_cohp[YOUSO10];
+  FILE *fp_eig, *fp_ev,*fp_cohp; 
   MPI_Status stat;
   MPI_Request request;
   float *array0;    
   float *SD;
+  double ***COHP,***COOP;
   int *is3,*ie3;
   int numprocs3,ID1;
 
@@ -1820,6 +1975,24 @@ void Save_DOS_Col( int n, int MaxN, int myid1, int *is2, int *ie2,
   is3 = (int*)malloc(sizeof(int)*numprocs);
   ie3 = (int*)malloc(sizeof(int)*numprocs);
   SD = (float*)malloc(sizeof(float)*(atomnum+1)*List_YOUSO[7]);
+  
+  if (COHP_calc_flag==1){
+    COHP = (double***)malloc(sizeof(double**)*COHP_num_pairs);
+    for (i=0; i<COHP_num_pairs; i++){
+      COHP[i] = (double**)malloc(sizeof(double*)*List_YOUSO[7]);
+      for (j=0; j<List_YOUSO[7]; j++){
+        COHP[i][j] = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+      }    
+    }
+
+    COOP = (double***)malloc(sizeof(double**)*COHP_num_pairs);
+    for (i=0; i<COHP_num_pairs; i++){
+      COOP[i] = (double**)malloc(sizeof(double*)*List_YOUSO[7]);
+      for (j=0; j<List_YOUSO[7]; j++){
+        COOP[i][j] = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+      }    
+    }
+  }
 
   /* open file pointers */
 
@@ -1836,6 +2009,13 @@ void Save_DOS_Col( int n, int MaxN, int myid1, int *is2, int *ie2,
     if ( (fp_ev=fopen(file_ev,"w"))==NULL ) {
       printf("cannot open a file %s\n",file_ev);
     }
+
+    strcpy(file_cohp,".cohp");
+    fnjoint(filepath,filename,file_cohp);
+    if ( (fp_cohp=fopen(file_cohp,"w"))==NULL ) {
+      printf("cannot open a file %s\n",file_cohp);
+    }
+
   }
 
   /* find iemin */
@@ -1864,6 +2044,21 @@ void Save_DOS_Col( int n, int MaxN, int myid1, int *is2, int *ie2,
   }
   if (iemax==1)   iemax = MaxN;
   if (MaxN<iemax) iemax = MaxN;
+
+  /* COHP */  
+
+  if (myid==Host_ID && COHP_calc_flag==1){
+    fwrite(&Solver,sizeof(int),1,fp_cohp);
+    fwrite(&SpinP_switch,sizeof(int),1,fp_cohp);
+    i = 1;
+    fwrite(&i,sizeof(int),1,fp_cohp);
+    fwrite(&i,sizeof(int),1,fp_cohp);
+    fwrite(&i,sizeof(int),1,fp_cohp);
+    i = iemax - iemin + 1;
+    fwrite(&i,sizeof(int),1,fp_cohp);
+    fwrite(&COHP_num_pairs,sizeof(int),1,fp_cohp);
+    fwrite(&ChemP,sizeof(double),1,fp_cohp);
+  }
 
   /****************************************************
                    save *.Dos.vec
@@ -1939,6 +2134,19 @@ void Save_DOS_Col( int n, int MaxN, int myid1, int *is2, int *ie2,
 
       for (i=0; i<(atomnum+1)*List_YOUSO[7]; i++) SD[i] = 0.0;
 
+      /* initialize COHP and COOP */
+
+      if (COHP_calc_flag==1){
+	for (i=0; i<COHP_num_pairs; i++){
+	  for (j=0; j<List_YOUSO[7]; j++){
+	    for (k=0; k<List_YOUSO[7]; k++){
+	      COHP[i][j][k] = 0.0;
+	      COOP[i][j][k] = 0.0;
+	    }
+	  }    
+	}
+      }
+
       i_vec[0]=i_vec[1]=i_vec[2]=0;
       if (myid==Host_ID) fwrite(i_vec,sizeof(int),3,fp_ev);
 
@@ -1961,6 +2169,30 @@ void Save_DOS_Col( int n, int MaxN, int myid1, int *is2, int *ie2,
 	      SD[Anum+i] += array0[Anum-1+i]*array0[Bnum-1+j]*(float)OLP0[MA_AN][LB_AN][i][j];
 	    }
 
+            if (COHP_calc_flag==1){
+
+              RnB = ncn[GA_AN][LB_AN];
+	      l1 = atv_ijk[RnB][1];
+	      l2 = atv_ijk[RnB][2];
+	      l3 = atv_ijk[RnB][3];
+
+              for ( i3=0; i3<COHP_num_pairs; i3++ ){
+
+                if (  GA_AN==COHP_AtomA[i3] 
+                      && GB_AN==COHP_AtomB[i3] 
+                      && l1==COHP_CellB1[i3]
+                      && l2==COHP_CellB2[i3]
+		      && l3==COHP_CellB3[i3] ){
+
+		  for (j=0; j<tnoB; j++){
+		    COHP[i3][i][j] = array0[Anum-1+i]*array0[Bnum-1+j]*nh[spin][MA_AN][LB_AN][i][j];
+		    COOP[i3][i][j] = array0[Anum-1+i]*array0[Bnum-1+j]*OLP0[MA_AN][LB_AN][i][j];
+		  }
+
+		}
+	      }
+	    }
+
 	  } /* LB_AN */
 	} /* i */
       } /* MA_AN */
@@ -1970,10 +2202,56 @@ void Save_DOS_Col( int n, int MaxN, int myid1, int *is2, int *ie2,
       for (i=1; i<=n; i++) array0[i] = SD[i];
       MPI_Reduce(array0, SD, n+1, MPI_FLOAT, MPI_SUM, Host_ID, mpi_comm_level1);
 
+      if (COHP_calc_flag==1){
+	for (i=0; i<COHP_num_pairs; i++){
+	  for (j=0; j<List_YOUSO[7]; j++){
+            MPI_Allreduce(MPI_IN_PLACE, &COHP[i][j][0], List_YOUSO[7], MPI_DOUBLE, MPI_SUM, mpi_comm_level1);
+            MPI_Allreduce(MPI_IN_PLACE, &COOP[i][j][0], List_YOUSO[7], MPI_DOUBLE, MPI_SUM, mpi_comm_level1);
+	  }    
+	}
+      }
+
       /* write *.Dos.vec */
 
       if (myid==Host_ID){
         fwrite(&SD[1],sizeof(float),n,fp_ev);
+      }
+
+      /* write *.cohp */
+
+      if (myid==Host_ID && COHP_calc_flag==1){
+
+        fwrite(&spin,sizeof(int),1,fp_cohp);
+	i_vec[0] = 0; i_vec[1] = 0; i_vec[2] = 0;
+	fwrite(i_vec,sizeof(int),3,fp_cohp);
+        fwrite(&ko[spin][p],sizeof(double),1,fp_cohp);
+
+	for (i=0; i<COHP_num_pairs; i++){
+
+          GA_AN = COHP_AtomA[i];
+          GB_AN = COHP_AtomB[i];
+          wanA = WhatSpecies[GA_AN];
+          wanB = WhatSpecies[GB_AN];
+  	  tnoA = Spe_Total_CNO[wanA];
+          tnoB = Spe_Total_CNO[wanB];
+          l1 = COHP_CellB1[i];
+          l2 = COHP_CellB2[i];
+          l3 = COHP_CellB3[i];
+
+	  fwrite(&i,sizeof(int),1,fp_cohp);
+	  fwrite(&GA_AN,sizeof(int),1,fp_cohp);
+	  fwrite(&GB_AN,sizeof(int),1,fp_cohp);
+	  fwrite(&tnoA,sizeof(int),1,fp_cohp);
+	  fwrite(&tnoB,sizeof(int),1,fp_cohp);
+	  fwrite(&l1,sizeof(int),1,fp_cohp);
+	  fwrite(&l2,sizeof(int),1,fp_cohp);
+	  fwrite(&l3,sizeof(int),1,fp_cohp);
+
+	  for (j=0; j<tnoA; j++){
+            fwrite(&COHP[i][j][0],sizeof(double),tnoB,fp_cohp);
+            fwrite(&COOP[i][j][0],sizeof(double),tnoB,fp_cohp);
+	  }    
+	} /* i */
       }
 
     } /* p */
@@ -2038,11 +2316,30 @@ void Save_DOS_Col( int n, int MaxN, int myid1, int *is2, int *ie2,
   /* close file pointers */
 
   if (myid==Host_ID){
-    if (fp_eig) fclose(fp_eig);
-    if (fp_ev)  fclose(fp_ev);
+    if (fp_eig)  fclose(fp_eig);
+    if (fp_ev)   fclose(fp_ev);
+    if (fp_cohp) fclose(fp_cohp);
   }
 
   /* freeing of array */
+
+  if (COHP_calc_flag==1){
+    for (i=0; i<COHP_num_pairs; i++){
+      for (j=0; j<List_YOUSO[7]; j++){
+        free(COHP[i][j]);
+      }    
+      free(COHP[i]);
+    }
+    free(COHP);
+
+    for (i=0; i<COHP_num_pairs; i++){
+      for (j=0; j<List_YOUSO[7]; j++){
+        free(COOP[i][j]);
+      }    
+      free(COOP[i]);
+    }
+    free(COOP);
+  }
 
   free(SD);
   free(array0);
@@ -2840,8 +3137,11 @@ double Calc_Oscillator_Strength( int n, int UMOmax, int Nocc[2], int *MP,
   double tmp,det[2],alldet,sum,allsum,allsumx,allsumy,allsumz;
   double os,osx,osy,osz,p2,px2,py2,pz2;
   double fsum,fsumx,fsumy,fsumz,sumx,sumy,sumz;
+  double stime,etime;
   int numprocs,myid;
 
+  dtime(&stime);
+  
   /* MPI */
 
   MPI_Comm_size(mpi_comm_level1,&numprocs);
@@ -2950,6 +3250,8 @@ double Calc_Oscillator_Strength( int n, int UMOmax, int Nocc[2], int *MP,
   }
   */
 
+  dtime(&etime);
+  return (etime-stime);
 }
 
 
@@ -2957,55 +3259,938 @@ double Calc_Oscillator_Strength( int n, int UMOmax, int Nocc[2], int *MP,
 
 double Lapack_LU_Dinverse(int n, double *A)
 {
-    static char *thisprogram="Lapack_LU_inverse";
-    int *ipiv;
-    double *work,tmp,det;
-    int lwork;
-    int info,i,j;
+  static char *thisprogram="Lapack_LU_inverse";
+  int *ipiv;
+  double *work,tmp,det;
+  int lwork;
+  int info,i,j;
 
-    /* L*U factorization */
+  /* L*U factorization */
 
-    ipiv = (int*) malloc(sizeof(int)*n);
+  ipiv = (int*) malloc(sizeof(int)*n);
 
-    F77_NAME(dgetrf,DGETRF)(&n,&n,A,&n,ipiv,&info);
+  F77_NAME(dgetrf,DGETRF)(&n,&n,A,&n,ipiv,&info);
 
-    if ( info !=0 ) {
-      printf("dgetrf failed, info=%i, %s\n",info,thisprogram);
+  if ( info !=0 ) {
+    printf("dgetrf failed, info=%i, %s\n",info,thisprogram);
+  }
+
+  /* calculation of determinant */
+
+  det = 1.0; 
+  for (i=0; i<n; i++){
+    tmp = det;
+    det = tmp*A[n*(i)+(i)];
+  }
+
+  for (i=0; i<n; i++){
+    if (ipiv[i] != i+1) { det = -det; }
+  }
+
+  /* 
+     printf("det %15.12f\n",det);   
+
+     for (i=0; i<n; i++){
+     printf("i=%2d ipiv=%2d\n",i,ipiv[i]);
+     }
+  */
+
+  /* inverse L*U factorization */
+
+  lwork = 4*n;
+  work = (double*)malloc(sizeof(double)*lwork);
+
+  F77_NAME(dgetri,DGETRI)(&n, A, &n, ipiv, work, &lwork, &info);
+
+  if ( info !=0 ) {
+    printf("dgetrf failed, info=%i, %s\n",info,thisprogram);
+  }
+
+  free(work); free(ipiv);
+
+  return det;
+}
+
+
+
+
+double Calc_KS_orbitals_on_grid_single(
+    int myid0,
+    int numprocs0,
+    int myid1,
+    int numprocs1,
+    int myworld1,
+    int size_H1,
+    int *is2,
+    int *ie2,
+    int *MP,
+    int n,
+    MPI_Comm *MPI_CommWD1,
+    int *Comm_World_StartID1,
+    double *****CDM,
+    double *****EDM,
+    double **ko,
+    double *DM1,
+    double *EDM1,
+    double *PDM1,
+    double *Work1,
+    double **EVec1, 
+    int *SP_NZeros,
+    int *SP_Atoms )
+{
+  int kmin,kmax,i0,wanA,Anum;
+  int Mc_AN,Gc_AN,Nc,p,GN,tnoA;
+  int Nmax,i,j,orb,spin,orb1,orb2;
+  double **phi_on_grid,**b_on_grid;
+  double *work1_on_grid,*work2_on_grid;
+  double tmp,sum,*B,*ev,*asum,*proj_chi;
+  double stime,etime,stime1,etime1;
+
+  dtime(&stime);
+
+  kmin = is2[myid1];
+  kmax = ie2[myid1];
+
+  /* allocation of arrays */
+
+  spin = 0;
+  
+  for (i=0; i<n; i++){ Work1[i] = 0.0; }
+
+  Nmax = Cluster_HOMO[0];
+
+  work1_on_grid = (double*)malloc(sizeof(double)*TNumGrid);
+  work2_on_grid = (double*)malloc(sizeof(double)*TNumGrid);
+  
+  phi_on_grid = (double**)malloc(sizeof(double*)*Nmax);
+  for (i=0; i<Nmax; i++){
+    phi_on_grid[i] = (double*)malloc(sizeof(double)*TNumGrid);
+    for (j=0; j<TNumGrid; j++){
+      phi_on_grid[i][j] = 0.0;
+    }
+  }
+
+  b_on_grid = (double**)malloc(sizeof(double*)*Nmax);
+  for (i=0; i<Nmax; i++){
+    b_on_grid[i] = (double*)malloc(sizeof(double)*TNumGrid);
+    for (j=0; j<TNumGrid; j++){
+      b_on_grid[i][j] = 0.0;
+    }
+  }
+
+  B = (double*)malloc(sizeof(double)*Nmax*Nmax);
+  ev = (double*)malloc(sizeof(double)*Nmax);
+
+  asum = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+  proj_chi = (double*)malloc(sizeof(double)*n);
+
+  /* loop fof orb for the calculation of phi on grid */
+  
+  for (orb=0; orb<Nmax; orb++){
+
+    /* set LCAO coefficients of phi_k */
+      
+    for (i=0; i<n; i++){
+      // EVec1[][]: the second index starts from 0. 
+      i0 = i*(kmax-kmin+1) + orb + 1 - kmin;  
+      Work1[i] = EVec1[spin][i0];
     }
 
-    /* calculation of determinant */
+    /* calculate phi on grid */
 
-    det = 1.0; 
-    for (i=0; i<n; i++){
-      tmp = det;
-      det = tmp*A[n*(i)+(i)];
+    for (Mc_AN=1; Mc_AN<=Matomnum; Mc_AN++){
+
+      Gc_AN = M2G[Mc_AN];    
+      wanA = WhatSpecies[Gc_AN];
+      tnoA = Spe_Total_CNO[wanA];
+      Anum = MP[Gc_AN] - 1;
+
+      for (Nc=0; Nc<GridN_Atom[Gc_AN]; Nc++){
+
+	GN = GridListAtom[Mc_AN][Nc];
+	  
+	for (i=0; i<tnoA; i++){
+	  phi_on_grid[orb][GN] += Work1[Anum+i]*Orbs_Grid[Mc_AN][Nc][i];
+	}
+      }
     }
+  } 
 
-    for (i=0; i<n; i++){
-      if (ipiv[i] != i+1) { det = -det; }
+  /* calculation of b on grid */
+
+  if (1){
+  
+    for (orb1=0; orb1<Nmax; orb1++){
+      for (orb2=0; orb2<Nmax; orb2++){
+
+	/* calculate the potential of phi_1 * phi_2 */
+      
+	for (GN=0; GN<TNumGrid; GN++){
+	  work1_on_grid[GN] = phi_on_grid[orb1][GN]*phi_on_grid[orb2][GN];
+	}
+
+        if (measure_time) dtime(&stime1);
+	
+	Exchange_Poisson( work1_on_grid, work2_on_grid );
+
+	if (measure_time){
+	  dtime(&etime1);
+	  printf("orb1=%2d orb2=%2d Exchange_Poisson time=%15.10f\n",orb1,orb2,etime1-stime1); 
+	}
+	
+	for (GN=0; GN<TNumGrid; GN++){
+	  b_on_grid[orb1][GN] -= work2_on_grid[GN]*phi_on_grid[orb2][GN];
+	}
+      }
     }
+  }
 
-    /* 
-    printf("det %15.12f\n",det);   
+  else if (0) {
 
+    for (orb1=0; orb1<Nmax; orb1++){
+
+      for (GN=0; GN<TNumGrid; GN++){ work1_on_grid[GN] = 0.0; }
+      for (orb2=0; orb2<Nmax; orb2++){
+	for (GN=0; GN<TNumGrid; GN++){
+	  work1_on_grid[GN] += phi_on_grid[orb2][GN];                       
+	}
+      }
+
+      for (GN=0; GN<TNumGrid; GN++){ work1_on_grid[GN] *= phi_on_grid[orb1][GN]; }
+      
+      Exchange_Poisson( work1_on_grid, work2_on_grid );
+
+      for (GN=0; GN<TNumGrid; GN++){ work1_on_grid[GN] = 0.0; }
+      for (orb2=0; orb2<Nmax; orb2++){
+	for (GN=0; GN<TNumGrid; GN++){
+	  work1_on_grid[GN] += phi_on_grid[orb2][GN];                       
+	}
+      }
+      
+      for (GN=0; GN<TNumGrid; GN++){
+	b_on_grid[orb1][GN] = -work2_on_grid[GN]*work1_on_grid[GN];
+      }
+      
+    }
+  }
+
+  else if (0){
+
+    for (orb1=0; orb1<Nmax; orb1++){
+    
+      for (GN=0; GN<TNumGrid; GN++){ work1_on_grid[GN] = 0.0; }
+      for (orb2=0; orb2<Nmax; orb2++){
+	for (GN=0; GN<TNumGrid; GN++){
+	  work1_on_grid[GN] += 2.0*phi_on_grid[orb2][GN]*phi_on_grid[orb2][GN];                       
+	}
+      }
+
+      sum = 0.0;
+      for (GN=0; GN<TNumGrid; GN++){
+	sum += fabs(work1_on_grid[GN]);
+      }
+      printf("ZZZ1 sum=%15.12f\n",sum);
+      
+      Exchange_Poisson( work1_on_grid, work2_on_grid );
+
+      sum = 0.0;
+      for (GN=0; GN<TNumGrid; GN++){
+	sum += fabs(work2_on_grid[GN]);
+      }
+      printf("ZZZ2 sum=%15.12f\n",sum);
+      
+      for (GN=0; GN<TNumGrid; GN++){
+	b_on_grid[orb1][GN] -= work2_on_grid[GN]*phi_on_grid[orb1][GN];
+      }
+    }
+  }
+  
+  /* calculation of the matrix B */
+
+  for (orb1=0; orb1<Nmax; orb1++){
+    for (orb2=0; orb2<Nmax; orb2++){
+
+      sum = 0.0;
+      for (GN=0; GN<TNumGrid; GN++){
+        sum += b_on_grid[orb1][GN]*phi_on_grid[orb2][GN];  
+      }
+
+      B[orb1*Nmax+orb2] = sum*GridVol;
+
+      //printf("%7.4f ",B[orb1*Nmax+orb2]); 
+    }
+    //printf("\n");
+  }
+
+  /* diagonalization of the matrix B */
+
+  Eigen_lapack3( B, ev, Nmax, Nmax );
+
+  for (orb=0; orb<Nmax; orb++){
+    printf("VVV1 orb=%2d ev=%15.12f\n",orb,ev[orb]);
+  }
+  
+  for (orb=0; orb<Nmax; orb++){ ev[orb] = 1.0/ev[orb]; }
+
+  /* calculate |a_p> by \sum_{q} |b_q> (U)_{qp} */
+
+  for (orb1=0; orb1<Nmax; orb1++){
+
+    for (GN=0; GN<TNumGrid; GN++){ phi_on_grid[orb1][GN] = 0.0; }
+
+    for (orb2=0; orb2<Nmax; orb2++){
+
+      tmp = B[orb1*Nmax+orb2];
+      
+      for (GN=0; GN<TNumGrid; GN++){
+        phi_on_grid[orb1][GN] += b_on_grid[orb2][GN]*tmp;
+      }
+    }
+  }
+  
+  /* calculate <chi_i|Vx|chi_j> */
+
+  /*
+  for (i=0; i<(n*n); i++){ Hex[i] = 0.0; }
+  */  
+
+  for (orb=0; orb<Nmax; orb++){
+    for (Mc_AN=1; Mc_AN<=Matomnum; Mc_AN++){
+      
+      Gc_AN = M2G[Mc_AN];    
+      wanA = WhatSpecies[Gc_AN];
+      tnoA = Spe_Total_CNO[wanA];
+      Anum = MP[Gc_AN] - 1;
+
+      for (i=0; i<tnoA; i++){ asum[i] = 0.0; }
+      
+      for (Nc=0; Nc<GridN_Atom[Gc_AN]; Nc++){
+	GN = GridListAtom[Mc_AN][Nc];
+
+	tmp = phi_on_grid[orb][GN];
+	for (i=0; i<tnoA; i++){
+	  asum[i] += tmp*Orbs_Grid[Mc_AN][Nc][i];
+	}
+      }
+
+      for (i=0; i<tnoA; i++){
+	proj_chi[Anum+i] = asum[i]*GridVol;
+      }
+    } // Mc_AN
+
+    /*
     for (i=0; i<n; i++){
-      printf("i=%2d ipiv=%2d\n",i,ipiv[i]);
+      for (j=0; j<n; j++){
+        Hex[i*n+j] += proj_chi[i]*proj_chi[j]*ev[orb];
+      }
     }
     */
 
-    /* inverse L*U factorization */
+  } // orb
 
-    lwork = 4*n;
-    work = (double*)malloc(sizeof(double)*lwork);
+  /*
+  printf("WWW2\n");
+  for (i=0; i<n; i++){
+    for (j=0; j<n; j++){
+      printf("%7.4f ", Hex[i*n+j]);
+    }
+    printf("\n");
+  }
 
-    F77_NAME(dgetri,DGETRI)(&n, A, &n, ipiv, work, &lwork, &info);
+  MPI_Finalize();
+  exit(0);
+  */
 
-    if ( info !=0 ) {
-      printf("dgetrf failed, info=%i, %s\n",info,thisprogram);
+  /*  
+  for (i=0; i<(n*n); i++){
+    Hex[i] = 0.90*Hex0[i] + 0.10*Hex[i];
+    Hex0[i] = Hex[i];
+  }
+  */
+
+  /*
+  printf("WWW3\n");
+  for (i=0; i<n; i++){
+    for (j=0; j<n; j++){
+      printf("%7.4f ", Hex[i*n+j]);
+    }
+    printf("\n");
+  }
+  */
+  
+  /*
+  for (i=0; i<n; i++){
+    printf("GGG i=%2d Hex=%10.5f\n",i,Hex[i*n+i]);
+  }
+  */
+
+  /*
+  MPI_Finalize();
+  exit(0);
+  */
+  
+  /* freeing of arrays */
+
+  free(work1_on_grid);
+  free(work2_on_grid);
+  
+  for (i=0; i<Nmax; i++){
+    free(phi_on_grid[i]);
+  }
+  free(phi_on_grid);
+
+  for (i=0; i<Nmax; i++){
+    free(b_on_grid[i]);
+  }
+  free(b_on_grid);
+
+  free(B);
+  free(ev);
+
+  free(asum);
+  free(proj_chi);
+
+  //free(Hex);
+  
+  dtime(&etime);
+  return (etime-stime);
+
+}
+
+
+
+
+
+
+
+
+
+double Exchange_Poisson( double *work1_on_grid, double *work2_on_grid )
+{
+  int i,j,k,k1,k2,k3,GN,GN_in,GN_out;
+  double sk1,sk2,sk3,fac_invG2,Gx,Gy,Gz,tmp0;
+  double stime,etime;
+  double *ReTmp1,*ImTmp1;
+  double *ReTmp2,*ImTmp2;
+  fftw_complex *in, *out;
+  fftw_plan p;
+
+  dtime(&stime);
+
+  ReTmp1 = (double*)malloc(sizeof(double)*TNumGrid);
+  ImTmp1 = (double*)malloc(sizeof(double)*TNumGrid);
+
+  ReTmp2 = (double*)malloc(sizeof(double)*TNumGrid);
+  ImTmp2 = (double*)malloc(sizeof(double)*TNumGrid);
+  
+  in  = fftw_malloc(sizeof(fftw_complex)*List_YOUSO[17]); 
+  out = fftw_malloc(sizeof(fftw_complex)*List_YOUSO[17]); 
+
+  /***************************
+          FFT of charge
+  ***************************/
+  
+  /* FFT along the c-axis */
+
+  p = fftw_plan_dft_1d(Ngrid3,in,out,-1,FFTW_ESTIMATE);
+  
+  for (i=0; i<Ngrid1; i++){
+    for (j=0; j<Ngrid2; j++){
+
+      GN_in  = i*Ngrid2*Ngrid3 + j*Ngrid3;
+
+      for (k=0; k<Ngrid3; k++){
+        in[k][0] = work1_on_grid[GN_in+k];
+        in[k][1] = 0.0;
+      }
+
+      fftw_execute(p);
+      
+      for (k=0; k<Ngrid3; k++){
+	GN_out = k*Ngrid1*Ngrid2 + i*Ngrid2 + j;
+        ReTmp1[GN_out] = out[k][0];
+        ImTmp1[GN_out] = out[k][1];
+      }
+    }
+  }
+
+  fftw_destroy_plan(p);  
+
+  /* FFT along the b-axis */
+
+  p = fftw_plan_dft_1d(Ngrid2,in,out,-1,FFTW_ESTIMATE);
+
+  for (k=0; k<Ngrid3; k++){
+    for (i=0; i<Ngrid1; i++){
+
+      GN_in = k*Ngrid1*Ngrid2 + i*Ngrid2;
+
+      for (j=0; j<Ngrid2; j++){
+        in[j][0] = ReTmp1[GN_in+j];
+        in[j][1] = ImTmp1[GN_in+j];
+      }
+
+      fftw_execute(p);
+
+      for (j=0; j<Ngrid2; j++){
+	GN_out = j*Ngrid3*Ngrid1 + k*Ngrid1 + i;
+        ReTmp2[GN_out] = out[j][0];
+        ImTmp2[GN_out] = out[j][1];
+      }
+    }
+  }
+
+  fftw_destroy_plan(p);  
+
+  /* FFT along the a-axis */
+
+  p = fftw_plan_dft_1d(Ngrid1,in,out,-1,FFTW_ESTIMATE);
+  
+  for (j=0; j<Ngrid2; j++){
+    for (k=0; k<Ngrid3; k++){
+
+      GN_in = j*Ngrid3*Ngrid1 + k*Ngrid1;
+
+      for (i=0; i<Ngrid1; i++){
+        in[i][0] = ReTmp2[GN_in+i];
+        in[i][1] = ImTmp2[GN_in+i];
+      }
+
+      fftw_execute(p);
+
+      for (i=0; i<Ngrid1; i++){
+	GN_out = i*Ngrid2*Ngrid3 + j*Ngrid3 + k;
+        ReTmp1[GN_out] = out[i][0];
+        ImTmp1[GN_out] = out[i][1];
+      }
+    }
+  }
+
+  fftw_destroy_plan(p);
+
+  /*******************************
+    calculate 4pi*rho(G)/|G|^2
+  *******************************/
+
+  tmp0 = 4.0*PI/(double)(Ngrid1*Ngrid2*Ngrid3);
+  
+  for (k1=0; k1<Ngrid1; k1++){
+    for (k2=0; k2<Ngrid2; k2++){
+      for (k3=0; k3<Ngrid3; k3++){
+
+	GN_in = k1*Ngrid2*Ngrid3 + k2*Ngrid3 + k3;
+
+	if (k1<Ngrid1/2) sk1 = (double)k1;
+	else             sk1 = (double)(k1 - Ngrid1);
+
+	if (k2<Ngrid2/2) sk2 = (double)k2;
+	else             sk2 = (double)(k2 - Ngrid2);
+
+	if (k3<Ngrid3/2) sk3 = (double)k3;
+	else             sk3 = (double)(k3 - Ngrid3);
+
+	Gx = sk1*rtv[1][1] + sk2*rtv[2][1] + sk3*rtv[3][1];
+	Gy = sk1*rtv[1][2] + sk2*rtv[2][2] + sk3*rtv[3][2]; 
+	Gz = sk1*rtv[1][3] + sk2*rtv[2][3] + sk3*rtv[3][3];
+	
+        fac_invG2 = tmp0/(Gx*Gx + Gy*Gy + Gz*Gz);
+
+	if (k1==0 && k2==0 && k3==0){
+	  ReTmp1[GN_in] = 0.0;
+	  ImTmp1[GN_in] = 0.0;
+	}
+	else{
+	  ReTmp1[GN_in] *= fac_invG2;
+	  ImTmp1[GN_in] *= fac_invG2;
+	}
+
+      }
+    }
+  }
+
+  /***********************************
+    inverse FFT of 4pi*rho(G)/|G|^2
+  ***********************************/
+
+  /* FFT along the c-axis */
+
+  p = fftw_plan_dft_1d(Ngrid3,in,out,1,FFTW_ESTIMATE);
+  
+  for (i=0; i<Ngrid1; i++){
+    for (j=0; j<Ngrid2; j++){
+
+      GN_in  = i*Ngrid2*Ngrid3 + j*Ngrid3;
+
+      for (k=0; k<Ngrid3; k++){
+        in[k][0] = ReTmp1[GN_in+k];
+        in[k][1] = ImTmp1[GN_in+k];
+      }
+
+      fftw_execute(p);
+      
+      for (k=0; k<Ngrid3; k++){
+	GN_out = k*Ngrid1*Ngrid2 + i*Ngrid2 + j;
+        ReTmp2[GN_out] = out[k][0];
+        ImTmp2[GN_out] = out[k][1];
+      }
+    }
+  }
+
+  fftw_destroy_plan(p);  
+
+  /* FFT along the b-axis */
+
+  p = fftw_plan_dft_1d(Ngrid2,in,out,1,FFTW_ESTIMATE);
+
+  for (k=0; k<Ngrid3; k++){
+    for (i=0; i<Ngrid1; i++){
+
+      GN_in = k*Ngrid1*Ngrid2 + i*Ngrid2;
+
+      for (j=0; j<Ngrid2; j++){
+        in[j][0] = ReTmp2[GN_in+j];
+        in[j][1] = ImTmp2[GN_in+j];
+      }
+
+      fftw_execute(p);
+
+      for (j=0; j<Ngrid2; j++){
+	GN_out = j*Ngrid3*Ngrid1 + k*Ngrid1 + i;
+        ReTmp1[GN_out] = out[j][0];
+        ImTmp1[GN_out] = out[j][1];
+      }
+    }
+  }
+
+  fftw_destroy_plan(p);  
+
+  /* FFT along the a-axis */
+
+  p = fftw_plan_dft_1d(Ngrid1,in,out,1,FFTW_ESTIMATE);
+  
+  for (j=0; j<Ngrid2; j++){
+    for (k=0; k<Ngrid3; k++){
+
+      GN_in = j*Ngrid3*Ngrid1 + k*Ngrid1;
+
+      for (i=0; i<Ngrid1; i++){
+        in[i][0] = ReTmp1[GN_in+i];
+        in[i][1] = ImTmp1[GN_in+i];
+      }
+
+      fftw_execute(p);
+
+      for (i=0; i<Ngrid1; i++){
+	GN_out = i*Ngrid2*Ngrid3 + j*Ngrid3 + k;
+        ReTmp2[GN_out] = out[i][0];
+        ImTmp2[GN_out] = out[i][1];
+      }
+    }
+  }
+
+  fftw_destroy_plan(p);
+
+  /***********************************
+    inverse FFT of 4pi*rho(G)/|G|^2
+  ***********************************/
+
+  for (GN=0; GN<TNumGrid; GN++){
+    work2_on_grid[GN] = ReTmp2[GN];
+  }
+
+  /***********************************
+           freeing of arrays
+  ***********************************/
+
+  free(ReTmp1);
+  free(ImTmp1);
+
+  free(ReTmp2);
+  free(ImTmp2);
+
+  fftw_free(in);
+  fftw_free(out);
+  
+  dtime(&etime);
+  return (etime-stime);
+
+}
+
+
+
+
+double Calc_HF_Vx_single(
+    int myid0,
+    int numprocs0,
+    int myid1,
+    int numprocs1,
+    int myworld1,
+    int size_H1,
+    int *is2,
+    int *ie2,
+    int *MP,
+    int n,
+    MPI_Comm *MPI_CommWD1,
+    int *Comm_World_StartID1,
+    double *****CDM,
+    double *****EDM,
+    double **ko,
+    double *DM1,
+    double *EDM1,
+    double *PDM1,
+    double *Work1,
+    double **EVec1, 
+    int *SP_NZeros,
+    int *SP_Atoms )
+{
+  int kmin,kmax,i0,wanA,Anum;
+  int Mc_AN,Gc_AN,Nc,p,GN,tnoA;
+  int Nmax,i,j,orb,spin,orb1,orb2;
+  double **phi_on_grid,**b_on_grid;
+  double *work1_on_grid,*work2_on_grid;
+  double tmp,sum,*B,*ev,*asum,*proj_chi;
+  double stime,etime,stime1,etime1;
+
+  dtime(&stime);
+
+  kmin = is2[myid1];
+  kmax = ie2[myid1];
+
+  /* allocation of arrays */
+
+  spin = 0;
+  
+  for (i=0; i<n; i++){ Work1[i] = 0.0; }
+
+  Nmax = Cluster_HOMO[0];
+
+  work1_on_grid = (double*)malloc(sizeof(double)*TNumGrid);
+  work2_on_grid = (double*)malloc(sizeof(double)*TNumGrid);
+  
+  phi_on_grid = (double**)malloc(sizeof(double*)*Nmax);
+  for (i=0; i<Nmax; i++){
+    phi_on_grid[i] = (double*)malloc(sizeof(double)*TNumGrid);
+    for (j=0; j<TNumGrid; j++){
+      phi_on_grid[i][j] = 0.0;
+    }
+  }
+
+  b_on_grid = (double**)malloc(sizeof(double*)*Nmax);
+  for (i=0; i<Nmax; i++){
+    b_on_grid[i] = (double*)malloc(sizeof(double)*TNumGrid);
+    for (j=0; j<TNumGrid; j++){
+      b_on_grid[i][j] = 0.0;
+    }
+  }
+
+  B = (double*)malloc(sizeof(double)*Nmax*Nmax);
+  ev = (double*)malloc(sizeof(double)*Nmax);
+
+  asum = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+  proj_chi = (double*)malloc(sizeof(double)*n);
+
+  /* loop fof orb for the calculation of phi on grid */
+  
+  for (orb=0; orb<Nmax; orb++){
+
+    /* set LCAO coefficients of phi_k */
+      
+    for (i=0; i<n; i++){
+      // EVec1[][]: the second index starts from 0. 
+      i0 = i*(kmax-kmin+1) + orb + 1 - kmin;  
+      Work1[i] = EVec1[spin][i0];
     }
 
-    free(work); free(ipiv);
+    /* calculate phi on grid */
 
-    return det;
+    for (Mc_AN=1; Mc_AN<=Matomnum; Mc_AN++){
+
+      Gc_AN = M2G[Mc_AN];    
+      wanA = WhatSpecies[Gc_AN];
+      tnoA = Spe_Total_CNO[wanA];
+      Anum = MP[Gc_AN] - 1;
+
+      for (Nc=0; Nc<GridN_Atom[Gc_AN]; Nc++){
+
+	GN = GridListAtom[Mc_AN][Nc];
+	  
+	for (i=0; i<tnoA; i++){
+	  phi_on_grid[orb][GN] += Work1[Anum+i]*Orbs_Grid[Mc_AN][Nc][i];
+	}
+      }
+    }
+  } 
+
+  /* calculation of b on grid */
+
+  for (orb1=0; orb1<Nmax; orb1++){
+    for (orb2=0; orb2<Nmax; orb2++){
+
+      /* calculate the potential of phi_1 * phi_2 */
+      
+      for (GN=0; GN<TNumGrid; GN++){
+	work1_on_grid[GN] = phi_on_grid[orb1][GN]*phi_on_grid[orb2][GN];
+      }
+
+      if (measure_time) dtime(&stime1);
+	
+      Exchange_Poisson( work1_on_grid, work2_on_grid );
+
+      if (measure_time){
+	dtime(&etime1);
+	printf("orb1=%2d orb2=%2d Exchange_Poisson time=%15.10f\n",orb1,orb2,etime1-stime1); 
+      }
+	
+      for (GN=0; GN<TNumGrid; GN++){
+	b_on_grid[orb1][GN] -= work2_on_grid[GN]*phi_on_grid[orb2][GN];
+      }
+    }
+  }
+  
+  /* calculation of the matrix B */
+
+  for (orb1=0; orb1<Nmax; orb1++){
+    for (orb2=0; orb2<Nmax; orb2++){
+
+      sum = 0.0;
+      for (GN=0; GN<TNumGrid; GN++){
+        sum += b_on_grid[orb1][GN]*phi_on_grid[orb2][GN];  
+      }
+
+      B[orb1*Nmax+orb2] = sum*GridVol;
+
+      //printf("%7.4f ",B[orb1*Nmax+orb2]); 
+    }
+    //printf("\n");
+  }
+
+  /* diagonalization of the matrix B */
+
+  Eigen_lapack3( B, ev, Nmax, Nmax );
+
+  for (orb=0; orb<Nmax; orb++){
+    printf("VVV1 orb=%2d ev=%15.12f\n",orb,ev[orb]);
+  }
+  
+  for (orb=0; orb<Nmax; orb++){ ev[orb] = 1.0/ev[orb]; }
+
+  /* calculate |a_p> by \sum_{q} |b_q> (U)_{qp} */
+
+  for (orb1=0; orb1<Nmax; orb1++){
+
+    for (GN=0; GN<TNumGrid; GN++){ phi_on_grid[orb1][GN] = 0.0; }
+
+    for (orb2=0; orb2<Nmax; orb2++){
+
+      tmp = B[orb1*Nmax+orb2];
+      
+      for (GN=0; GN<TNumGrid; GN++){
+        phi_on_grid[orb1][GN] += b_on_grid[orb2][GN]*tmp;
+      }
+    }
+  }
+  
+  /* calculate <chi_i|Vx|chi_j> */
+
+  for (i=0; i<(n*n); i++){ Hex[i] = 0.0; }
+  
+  for (orb=0; orb<Nmax; orb++){
+    for (Mc_AN=1; Mc_AN<=Matomnum; Mc_AN++){
+      
+      Gc_AN = M2G[Mc_AN];    
+      wanA = WhatSpecies[Gc_AN];
+      tnoA = Spe_Total_CNO[wanA];
+      Anum = MP[Gc_AN] - 1;
+
+      for (i=0; i<tnoA; i++){ asum[i] = 0.0; }
+      
+      for (Nc=0; Nc<GridN_Atom[Gc_AN]; Nc++){
+	GN = GridListAtom[Mc_AN][Nc];
+
+	tmp = phi_on_grid[orb][GN];
+	for (i=0; i<tnoA; i++){
+	  asum[i] += tmp*Orbs_Grid[Mc_AN][Nc][i];
+	}
+      }
+
+      for (i=0; i<tnoA; i++){
+	proj_chi[Anum+i] = asum[i]*GridVol;
+      }
+    } // Mc_AN
+
+    for (i=0; i<n; i++){
+      for (j=0; j<n; j++){
+        Hex[i*n+j] += proj_chi[i]*proj_chi[j]*ev[orb];
+      }
+    }
+  } // orb
+
+  /*
+  printf("WWW2\n");
+  for (i=0; i<n; i++){
+    for (j=0; j<n; j++){
+      printf("%7.4f ", Hex[i*n+j]);
+    }
+    printf("\n");
+  }
+
+  MPI_Finalize();
+  exit(0);
+  */
+
+  
+  for (i=0; i<(n*n); i++){
+    Hex[i] = 0.98*Hex0[i] + 0.02*Hex[i];
+    //Hex[i] = 0.0;
+    Hex0[i] = Hex[i];
+  }
+
+  /*
+  printf("WWW3\n");
+  for (i=0; i<n; i++){
+    for (j=0; j<n; j++){
+      printf("%7.4f ", Hex[i*n+j]);
+    }
+    printf("\n");
+  }
+  */
+  
+  /*
+  for (i=0; i<n; i++){
+    printf("GGG i=%2d Hex=%10.5f\n",i,Hex[i*n+i]);
+  }
+  */
+
+  /*
+  MPI_Finalize();
+  exit(0);
+  */
+  
+  /* freeing of arrays */
+
+  free(work1_on_grid);
+  free(work2_on_grid);
+  
+  for (i=0; i<Nmax; i++){
+    free(phi_on_grid[i]);
+  }
+  free(phi_on_grid);
+
+  for (i=0; i<Nmax; i++){
+    free(b_on_grid[i]);
+  }
+  free(b_on_grid);
+
+  free(B);
+  free(ev);
+
+  free(asum);
+  free(proj_chi);
+
+  //free(Hex);
+  
+  dtime(&etime);
+  return (etime-stime);
+
 }
 

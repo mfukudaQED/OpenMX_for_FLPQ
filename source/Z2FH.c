@@ -47,10 +47,10 @@
 #include <sys/types.h>
 #include <sys/times.h>
 #include <sys/time.h> 
+#include "mpi.h"
 #include "read_scfout.h"
 #include "lapack_prototypes.h"
 #include "f77func.h"
-#include "mpi.h"
 
 #define Host_ID       0         /* ID of the host CPU in MPI */
 
@@ -99,6 +99,8 @@ static void Overlap_k1k2(int diag_flag,
     dcomplex ***Sop, dcomplex ***Wk1, dcomplex ***Wk2,
     double **EigenVal1, double **EigenVal2);
 /* ***/
+
+void read_scfout(char *argv[]);
 
 static void Eigen_HH(dcomplex **ac, double *ko, int n, int EVmax);
 static void lapack_dstevx2(INTEGER N, double *D, double *E, double *W, dcomplex **ev);

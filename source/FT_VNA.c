@@ -5,7 +5,7 @@
 
   Log of FT_VNA.c:
 
-     18/May/2004  Released by T.Ozaki
+     18/May/2004  Released by T. Ozaki
 
 ***********************************************************************/
 
@@ -36,9 +36,8 @@ void FT_VNA()
   double Sr,Dr,Sk,Dk,kmin,kmax;
   double norm_k,h,dum0;
   double xmin,xmax,x,r,sum;
-  double sj;
+  double sj,*TmpVNAF;
   double tmp0,tmp1;
-  double *tmp_SphB,*tmp_SphBp;
   double TStime, TEtime;
   /* for MPI */
   MPI_Status stat;
@@ -130,13 +129,25 @@ void FT_VNA()
       xmax = sqrt(Spe_Atom_Cut1[spe] + 0.5);
       h = (xmax - xmin)/(double)OneD_Grid;
 
+      /* calculation of VNAF */
+
+      TmpVNAF = (double*)malloc(sizeof(double)*(OneD_Grid+1));
+      for (i=0; i<=OneD_Grid; i++){
+        x = xmin + (double)i*h;
+        r = x*x; 
+        TmpVNAF[i] = VNAF(spe,r);
+      }  
+
       /* loop for j */
 
-#pragma omp parallel shared(spe,Dk,Sk,GL_Abscissae,xmin,xmax,h,OneD_Grid,Spe_CrudeVNA_Bessel)  private(OMPID,Nthrds,Nprocs,j,norm_k,sum,x,r,i,tmp_SphB,tmp_SphBp,sj)
+#pragma omp parallel shared(spe,Dk,Sk,GL_Abscissae,xmin,xmax,h,OneD_Grid,Spe_CrudeVNA_Bessel,TmpVNAF)  private(OMPID,Nthrds,Nprocs,j,norm_k,sum,x,r,i,sj)
       {
+ 
+        double *tmp_SphB,*tmp_SphBp,*SphB;
 
-	/* allocate arrays */
+	/* allocation of arrays */
 
+        SphB = (double*)malloc(sizeof(double)*(OneD_Grid+1));
 	tmp_SphB  = (double*)malloc(sizeof(double)*3);
 	tmp_SphBp = (double*)malloc(sizeof(double)*3);
 
@@ -150,6 +161,17 @@ void FT_VNA()
 
 	  norm_k = 0.50*(Dk*GL_Abscissae[j] + Sk);
 
+          /* calculation of SphB */
+
+	  for (i=0; i<=OneD_Grid; i++){
+	    x = xmin + (double)i*h;
+	    r = x*x; 
+	    Spherical_Bessel(norm_k*r,0,tmp_SphB,tmp_SphBp);
+            SphB[i] = 2.0*r*r*x*tmp_SphB[0];
+	  }
+          SphB[0] *= 0.5;
+          SphB[OneD_Grid] *= 0.5;
+
 	  /**************************
            trapezoidal rule
 
@@ -158,33 +180,27 @@ void FT_VNA()
 	  ***************************/
 
 	  sum = 0.0;
-
 	  for (i=0; i<=OneD_Grid; i++){
-	    x = xmin + (double)i*h;
-	    r = x*x; 
-
-	    Spherical_Bessel(norm_k*r,0,tmp_SphB,tmp_SphBp);
-	    sj = tmp_SphB[0];
-
-	    if (i==0 || i==OneD_Grid)
-	      sum += r*r*x*sj*VNAF(spe,r);
-	    else 
-	      sum += 2.0*r*r*x*sj*VNAF(spe,r);
+            sum += SphB[i]*TmpVNAF[i];
 	  }
-	  sum = sum*h;
-
-	  Spe_CrudeVNA_Bessel[spe][j] = sum;
+	  Spe_CrudeVNA_Bessel[spe][j] = sum*h;
 
 	} /* j */
 
 	/* free arrays */
 
+        free(SphB);
 	free(tmp_SphB);
 	free(tmp_SphBp);
 
 #pragma omp flush(Spe_CrudeVNA_Bessel)
 
       } /* #pragma omp parallel */
+
+      /* freeing of TmpVNAF */ 
+
+      free(TmpVNAF);
+
     } /* Lspe */
 
     /****************************************************
@@ -244,10 +260,11 @@ void FT_VNA()
   dtime(&TEtime);
 
   /*
-  printf("myid=%2d Elapsed Time (s) = %15.12f\n",myid,TEtime-TStime);
+  printf("FT_VNA: myid=%2d Elapsed Time (s) = %15.12f\n",myid,TEtime-TStime);
   MPI_Finalize();
   exit(0);
   */
+
 }
 
 

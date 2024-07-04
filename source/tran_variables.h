@@ -79,11 +79,11 @@ double gtv_e[2][4][4];
 double ChemP_e[2];
 
 
-double **ElectrodeDensity_Grid[2];
-double *ElectrodeADensity_Grid[2];
-double *ElectrodedVHart_Grid[2];
-dcomplex ***VHart_Boundary[2];
-dcomplex ***dDen_IntBoundary[2];
+double ***ElectrodeDensity_Grid;
+double **ElectrodeADensity_Grid;
+double **ElectrodedVHart_Grid;
+dcomplex ****VHart_Boundary;
+dcomplex ****dDen_IntBoundary;
 /* added by mari 09.12.2014 */
 dcomplex *VHart_Boundary_G[2];
 

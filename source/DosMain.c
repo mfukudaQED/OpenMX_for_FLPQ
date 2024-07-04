@@ -176,7 +176,7 @@ int main(int argc, char **argv)
 
     if (method==1){
 
-      double de = 0.01/eV2Hartree;
+      double de = 0.001/eV2Hartree;
       Dos_N = (emax-emin)/de;
     }
     else if (method==4){
@@ -1056,6 +1056,7 @@ void Dos_Tetrahedron( char *basename, int Dos_N,
 		}
 	      }
 	    }
+
 	    for (itetra=0;itetra<6;itetra++) {
 	      for (ic=0;ic<4;ic++) {
 		tetra_e[ic]=cell_e[ tetra_id[itetra][ic] ];
@@ -1088,39 +1089,38 @@ void Dos_Tetrahedron( char *basename, int Dos_N,
       Dos[spin][ie] = Dos[spin][ie] * factor;
     }
 
-  /* sawada */
+    /* sawada */
    
-  h = (DosE[Dos_N-1] - DosE[0])/(Dos_N-1)*eV2Hartree;
-  sw = 2; 
+    h = (DosE[Dos_N-1] - DosE[0])/(Dos_N-1)*eV2Hartree;
+    sw = 2; 
    
-  if (sw == 1) {
+    if (sw == 1) {
  
-    /* Trapezoidal rule */
+      /* Trapezoidal rule */
  
-    for (q=0;q<Dos_N;q++) {
-      s1 = 0.0;
-      for (ie=1;ie<q;ie++) {
-        s1 += Dos[spin][ie];
-      }   
-      ssum[spin][q] = (0.5*(Dos[spin][0]+Dos[spin][q])+s1)*h;
-    } 
-  } else {
- 
-    /* Simpson's rule */
- 
-    for (q=0;q<Dos_N;q++) {
-      s1 = 0.0;
-      s2 = 0.0;
-      for (ie=1;ie<q;ie+=2) {
-        s1 += Dos[spin][ie];
+      for (q=0;q<Dos_N;q++) {
+	s1 = 0.0;
+	for (ie=1;ie<q;ie++) {
+	  s1 += Dos[spin][ie];
+	}   
+	ssum[spin][q] = (0.5*(Dos[spin][0]+Dos[spin][q])+s1)*h;
       } 
-      for (ie=2;ie<q;ie+=2) {
-        s2 += Dos[spin][ie];
+    } else {
+ 
+      /* Simpson's rule */
+ 
+      for (q=0;q<Dos_N;q++) {
+	s1 = 0.0;
+	s2 = 0.0;
+	for (ie=1;ie<q;ie+=2) {
+	  s1 += Dos[spin][ie];
+	} 
+	for (ie=2;ie<q;ie+=2) {
+	  s2 += Dos[spin][ie];
+	} 
+	ssum[spin][q] = (Dos[spin][0]+4.0*s1+2.0*s2+Dos[spin][q])*h/3.0;
       } 
-      ssum[spin][q] = (Dos[spin][0]+4.0*s1+2.0*s2+Dos[spin][q])*h/3.0;
     } 
-  } 
-
   }
 
   if (SpinP_switch==1) {
@@ -1891,8 +1891,6 @@ void Spectra_Tetrahedron( int pdos_n, int *pdos_atoms, char *basename, int Dos_N
     wanA=WhatSpecies[i];
     if (Max_tnoA<Spe_Total_CNO[wanA]) Max_tnoA=Spe_Total_CNO[wanA];
   }
-
-
 
   /* allocation */
   DosE=(double*)malloc(sizeof(double)*Dos_N);
@@ -3262,7 +3260,7 @@ void input_main( int mode, int Kgrid[3], int atomnum,
       (*pdos_atoms)[0]=1;
     }
     else {
-      printf("Which atoms for PDOS : (1,...,%d), ex 1 2\n",atomnum);
+      printf("Which atoms for PDOS : (1,...,%d), e.g. 1 2\n",atomnum);
       fgets(buf,1000,stdin);
       strcpy(buf2,buf);
       /*	printf("<%s>\n",buf); */

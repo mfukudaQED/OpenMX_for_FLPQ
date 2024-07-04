@@ -1012,7 +1012,7 @@ void TRAN_Main_Analysis_NC( MPI_Comm comm1,
   /***********************************************************
   start "kloop0"
   ***********************************************************/
-  if (TRAN_Channel_Nenergy * TRAN_Channel_Nkpoint <= 0) TRAN_Channel == 0;
+  if (TRAN_Channel_Nenergy * TRAN_Channel_Nkpoint <= 0) TRAN_Channel = 0;
 
   if (TRAN_Channel == 1){
 
@@ -3227,7 +3227,7 @@ void MTRAN_Input(MPI_Comm comm1,
   double Av_ChemP;
   int myid;
   /* S MitsuakiKAWAMURA */
-  char buf[BUFSIZE];
+  char buf[BUFSIZE] = "";
   FILE *fp;
   /* E MitsuakiKAWAMURA*/
 
@@ -3415,7 +3415,7 @@ void MTRAN_Input(MPI_Comm comm1,
       TRAN_Channel_kpoint[i] = (double*)malloc(sizeof(double) * 2);
     } /* for (i = 0; i<(TRAN_Channel_Nkpoint + 1); i++) */
 
-    if (fp = input_find("<NEGF.Channel.kpoint")) {
+    if ( (fp = input_find("<NEGF.Channel.kpoint")) != NULL ) {
       for (i = 0; i < TRAN_Channel_Nkpoint - 1; i++){
         fgets(buf, BUFSIZE, fp);
         sscanf(buf, "%lf %lf",
@@ -3461,7 +3461,7 @@ void MTRAN_Input(MPI_Comm comm1,
 
     TRAN_Channel_energy = (double*)malloc(sizeof(double)*(TRAN_Channel_Nenergy));
 
-    if (fp = input_find("<NEGF.Channel.Energy")){
+    if ( (fp=input_find("<NEGF.Channel.Energy")) != NULL ){
       for (i = 0; i<TRAN_Channel_Nenergy - 1; i++){
         fgets(buf, BUFSIZE, fp);
         sscanf(buf, "%lf", &TRAN_Channel_energy[i]);

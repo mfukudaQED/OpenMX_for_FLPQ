@@ -8,7 +8,7 @@
 
   Log of XC_CA_LSDA.c:
 
-     22/Nov/2001  Released by T.Ozaki
+     22/Nov/2001  Released by T. Ozaki
 
 ***********************************************************************/
 
@@ -18,7 +18,8 @@
 
 
 /* input argument "SCF_iter" was added by S.Ryee for LDA+U */
-void XC_CA_LSDA(int SCF_iter, double den0, double den1, double XC[2],int P_switch)
+#pragma optimization_level 1
+void XC_CA_LSDA(int SCF_iter, double den0, double den1, double XC[2], double X[2], double C[2], int P_switch)
 {
 
   /****************************************************
@@ -35,6 +36,7 @@ void XC_CA_LSDA(int SCF_iter, double den0, double den1, double XC[2],int P_switc
   double zeta,fzeta,dfzeta;
   double tmp0,tmp1,tmp2;
   double z0,z1,z02,z04,z12,z14; 
+  double X0,X1,C0,C1;
 
   /****************************************************
               Non-relativisic formalism
@@ -51,9 +53,14 @@ void XC_CA_LSDA(int SCF_iter, double den0, double den1, double XC[2],int P_switc
   if (tden<min_den){
     XC[0] = 0.0;
     XC[1] = 0.0;
+    X[0] = 0.0;
+    X[1] = 0.0;
+    C[0] = 0.0;
+    C[1] = 0.0;
   }
   
   else{
+
     zeta = (den0 - den1)/tden;  
     if (1.0<zeta)  zeta =  1.0 - min_den;
     if (zeta<-1.0) zeta = -1.0 + min_den;
@@ -146,15 +153,22 @@ void XC_CA_LSDA(int SCF_iter, double den0, double den1, double XC[2],int P_switc
             = ExP + EcP + (ExF + EcF - ExP - EcP)*fzeta       
       *****************************************************/
 
-      Exc = ExP + EcP + (ExF + EcF - ExP - EcP)*fzeta;
+      X0 = ExP + (ExF - ExP)*fzeta;  
+      X1 = X0;
 
-      /*
-      printf("ABC %15.12f\n",ExP + (ExF - ExP)*fzeta);
-      */
+      C0 = EcP + (EcF - EcP)*fzeta;  
+      C1 = C0;
 
-      XC[0] = Exc;
-      XC[1] = Exc;
+      XC[0] = X0 + C0;
+      XC[1] = X1 + C1;
+
+      X[0] = X0;
+      X[1] = X1;
+
+      C[0] = C0;
+      C[1] = C1;
     }
+
     else if (P_switch==1){
 
       /*****************************************************
@@ -192,16 +206,30 @@ void XC_CA_LSDA(int SCF_iter, double den0, double den1, double XC[2],int P_switc
         tden*dExc/drho = -1/3*rs*dExc/drs
       *****************************************************/
 
-      tmp0 = ExF + EcF - ExP - EcP;
-      Exc = ExP + EcP + tmp0*fzeta;
-      dExc = dExP + dEcP + (dExF + dEcF - dExP - dEcP)*fzeta;
+      tmp0 = ExF - ExP;
+      Exc = ExP + tmp0*fzeta;
+      dExc = dExP + (dExF - dExP)*fzeta;
       Vxc = Exc - 0.33333333333333333333*rs*dExc;
- 
-      XC[0] = Vxc + tmp0*( 1.0 - zeta)*dfzeta;
-      XC[1] = Vxc + tmp0*(-1.0 - zeta)*dfzeta;
+      X0 = Vxc + tmp0*( 1.0 - zeta)*dfzeta;
+      X1 = Vxc + tmp0*(-1.0 - zeta)*dfzeta;
 
+      tmp0 = EcF - EcP;
+      Exc = EcP + tmp0*fzeta;
+      dExc = dEcP + (dEcF - dEcP)*fzeta;
+      Vxc = Exc - 0.33333333333333333333*rs*dExc;
+      C0 = Vxc + tmp0*( 1.0 - zeta)*dfzeta;
+      C1 = Vxc + tmp0*(-1.0 - zeta)*dfzeta;
 
+      XC[0] = X0 + C0;
+      XC[1] = X1 + C1;
+
+      X[0] = X0;
+      X[1] = X1;
+
+      C[0] = C0;
+      C[1] = C1;
     }
+
     else if (P_switch==2){
 
       /*****************************************************
@@ -225,14 +253,33 @@ void XC_CA_LSDA(int SCF_iter, double den0, double den1, double XC[2],int P_switc
         Exc - Vxc 
       *****************************************************/
 
-      tmp0 = ExF + EcF - ExP - EcP;
-      Exc = ExP + EcP + tmp0*fzeta;
-      dExc = dExP + dEcP + (dExF + dEcF - dExP - dEcP)*fzeta;
+      tmp0 = ExF - ExP;
+      Exc = ExP + tmp0*fzeta;
+      dExc = dExP + (dExF - dExP)*fzeta;
       Vxc = Exc - 0.33333333333333333333*rs*dExc;
       tmp1 = 0.33333333333333333333*rs*dExc; 
       tmp2 = tmp0*dfzeta;
-      XC[0] = tmp1 - tmp2*( 1.0 - zeta);
-      XC[1] = tmp1 - tmp2*(-1.0 - zeta);
+      X0 = tmp1 - tmp2*( 1.0 - zeta);
+      X1 = tmp1 - tmp2*(-1.0 - zeta);
+
+      tmp0 = EcF - EcP;
+      Exc = EcP + tmp0*fzeta;
+      dExc = dEcP + (dEcF - dEcP)*fzeta;
+      Vxc = Exc - 0.33333333333333333333*rs*dExc;
+      tmp1 = 0.33333333333333333333*rs*dExc; 
+      tmp2 = tmp0*dfzeta;
+      C0 = tmp1 - tmp2*( 1.0 - zeta);
+      C1 = tmp1 - tmp2*(-1.0 - zeta);
+
+      XC[0] = X0 + C0;
+      XC[1] = X1 + C1;
+
+      X[0] = X0;
+      X[1] = X1;
+
+      C[0] = C0;
+      C[1] = C1;
+
     }
   }
 

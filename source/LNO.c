@@ -15,9 +15,9 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include "mpi.h"
 #include "openmx_common.h"
 #include "lapack_prototypes.h"
-#include "mpi.h"
 #include <omp.h>
 
 #define  measure_time   0
@@ -29,7 +29,9 @@ static double LNO_Col_Schur(char *mode, int SCF_iter,
 			    double ****OLP0, double *****Hks, double *****CDM);
 
 static double LNO_Col_Diag(char *mode, int SCF_iter,
-			   double ****OLP0, double *****CDM);
+			   double ****OLP0,
+			   double *****Hks,
+			   double *****CDM);
 
 static double LNO_NonCol_Diag(char *mode, int SCF_iter,
 		   	      double ****OLP0, double *****CDM);
@@ -51,8 +53,7 @@ double LNO(char *mode,
 
   if ( SpinP_switch==0 || SpinP_switch==1){
 
-    time0 = LNO_Col_Diag(mode, SCF_iter, OLP0, CDM);
-
+    time0 = LNO_Col_Diag(mode, SCF_iter, OLP0, Hks, CDM);
 
     /*
     time0 = LNO_Col_Schur(mode, SCF_iter, OLP0, Hks, CDM);
@@ -535,7 +536,7 @@ static double LNO_Col_Projection( char *mode, int SCF_iter,
        included in proceeding calculations.
       ********************************************/
 
-      if ( (SCF_iter==1 && mode=="o-n3") || mode=="full" ){
+      if ( (SCF_iter==1 && strcmp(mode,"o-n3")==0) || strcmp(mode,"full")==0 ){
         LNO_Num[Gc_AN] = tno1;
       }
 
@@ -883,7 +884,7 @@ static double LNO_Col_Schur(char *mode, int SCF_iter,
       LIWORK = 1;
 
       for (i=0; i<tno1*tno1; i++) B[i] = DMS[spin][Mc_AN][i];
-
+ 
       F77_NAME(dgeesx,DGEESX)( JOBVS, SORT, myselect, SENSE, &N, B, &LDA, &SDIM, WR, WI, VS, &LDVS, 
                                &RCONDE, &RCONDV, WORK, &LWORK, IWORK, &LIWORK, BWORK, &INFO );
 
@@ -917,7 +918,7 @@ static double LNO_Col_Schur(char *mode, int SCF_iter,
        included in proceeding calculations.
       ********************************************/
 
-      if ( (SCF_iter==1 && mode=="o-n3") || mode=="full" ){
+      if ( (SCF_iter==1 && strcmp(mode,"o-n3")==0) || strcmp(mode,"full")==0 ){
         LNO_Num[Gc_AN] = tno1;
       }
 
@@ -1148,7 +1149,6 @@ static double LNO_Col_Schur(char *mode, int SCF_iter,
     }
   }
 
-
   /*
   if (myid==0){
 
@@ -1214,7 +1214,9 @@ static double LNO_Col_Schur(char *mode, int SCF_iter,
 
 
 static double LNO_Col_Diag(char *mode, int SCF_iter,
-			   double ****OLP0, double *****CDM)
+			   double ****OLP0,
+			   double *****Hks,
+			   double *****CDM)
 {
   int i,j,k,l,n,Mc_AN,Gc_AN,h_AN,Mh_AN,Gh_AN;
   int Cwan,num,wan1,wan2,tno0,tno1,tno2,spin;
@@ -1222,7 +1224,7 @@ static double LNO_Col_Diag(char *mode, int SCF_iter,
   char *JOBVL,*JOBVR;
   int N,A,LDA,LDVL,LDVR,SDIM,LWORK,INFO,*IWORK;
   double ***DMS,*WR,*WI,*VL,*VR,*WORK,RCONDE,RCONDV;
-  double *B,*C,*IC,sum,sum0,F;
+  double *B,*C,*IC,sum,sum0,F,tmp;
   double *tmp_array;
   double *tmp_array2;
   double TStime,TEtime;
@@ -1269,7 +1271,7 @@ static double LNO_Col_Diag(char *mode, int SCF_iter,
   /********************************************
         calculation of DMS defined by DM*S
   ********************************************/
-
+  
   for (spin=0; spin<=SpinP_switch; spin++){
  
     for (Mc_AN=1; Mc_AN<=Matomnum; Mc_AN++){
@@ -1278,28 +1280,75 @@ static double LNO_Col_Diag(char *mode, int SCF_iter,
       wan1 = WhatSpecies[Gc_AN];
       tno1 = Spe_Total_CNO[wan1];
 
-      for (h_AN=0; h_AN<=FNAN[Gc_AN]; h_AN++){
+      if (strcmp(mode,"scf")==0){
+      
+	for (h_AN=0; h_AN<=FNAN[Gc_AN]; h_AN++){
 
-	Gh_AN = natn[Gc_AN][h_AN];
-	wan2 = WhatSpecies[Gh_AN];
-	tno2 = Spe_Total_CNO[wan2];
+	  Gh_AN = natn[Gc_AN][h_AN];
+	  wan2 = WhatSpecies[Gh_AN];
+	  tno2 = Spe_Total_CNO[wan2];
 
-	for (i=0; i<tno1; i++){
+	  for (i=0; i<tno1; i++){
+	    for (j=0; j<tno1; j++){
+
+	      sum = 0.0;
+	      for (k=0; k<tno2; k++){
+		sum += CDM[spin][Mc_AN][h_AN][i][k]*OLP0[Mc_AN][h_AN][j][k];
+	      }
+
+	      DMS[spin][Mc_AN][tno1*j+i] += sum; 
+	    }
+	  }
+	} // h_AN
+      } // if (mode=="scf")
+
+      else if (strcmp(mode,"contracted_diag")==0){
+      
+	for (h_AN=0; h_AN<=FNAN[Gc_AN]; h_AN++){
+
+	  Gh_AN = natn[Gc_AN][h_AN];
+	  wan2 = WhatSpecies[Gh_AN];
+	  tno2 = Spe_Total_CNO[wan2];
+
+	  for (i=0; i<tno1; i++){
+	    for (j=0; j<tno1; j++){
+
+	      sum = 0.0;
+	      for (k=0; k<tno2; k++){
+		
+		if (h_AN==0 && i==k){
+                  tmp = CDM[spin][Mc_AN][h_AN][i][i] + 0.0/(1.0+exp(0.2*Hks[spin][Mc_AN][0][i][i]));
+		}
+                else{
+                  tmp = CDM[spin][Mc_AN][h_AN][i][k];
+		}
+		
+		sum += tmp*OLP0[Mc_AN][h_AN][j][k];
+	      }
+
+	      DMS[spin][Mc_AN][tno1*j+i] += sum; 
+	    }
+	  }
+	} // h_AN
+	
+      } // end of else if (mode=="contracted_diag")
+      
+      else if (strcmp(mode,"guess")==0){
+
+        for (i=0; i<tno1; i++){
 	  for (j=0; j<tno1; j++){
-
-	    sum = 0.0;
-            for (k=0; k<tno2; k++){
-              sum += CDM[spin][Mc_AN][h_AN][i][k]*OLP0[Mc_AN][h_AN][j][k];
-            }
-
-	    DMS[spin][Mc_AN][tno1*j+i] += sum; 
+            DMS[spin][Mc_AN][tno1*j+i] = 0.0;
 	  }
 	}
-      }
 
+        for (i=0; i<tno1; i++){
+          DMS[spin][Mc_AN][tno1*i+i] = 1.0/(1.0+exp(Hks[spin][Mc_AN][0][i][i]));
+	}
+      } // end of else if (mode=="guess")
+      
     } /* Mc_AN */
   } /* spin */
-
+  
   /********************************************
             diagonalization of DMS
   ********************************************/
@@ -1355,7 +1404,7 @@ static double LNO_Col_Diag(char *mode, int SCF_iter,
 	  }     
 	}
 
-        printf("DMS\n");
+        printf("DMS spin=%2d Gc_AN=%2d\n",spin,Gc_AN);
 	for (i=0; i<tno1; i++){
 	  for (j=0; j<tno1; j++){
             printf("%10.6f ",DMS[spin][Mc_AN][tno1*j+i]);
@@ -1363,7 +1412,7 @@ static double LNO_Col_Diag(char *mode, int SCF_iter,
           printf("\n");
 	}
 
-        printf("B\n");
+        printf("B spin=%2d Gc_AN=%2d\n",spin,Gc_AN);
 	for (i=0; i<tno1; i++){
 	  for (j=0; j<tno1; j++){
             printf("%10.6f ",B[tno1*j+i]);
@@ -1402,7 +1451,7 @@ static double LNO_Col_Diag(char *mode, int SCF_iter,
        included in proceeding calculations.
       ********************************************/
 
-      if ( (SCF_iter==1 && mode=="o-n3") || mode=="full" ){
+      if ( (SCF_iter==1 && strcmp(mode,"o-n3")==0) || strcmp(mode,"full")==0 ){
         LNO_Num[Gc_AN] = tno1;
       }
 
@@ -1432,7 +1481,7 @@ static double LNO_Col_Diag(char *mode, int SCF_iter,
           LNO_Num[Gc_AN] = LNOs_Num_predefined[wan1];
 	}
 
-      }
+      } // end of else
 
       if (0 && myid==0){
 
@@ -1440,7 +1489,7 @@ static double LNO_Col_Diag(char *mode, int SCF_iter,
 
 	for (i=0; i<tno1; i++){
 	  printf("ABC myid=%2d spin=%2d Mc_AN=%2d i=%2d IWORK=%2d WR=%15.11f WI=%15.11f\n",
-                      myid,spin,Mc_AN,i,IWORK[i],WR[i],WI[i]);fflush(stdout);
+                      myid,spin,Mc_AN,i,IWORK[i],WR[i],WI[IWORK[i]]);fflush(stdout);
 	}
 
         printf("QQQ myid=%2d spin=%2d Mc_AN=%2d LNO_Num=%2d\n",myid,spin,Mc_AN,LNO_Num[Gc_AN]);fflush(stdout);
@@ -1488,10 +1537,6 @@ static double LNO_Col_Diag(char *mode, int SCF_iter,
         MPI_Finalize();
         exit(0);
 	*/
-
-        
-
-
 
       }
 
@@ -1897,7 +1942,7 @@ static double LNO_NonCol_Diag(char *mode, int SCF_iter,
        included in proceeding calculations.
     ********************************************/
 
-    if ( (SCF_iter==1 && mode=="o-n3") || mode=="full" ){
+    if ( (SCF_iter==1 && strcmp(mode,"o-n3")==0) || strcmp(mode,"full")==0 ){
       LNO_Num[Gc_AN] = tno1;
     }
 

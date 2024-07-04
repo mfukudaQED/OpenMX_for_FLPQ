@@ -13,9 +13,9 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
+#include "mpi.h"
 #include "openmx_common.h"
 #include "lapack_prototypes.h"
-#include "mpi.h"
 
 
 void lapack_dstedc3(INTEGER N, double *D, double *E, double *W, double *ev, INTEGER csize)

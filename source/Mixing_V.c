@@ -3,9 +3,11 @@
 #include <math.h>
 #include <time.h>
 #include <string.h>
-#include "openmx_common.h"
-#include "tran_variables.h"
 #include "mpi.h"
+#include "openmx_common.h"
+#include "lapack_prototypes.h"
+#include "tran_variables.h"
+#include <omp.h>
 
 #define  maxima_step  300000.0
 #define  measure_time   0

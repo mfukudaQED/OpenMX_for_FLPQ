@@ -13,7 +13,7 @@
 
 #include "tran_prototypes.h"
 
-#define MAXBUF 1024
+#define MAXBUF 4096
 #define Max_Num_WF_Projs 15
 
 
@@ -95,7 +95,9 @@ void Input_std(char *file)
   }
 
   /* add '/' to filepath */
-  sprintf(filepath,"%s/",filepath);
+  char tmp_filepath[YOUSO10];
+  strcpy(tmp_filepath,filepath);
+  sprintf(filepath,"%s/",tmp_filepath);
 
   input_string("System.Name",filename,"default");
   input_string("DATA.PATH",DFT_DATA_PATH,"../DFT_DATA19");
@@ -271,7 +273,7 @@ void Input_std(char *file)
                            read species
   *************************************************************/ 
 
-  if (fp=input_find("<Definition.of.Atomic.Species")) {
+  if ( (fp=input_find("<Definition.of.Atomic.Species")) != NULL ) {
 
     for (i=0; i<SpeciesNum; i++){
       fgets(buf,MAXBUF,fp);
@@ -314,7 +316,7 @@ void Input_std(char *file)
 
   Number_of_Electrons_Species_flag = 0;
 
-  if (fp=input_find("<Number.of.Electrons.Species")) {    
+  if ( (fp=input_find("<Number.of.Electrons.Species")) != NULL ) {    
 
     Number_of_Electrons_Species_flag = 1;
 
@@ -593,9 +595,9 @@ void Input_std(char *file)
   }
 
   input_double("MD.Opt.criterion",&MD_Opt_criterion,(double)0.0003);
-  input_int("MD.Opt.DIIS.History",&M_GDIIS_HISTORY,3);
-  input_int("MD.Opt.StartDIIS",&OptStartDIIS,5);
-  input_int("MD.Opt.EveryDIIS",&OptEveryDIIS,20000);
+  input_int("MD.Opt.DIIS.History",&M_GDIIS_HISTORY,2);
+  input_int("MD.Opt.StartDIIS",&OptStartDIIS,1);
+  input_int("MD.Opt.EveryDIIS",&OptEveryDIIS,200000);
 
   input_double("MD.EvsLC.Step",&MD_EvsLattice_Step,(double)0.4);
 
@@ -632,7 +634,7 @@ void Input_std(char *file)
   if (MD_switch==2 || MD_switch==9 || MD_switch==11 || MD_switch==14 || MD_switch==15
       || MD_switch==27 || MD_switch==28 || MD_switch==29 || MD_switch==30){
 
-    if (fp=input_find("<MD.TempControl")) {
+    if ( (fp=input_find("<MD.TempControl")) != NULL ) {
 
       fscanf(fp,"%i",&TempNum);         
 
@@ -679,7 +681,7 @@ void Input_std(char *file)
     }
   }
 
-  if (fp=input_find("<MD.CellPressureControl")) {
+  if ( (fp=input_find("<MD.CellPressureControl")) != NULL ) {
     fscanf(fp,"%i",&PreNum);  
     /* modified by MIZUHO for NPT-MD */
     for (i=1; i<=PreNum; i++){  
@@ -714,7 +716,7 @@ void Input_std(char *file)
   input_string2int("NPT.LatticeRestriction",&LatticeRestriction, i, s_vec,i_vec);
   input_double("Langevin.Friction.Factor",&FricFac,(double)0.001);
 
-  if (fp=input_find("<NPT.WV.F0")) {
+  if ( (fp=input_find("<NPT.WV.F0")) !=NULL ) {
 
     for (i=1; i<=3; i++){
       fscanf(fp,"%lf %lf %lf",&NPT_WV_F0[i][1],&NPT_WV_F0[i][2],&NPT_WV_F0[i][3]);
@@ -729,6 +731,10 @@ void Input_std(char *file)
   /* LNO_flag */
 
   input_logical("LNO.flag",&LNO_flag,0);
+
+  /* CWF_Calc */
+
+  input_logical("CWF.Calc",&CWF_Calc,0); /* default=off */
 
   /****************************************************
              solver of the eigenvalue problem
@@ -771,8 +777,8 @@ void Input_std(char *file)
   i_vec[0]=2;        i_vec[1]=0;        i_vec[2]=1;        i_vec[3]=3;        
   input_string2int("scf.lapack.dste", &dste_flag, 4, s_vec,i_vec);
 
-  s_vec[0]="elpa1"; s_vec[1]="lapack"; s_vec[2]="elpa2";
-  i_vec[0]=1;       i_vec[1]=0;        i_vec[2]=2; 
+  s_vec[0]="elpa2"; s_vec[1]="lapack"; s_vec[2]="elpa1";
+  i_vec[0]=2;       i_vec[1]=0;        i_vec[2]=1; 
   input_string2int("scf.eigen.lib", &scf_eigen_lib_flag, 3, s_vec,i_vec);
 
   if (Solver==1){
@@ -792,9 +798,9 @@ void Input_std(char *file)
 
   input_double("scf.MP.criterion",&Criterion_MP_Special_Kpt,(double)1.0e-5);
 
-  s_vec[0]="REGULAR"; s_vec[1]="MP";
-  i_vec[0]=1        ; i_vec[1]=2   ; 
-  input_string2int("scf.Generation.Kpoint", &way_of_kpoint, 2, s_vec,i_vec);
+  s_vec[0]="GCenter"; s_vec[1]="MP"; s_vec[2]="REGULAR";
+  i_vec[0]=3        ; i_vec[1]=2   ; i_vec[2]=1   ; 
+  input_string2int("scf.Generation.Kpoint", &way_of_kpoint, 3, s_vec,i_vec);
 
   if (Solver==4 && way_of_kpoint==2){
     if (myid==Host_ID){
@@ -817,7 +823,7 @@ void Input_std(char *file)
                 SCF or electronic system
   ****************************************************/
 
-  s_vec[0]="LDA"; s_vec[1]="LSDA-CA"; s_vec[2]="LSDA-PW"; s_vec[3]="GGA-PBE"; s_vec[4]="EXX-TEST"; s_vec[5]="NLX";
+  s_vec[0]="LDA"; s_vec[1]="LSDA-CA"; s_vec[2]="LSDA-PW"; s_vec[3]="GGA-PBE"; s_vec[4]="PBE0"; s_vec[5]="NLX";
   i_vec[0]=1; i_vec[1]=2; i_vec[2]= 3; i_vec[3]= 4; i_vec[4]=5; i_vec[5]=6;
   input_string2int("scf.XcType", &XC_switch, 6, s_vec,i_vec);
 
@@ -899,7 +905,7 @@ void Input_std(char *file)
 
   if (SpinP_switch==3 && SO_switch==1){
 
-    if (fp=input_find("<scf.SO.factor")) {    
+    if ( (fp=input_find("<scf.SO.factor")) != NULL ) {    
 
       /* switch on SO_factor_flag */
 
@@ -947,7 +953,7 @@ void Input_std(char *file)
 
   /* scf.pcc.opencore */
 
-  if (fp=input_find("<scf.pcc.opencore")) {    
+  if ( (fp=input_find("<scf.pcc.opencore")) != NULL ) {    
 
     for (i=0; i<SpeciesNum; i++){
       fscanf(fp,"%s",Species);
@@ -1065,17 +1071,17 @@ void Input_std(char *file)
   Kspace_grid3 = i_vec[2];
 
   if (Kspace_grid1<=0){
-    printf("Kspace_grid1 should be over 1\n");
+    if (myid==Host_ID) printf("Kspace_grid1 should be over 1\n");
     MPI_Finalize();
     exit(0);
   } 
   if (Kspace_grid2<=0){
-    printf("Kspace_grid2 should be over 1\n");
+    if (myid==Host_ID) printf("Kspace_grid2 should be over 1\n");
     MPI_Finalize();
     exit(0);
   } 
   if (Kspace_grid3<=0){
-    printf("Kspace_grid3 should be over 1\n");
+    if (myid==Host_ID) printf("Kspace_grid3 should be over 1\n");
     MPI_Finalize();
     exit(0);
   } 
@@ -1089,6 +1095,16 @@ void Input_std(char *file)
     List_YOUSO[27] = Kspace_grid1;
     List_YOUSO[28] = Kspace_grid2;
     List_YOUSO[29] = Kspace_grid3;
+  }
+
+  /* check the compatibility for CWF */
+
+  if ( CWF_Calc && ( Kspace_grid1%2==0 || Kspace_grid2%2==0 || Kspace_grid3%2==0 ) ){
+    if (myid==Host_ID){
+      printf("In case of CWF.Calc='on', Kspace_grid should be odd.\n");
+    }    
+    MPI_Finalize();
+    exit(0);
   }
 
   /* set PeriodicGamma_flag in 1 in the band calc. with only the gamma point */
@@ -1290,9 +1306,6 @@ void Input_std(char *file)
   s_vec[0]="x"; s_vec[1]="y"; s_vec[2]="z";
   i_vec[0]=1  ; i_vec[1]=2  ; i_vec[2]=3  ;
   input_string2int("ESM.direction", &ESM_direction, 3, s_vec,i_vec);
-
-  //printf("ESM_direction = %d\n",ESM_direction);
-
   switch (ESM_direction){
   case 1:
     iESM[1]=1; iESM[2]=2; iESM[3]=3;
@@ -1315,7 +1328,7 @@ void Input_std(char *file)
       printf("    The following calc. is implemented with ESM method.    \n");
       printf("    Boundary condition = Vacuum|Vacuum|Vacuum              \n");
       printf("                                                           \n");
-      printf("        Copyright (C), 2011-2021, T.Ohwaki and M.Otani     \n");
+      printf("        Copyright (C), 2011-2019, T.Ohwaki and M.Otani     \n");
       printf("********************************************************** \n");
       printf("\n");
     }
@@ -1328,7 +1341,7 @@ void Input_std(char *file)
       printf("    The following calc. is implemented with ESM method.    \n");
       printf("    Boundary condition = Metal|Vacuum|Metal                \n");
       printf("                                                           \n");
-      printf("        Copyright (C), 2011-2021, T.Ohwaki and M.Otani     \n");
+      printf("        Copyright (C), 2011-2019, T.Ohwaki and M.Otani     \n");
       printf("********************************************************** \n");
       printf("\n");
     }
@@ -1341,7 +1354,7 @@ void Input_std(char *file)
       printf("    The following calc. is implemented with ESM method.    \n");
       printf("    Boundary condition = Vacuum|Vacuum|Metal               \n");
       printf("                                                           \n");
-      printf("        Copyright (C), 2011-2021, T.Ohwaki and M.Otani     \n");
+      printf("        Copyright (C), 2011-2019, T.Ohwaki and M.Otani     \n");
       printf("********************************************************** \n");
       printf("\n");
     }
@@ -1355,7 +1368,7 @@ void Input_std(char *file)
       printf("    Boundary condition = Metal|Vacuum|Metal                \n");
       printf("                         plus Uniform electric field       \n");
       printf("                                                           \n");
-      printf("        Copyright (C), 2011-2021, T.Ohwaki and M.Otani     \n");
+      printf("        Copyright (C), 2011-2019, T.Ohwaki and M.Otani     \n");
       printf("********************************************************** \n");
       printf("\n");
     }
@@ -1429,6 +1442,13 @@ void Input_std(char *file)
 
   input_logical("geoopt.restart",&GeoOpt_RestartFromFile, 0); 
 
+  /*****************************************************
+        Exc0.correction.flag and scf.Num.Leb.Grid
+  *****************************************************/
+
+  input_logical("scf.Exc0.correction.flag",&Exc0_correction_flag, 1); 
+  input_int("scf.Num.Leb.Grid",&Num_Leb_Grid,590);
+
   /****************************************************
                          atoms
   ****************************************************/
@@ -1457,7 +1477,7 @@ void Input_std(char *file)
     input_string2int("Atoms.SpeciesAndCoordinates.Unit",
                      &coordinates_unit,3,s_vec,i_vec);
 
-    if (fp=input_find("<Atoms.SpeciesAndCoordinates") ) {
+    if ( (fp=input_find("<Atoms.SpeciesAndCoordinates")) != NULL ) {
 
       for (i=1; i<=atomnum; i++){
         fgets(buf,MAXBUF,fp);
@@ -1591,7 +1611,7 @@ void Input_std(char *file)
     i_vec[0]=0;  i_vec[1]=1;
     input_string2int("Atoms.UnitVectors.Unit",&unitvector_unit,2,s_vec,i_vec);
 
-    if (fp=input_find("<Atoms.Unitvectors")) {
+    if ( (fp=input_find("<Atoms.Unitvectors")) != NULL ) {
 
       for (i=1; i<=3; i++){
         fscanf(fp,"%lf %lf %lf",&tv[i][1],&tv[i][2],&tv[i][3]);
@@ -1828,7 +1848,7 @@ void Input_std(char *file)
     }
   }
 
-  if (fp=input_find("<Atoms.Unitvectors.Velocity")) {
+  if ( (fp=input_find("<Atoms.Unitvectors.Velocity")) != NULL ) {
 
     for (i=1; i<=3; i++){
       fscanf(fp,"%lf %lf %lf",&tv_velocity[i][1],&tv_velocity[i][2],&tv_velocity[i][3]);
@@ -1849,6 +1869,320 @@ void Input_std(char *file)
     TRAN_Input_std_Atoms(mpi_comm_level1, Solver);
   }
 
+  /****************************************************
+                   Energy decomposition
+  ****************************************************/
+
+  input_logical("Energy.Decomposition",&Energy_Decomposition_flag,0);
+
+  if (Energy_Decomposition_flag==1 && Cnt_switch==1){
+    if (myid==Host_ID){
+      printf("Energy decomposition is not supported for orbital optimization.\n");
+    }
+    MPI_Finalize();
+    exit(0);
+  }
+
+  /************************************************************************
+         Closest Wannier Function (CWF) to a given set of orbitals
+  ************************************************************************/
+
+  input_logical("CWF.Dis.vs.H",&CWF_Dis_vs_H,0); /* default=off */
+
+  r_vec[0]=-1000.0; r_vec[1]=0.0;
+  input_doublev("CWF.disentangling.Erange",2,CWF_disentangling_Erange,r_vec);
+  /* change the unit from eV to Hartree */
+  CWF_disentangling_Erange[0]= CWF_disentangling_Erange[0]/eV2Hartree;
+  CWF_disentangling_Erange[1]= CWF_disentangling_Erange[1]/eV2Hartree;
+
+  r_vec[0]=0.3; r_vec[1]=0.3;
+  input_doublev("CWF.disentangling.smearing.kBT",2,r_vec2,r_vec);
+  CWF_disentangling_smearing_kBT0 = r_vec2[0]/eV2Hartree;
+  CWF_disentangling_smearing_kBT1 = r_vec2[1]/eV2Hartree;
+
+  input_double("CWF.disentangling.smearing.bound",&CWF_disentangling_smearing_bound,(double)1.0e-12);
+  input_int("CWF.unoccupied.factor",&CWF_unoccupied_factor,10);
+
+  s_vec[0]="HO";   s_vec[1]="AO";  s_vec[2]="MO"; 
+  i_vec[0]=1;      i_vec[1]=2;     i_vec[2]=3;
+  input_string2int("CWF.Guiding.Orbitals", &CWF_Guiding_Orbital, 3, s_vec,i_vec);
+
+  if (CWF_Calc==1){
+
+    if ( (fp=input_find("<CWF.Guiding.AOs")) != NULL ) {    
+
+      /* initialize the seed orbitals */ 
+      for (i=0; i<SpeciesNum; i++){
+	for (l=0; l<=Spe_MaxL_Basis[i]; l++){
+	  for (mul=0; mul<Spe_Num_Basis[i][l]; mul++){
+	    CWF_Guiding_AO[i][l][mul] = 0 ;
+	  }
+	}
+      }
+
+      for (i=0; i<SpeciesNum; i++){
+	fscanf(fp,"%s",Species);
+        j = Species2int(Species);
+        CWF_Num_predefined[j] = 0; 
+
+	for (l=0; l<=Spe_MaxL_Basis[j]; l++){
+	  for (mul=0; mul<Spe_Num_Basis[j][l]; mul++){
+	    fscanf(fp,"%s %d", buf, &CWF_Guiding_AO[j][l][mul]);
+
+            CWF_Num_predefined[j] += (2*l+1)*CWF_Guiding_AO[j][l][mul];
+	  }
+	}
+
+        //printf("i=%2d CWF_Num_predefined[j]=%2d\n",j,CWF_Num_predefined[j]);
+
+      }
+
+      if (! input_last("CWF.Guiding.AOs>") ) {
+	/* format error */
+	printf("Format error for CWF.Guiding.AOs\n");
+        MPI_Finalize();
+        exit(0);
+	po++;
+      }
+    }
+  }
+
+  /* As a given set of orbitals, 'molecular orbitals' are used, which are calculated 
+     from the trace formula. */
+
+  if ( CWF_Calc==1 && CWF_Guiding_Orbital==3 ){
+
+    /* read data */
+
+    int *tmp_array;   
+    tmp_array = (int*)malloc(sizeof(int)*(atomnum+1)); 
+    
+    if ( (fp=input_find("<CWF.MO.Grouped.Atoms")) != NULL) {
+
+      for (i=1; i<=atomnum; i++){  
+
+	fscanf(fp,"%d %d",&j,&tmp_array[i]);
+
+        if (i!=j){
+          if (myid==Host_ID){
+  	    printf("Format error for CWF.MO.Grouped.Atoms: atom %d\n",i);
+	  }
+	  po++;
+	}
+    
+        if (tmp_array[i]<0){
+          if (myid==Host_ID){
+  	    printf("Format error for CWF.MO.Grouped.Atoms: values cannot be negative. %d\n",i);
+	  }
+	  po++;
+	} 
+      }  
+
+      if ( ! input_last("CWF.MO.Grouped.Atoms>") ) {
+	/* format error */
+        if (myid==Host_ID){
+  	  printf("Format error for CWF.MO.Grouped.Atoms\n");
+	}
+	po++;
+      }
+
+    } /* end of if (fp=input_find("<CWF.MO.Grouped.Atoms")) */
+
+    /* check the data */
+
+    int *tmp_flag;
+    tmp_flag = (int*)malloc(sizeof(int)*(atomnum+1)); 
+
+    for (i=0; i<atomnum; i++){ tmp_flag[i] = 0; } 
+
+    for (i=1; i<=atomnum; i++){  
+      k = tmp_array[i] - 1;
+      tmp_flag[k]++;
+    }    
+
+    Num_CWF_Grouped_Atoms = 0; 
+    for (i=0; i<atomnum; i++){  
+      if (0<tmp_flag[i]) Num_CWF_Grouped_Atoms++;
+    }
+
+    CWF_Grouped_Atoms_EachNum = (int*)malloc(sizeof(int)*Num_CWF_Grouped_Atoms);
+    for (i=0; i<Num_CWF_Grouped_Atoms; i++){
+      CWF_Grouped_Atoms_EachNum[i] = tmp_flag[i];
+    }
+
+    CWF_Grouped_Atoms = (int**)malloc(sizeof(int*)*Num_CWF_Grouped_Atoms);
+    for (i=0; i<Num_CWF_Grouped_Atoms; i++){
+      CWF_Grouped_Atoms[i] = (int*)malloc(sizeof(int)*CWF_Grouped_Atoms_EachNum[i]);
+    }
+
+    for (i=0; i<atomnum; i++){ tmp_flag[i] = 0; } 
+    for (i=1; i<=atomnum; i++){  
+      k = tmp_array[i] - 1;
+      CWF_Grouped_Atoms[k][tmp_flag[k]] = i;
+      tmp_flag[k]++;
+    }
+
+    /* free arrays */
+    free(tmp_array);
+    free(tmp_flag);
+
+    Num_CWF_MOs_Group = (int*)malloc(sizeof(int)*Num_CWF_Grouped_Atoms);
+    for (i=0; i<Num_CWF_Grouped_Atoms; i++) Num_CWF_MOs_Group[i] = 0;
+
+    /*
+    for (i=0; i<Num_CWF_Grouped_Atoms; i++){
+      for (j=0; j<CWF_Grouped_Atoms_EachNum[i]; j++){
+        printf("ABC1 i=%2d j=%2d CWF_Grouped_Atoms=%2d\n",i,j,CWF_Grouped_Atoms[i][j]);
+      }
+    }
+    MPI_Finalize();
+    exit(0);
+    */
+
+  } /* end of if ( CWF_Calc==1 && CWF_Guiding_Orbital==3 ) */
+
+  if ( CWF_Calc==1 && CWF_Guiding_Orbital==3 ){
+
+    int num,ar[10]; 
+    char *token,*token2,copychar[100];
+    char *saveptr1, *saveptr2;
+
+    /* for allocation of CWF_MO_Selection */
+
+    CWF_MO_Selection = (int**)malloc(sizeof(int*)*Num_CWF_Grouped_Atoms);
+
+    if ( (fp=input_find("<CWF.MO.Selection")) != NULL ) {
+
+      for (i=0; i<Num_CWF_Grouped_Atoms; i++){
+
+	fscanf(fp,"%d",&j);
+        fgets(buf,MAXBUF,fp);
+
+        if ((i+1)!=j){
+          if (myid==Host_ID){
+  	    printf("Format error for CWF.MO.Selection: Group %d\n",i+1);
+	  }
+	  po++;
+	} 
+
+        num = 0; 
+        token = strtok_r(buf, ",", &saveptr1);
+
+        while (token != NULL){
+
+          if (strchr(token,(int)'-') != NULL){
+
+            strcpy(copychar,token);
+   	    token2 = strtok_r(copychar, "-", &saveptr2);
+
+            j = 0;
+            while ( token2 != NULL){
+              ar[j] = atoi(token2);
+   	      token2 = strtok_r(NULL, "-", &saveptr2);
+              j++;
+	    }
+            num += ar[1] - ar[0] + 1;
+
+	  }
+          else{
+            num++;              
+	  }
+
+	  token = strtok_r(NULL, ",", &saveptr1);
+
+	} // end of while (token != NULL)
+
+        CWF_MO_Selection[i] = (int*)malloc(sizeof(int)*num);
+
+      } // i
+
+      ungetc('\n',fp);
+
+      if ( ! input_last("CWF.MO.Selection>") ) {
+	/* format error */
+        if (myid==Host_ID){
+  	  printf("Format error for CWF.MO.Selection\n");
+	}
+	po++;
+      }
+
+    } /* end of if (fp=input_find("<CWF.MO.Selection")) */
+
+    /* for storing the selected MOs in CWF_MO_Selection */
+
+    if ( (fp=input_find("<CWF.MO.Selection")) != NULL ) {
+
+      for (i=0; i<Num_CWF_Grouped_Atoms; i++){
+
+	fscanf(fp,"%d",&j);
+        fgets(buf,MAXBUF,fp);
+
+        if ((i+1)!=j){
+          if (myid==Host_ID){
+  	    printf("Format error for CWF.MO.Selection: Group %d\n",i+1);
+	  }
+	  po++;
+	} 
+
+        num = 0; 
+        token = strtok_r(buf, ",", &saveptr1);
+
+        while (token != NULL){
+
+          if (strchr(token,(int)'-') != NULL){
+
+            strcpy(copychar,token);
+   	    token2 = strtok_r(copychar, "-", &saveptr2);
+
+            j = 0;
+            while ( token2 != NULL){
+              ar[j] = atoi(token2);
+   	      token2 = strtok_r(NULL, "-", &saveptr2);
+              j++;
+	    }
+        
+            for (k=ar[0]; k<=ar[1]; k++){
+              CWF_MO_Selection[i][num] = k;
+              num++;
+	    }
+	  }
+          else{
+            CWF_MO_Selection[i][num] = atoi(token);
+            num++;              
+	  }
+
+	  token = strtok_r(NULL, ",", &saveptr1);
+
+	} // end of while (token != NULL)
+
+        if (num==1 && CWF_MO_Selection[i][0]==0){
+          Num_CWF_MOs_Group[i] = 0;
+	} 
+        else{
+          Num_CWF_MOs_Group[i] = num;  
+	}
+
+	/*
+        for (j=0; j<Num_CWF_MOs_Group[i]; j++){
+          printf("ABC1 i=%2d j=%2d %2d\n",i,j,CWF_MO_Selection[i][j]);
+	}
+	*/
+
+      } // i
+
+      ungetc('\n',fp);
+
+      if ( ! input_last("CWF.MO.Selection>") ) {
+	/* format error */
+        if (myid==Host_ID){
+  	  printf("Format error for CWF.MO.Selection\n");
+	}
+	po++;
+      }
+
+    } /* end of if (fp=input_find("<CWF.MO.Selection")) */
+  } 
+
   /**************************************************
                           LNO
   **************************************************/
@@ -1860,7 +2194,7 @@ void Input_std(char *file)
 
   if (LNO_flag==1){
 
-    if (fp=input_find("<LNOs.Num")) {    
+    if ( (fp=input_find("<LNOs.Num")) != NULL ) {    
 
       LNOs_Num_predefined_flag = 1;
 
@@ -1880,6 +2214,196 @@ void Input_std(char *file)
     }  /* if (fp=input_find("<LNOs.Num"))  */
   }
 
+  if ( LNOs_Num_predefined_flag==0 && Solver==12 ){
+
+    if (myid==Host_ID){
+      printf("For Cluster-LNO or Band-LNO, LNOs.Num should be specified.\n"); 
+    }
+    MPI_Finalize();
+    exit(0);
+  }
+  
+  // CWF_Kgrid should be Kspace_grid, since the same MPI_CommWD2 is used as for the Band_DFT_Col, 
+  // which is a technical issue in the MPI parallelization.  
+  CWF_Kgrid1 = Kspace_grid1;
+  CWF_Kgrid2 = Kspace_grid2;
+  CWF_Kgrid3 = Kspace_grid3;
+
+  input_logical("CWF.fileout.flag",&CWF_fileout_flag, 0); 
+
+  i_vec2[0]=0;  i_vec2[1]=0;  i_vec2[2]=0;
+  input_intv("CWF.Plot.SuperCells",3,CWF_Plot_SuperCells,i_vec2);
+
+  if (    Kspace_grid1<(2*CWF_Plot_SuperCells[0]+1)
+       || Kspace_grid2<(2*CWF_Plot_SuperCells[1]+1)
+       || Kspace_grid3<(2*CWF_Plot_SuperCells[2]+1)){
+
+    if (myid==Host_ID){
+      printf("Error for CWF: the following condition should be satisfied\n");
+      printf("      (2*CWF.Plot.SuperCells+1)<=Kspace_grid\n");
+
+    }
+    MPI_Finalize();
+    exit(0); 
+  }
+
+  input_int("CWF.fileout.Num",&CWF_fileout_Num, 0); 
+
+  if (CWF_fileout_flag==1 && CWF_Calc==0){
+    printf("CWF.Calc should be switched on when CWF.fileout.flag=on.\n");
+    MPI_Finalize();
+    exit(0);
+  } 
+
+  /* AO or HO case */
+
+  if ( (CWF_Calc==1 && CWF_fileout_flag==1) && (CWF_Guiding_Orbital==1 || CWF_Guiding_Orbital==2) ){
+
+    CWF_file_Atoms = (int*)malloc(sizeof(int)*CWF_fileout_Num); 
+
+    if ( (fp=input_find("<CWF.fileout.cube")) != NULL ) {    
+
+      for (i=0; i<CWF_fileout_Num; i++){
+
+	fscanf(fp,"%d", &CWF_file_Atoms[i]);
+
+	if ( CWF_file_Atoms[i]<1 || atomnum<CWF_file_Atoms[i] ){
+	  printf("Format error for CWF.fileout.cube\n");
+	  MPI_Finalize();
+	  exit(0);
+	}   
+      }    
+
+      if (! input_last("CWF.fileout.cube>") ) {
+	/* format error */
+	printf("Format error for CWF.fileout.cube\n");
+	MPI_Finalize();
+	exit(0);
+      }
+    }
+  }
+
+  /* MO case */
+
+  if ( (CWF_Calc==1 && CWF_fileout_flag==1) && (CWF_Guiding_Orbital==3) ){
+
+    CWF_file_MOs = (int*)malloc(sizeof(int)*CWF_fileout_Num); 
+
+    if ( (fp=input_find("<CWF.fileout.cube")) != NULL ) {    
+
+      for (i=0; i<CWF_fileout_Num; i++){
+
+	fscanf(fp,"%d", &CWF_file_MOs[i]);
+
+	if ( CWF_file_MOs[i]<1 || Num_CWF_Grouped_Atoms<CWF_file_MOs[i] ){
+	  printf("Format error for CWF.fileout.cube\n");
+	  MPI_Finalize();
+	  exit(0);
+	}
+        else{
+          CWF_file_MOs[i]--;
+	}
+      }    
+
+      if (! input_last("CWF.fileout.cube>") ) {
+	/* format error */
+	printf("Format error for CWF.fileout.cube\n");
+	MPI_Finalize();
+	exit(0);
+      }
+    }
+  }
+
+  /* energy decomposition by CWFs */
+
+  input_logical("CWF.Energy.Decomposition",&CWF_Energy_Decomposition, 0); 
+
+  /* set Energy_Decomposition_flag if CWF_Energy_Decomposition==1 */
+
+  if (CWF_Energy_Decomposition==1) Energy_Decomposition_flag = 1;
+
+  if (CWF_Energy_Decomposition==1 && CWF_Calc==0){
+
+    if (myid==Host_ID){
+      printf("For CWF.Energy.Decomposition=on, CWF.Calc should be 'on'.\n");
+    }
+    MPI_Finalize();
+    exit(0);
+  }
+
+  if (CWF_Calc==1 && CWF_Energy_Decomposition==1 && CWF_Guiding_Orbital!=2){
+
+    if (myid==Host_ID){
+      printf("For CWF.Energy.Decomposition=on, CWF.Guiding.Orbitals should be 'AO'.\n");
+    }
+    MPI_Finalize();
+    exit(0);
+  }
+
+  if ( CWF_Calc==1 ){
+
+    int spinsize,wan,spin;
+
+    if (SpinP_switch==0 || SpinP_switch==1){
+
+      spinsize = 2;
+
+      if ( CWF_Guiding_Orbital==1 || CWF_Guiding_Orbital==2 ){
+	TNum_CWFs = 0;
+	for (i=1; i<=atomnum; i++){
+	  wan = WhatSpecies[i];
+	  TNum_CWFs += CWF_Num_predefined[wan];
+	}
+      }
+
+      else if (CWF_Guiding_Orbital==3){
+
+	int gidx;
+
+	TNum_CWFs = 0;
+	for (gidx=0; gidx<Num_CWF_Grouped_Atoms; gidx++){
+	  TNum_CWFs += Num_CWF_MOs_Group[gidx];
+	}
+      }
+    }
+
+    else if (SpinP_switch==3){
+
+      spinsize = 1;
+
+      if ( CWF_Guiding_Orbital==1 || CWF_Guiding_Orbital==2 ){
+
+	TNum_CWFs = 0;
+	for (i=1; i<=atomnum; i++){
+	  wan = WhatSpecies[i];
+	  TNum_CWFs += 2*CWF_Num_predefined[wan];
+	}
+      }
+
+      else if (CWF_Guiding_Orbital==3){
+
+	int gidx;
+
+	TNum_CWFs = 0;
+	for (gidx=0; gidx<Num_CWF_Grouped_Atoms; gidx++){
+	  TNum_CWFs += Num_CWF_MOs_Group[gidx];
+	}
+      }
+    }
+
+    CWF_Charge = (double**)malloc(sizeof(double*)*spinsize);
+    for (spin=0; spin<spinsize; spin++){
+      CWF_Charge[spin] = (double*)malloc(sizeof(double)*TNum_CWFs);
+      for (i=0; i<TNum_CWFs; i++) CWF_Charge[spin][i] = 0.0;
+    }
+
+    CWF_Energy = (double**)malloc(sizeof(double*)*spinsize);
+    for (spin=0; spin<spinsize; spin++){
+      CWF_Energy[spin] = (double*)malloc(sizeof(double)*TNum_CWFs);
+      for (i=0; i<TNum_CWFs; i++) CWF_Energy[spin][i] = 0.0;
+    }
+  } 
+
   /**************************************************
           store the initial magnetic moment
   **************************************************/
@@ -1895,15 +2419,16 @@ void Input_std(char *file)
   *************************************/
 
   input_logical("scf.core.hole",&core_hole_state_flag, 0); 
+  input_double("scf.base.penalty.value",&base_core_hole_penalty_value,20.0);
 
-  if (fp=input_find("<core.hole.state")) {
+  if ( (fp=input_find("<core.hole.state")) != NULL ) {
     
     fgets(buf,MAXBUF,fp);
     sscanf(buf,"%i %s %i",&Core_Hole_Atom,Core_Hole_Orbital,&Core_Hole_J);
 
     /* check SpinP_switch */
 
-    if (SpinP_switch==0){
+    if (SpinP_switch==0 && core_hole_state_flag==1){
       if (myid==Host_ID){
         printf("The calculation with a core hole is not supported for non-spin polarized calculations.\n\n");
       }
@@ -1994,7 +2519,7 @@ void Input_std(char *file)
     On the other hand, if G12=G22=G32, y becomes 1.
 
     Taking appropriate prefactors, we define as    
-    Kerker_factor = 0.5/G0*y = 0.5/G0*(4.0*DG/AG+1.0);
+    Kerker_factor = 0.5/G0*y = 0.5/G0*(2.0*DG/AG+1.0);
   *******************************************************/
 
   if ( Kerker_factor<0.0 && (Mixing_switch==3 || Mixing_switch==4 || Mixing_switch==7) ){
@@ -2098,7 +2623,7 @@ void Input_std(char *file)
       Gxyz[i][60] = 1.0;
     }
 
-    if (fp=input_find("<DFTD.periodicity")) {
+    if ( (fp=input_find("<DFTD.periodicity")) != NULL ) {
 
       for (i=1; i<=atomnum; i++){  
 	fscanf(fp,"%d %lf",&j,&Gxyz[i][60]);
@@ -2195,7 +2720,7 @@ void Input_std(char *file)
 
   /* if MD.Fixed.Cell.Vectors is set, this specfication takes a priority. */
 
-  if (fp=input_find("<MD.Fixed.Cell.Vectors")) {
+  if ( (fp=input_find("<MD.Fixed.Cell.Vectors")) != NULL ) {
 
     for (i=1; i<=3; i++){  
       fscanf(fp,"%d %d %d",&Cell_Fixed_XYZ[i][1],&Cell_Fixed_XYZ[i][2],&Cell_Fixed_XYZ[i][3]);
@@ -2216,17 +2741,22 @@ void Input_std(char *file)
       0: relaxed
   ****************************************************/
 
-  if (fp=input_find("<MD.Fixed.XYZ")) {
+  if ( (fp=input_find("<MD.Fixed.XYZ")) != NULL ) {
 
     for (i=1; i<=atomnum; i++){  
-      fscanf(fp,"%d %d %d %d",
+
+      fgets(buf,MAXBUF,fp);
+      sscanf(buf,"%d %d %d %d",
              &j,&atom_Fixed_XYZ[i][1],&atom_Fixed_XYZ[i][2],&atom_Fixed_XYZ[i][3]);
     }  
 
     if ( ! input_last("MD.Fixed.XYZ>") ) {
+
       /* format error */
-      printf("Format error for MD.Fixed.XYZ\n");
+      if (myid==Host_ID) printf("Format error for MD.Fixed.XYZ\n");
       po++;
+      MPI_Finalize();
+      exit(0);
     }
   }
 
@@ -2238,7 +2768,7 @@ void Input_std(char *file)
 
   /* at this moment */
 
-  if (fp=input_find("<MD.Init.Velocity")) {
+  if ( (fp=input_find("<MD.Init.Velocity")) != NULL ) {
 
     MD_Init_Velocity = 1;
 
@@ -2276,7 +2806,7 @@ void Input_std(char *file)
 
   /* one step before */
 
-  if (fp=input_find("<MD.Init.Velocity.Prev")) {
+  if ( (fp=input_find("<MD.Init.Velocity.Prev")) != NULL ) {
 
     MD_Init_Velocity = 1;
 
@@ -2321,55 +2851,58 @@ void Input_std(char *file)
                                      added by T. Ohwaki
   *************************************************************/
 
-  input_int("MD.num.AtomGroup",&num_AtGr,1);
+  if (MD_switch==14){ /*AITUNE fix memory leak*/
 
-  Allocate_Arrays(10);
-  int chk_vs4;
+    input_int("MD.num.AtomGroup",&num_AtGr,1);
 
-  for (k=1; k<=num_AtGr; k++){
-    atnum_AtGr[k] = 0;
-  }
+    Allocate_Arrays(10);
+    int chk_vs4;
 
-  if (fp=input_find("<MD.AtomGroup")){
-
-    for (i=1; i<=atomnum; i++){
-      fscanf(fp,"%d %d", &j, &AtomGr[i]);
-      chk_vs4 = 0;
-
-      for (k=1; k<=num_AtGr; k++){
-        if (AtomGr[i] == k){
-          atnum_AtGr[k]+=1;
-          chk_vs4 = 1;
-        }
-      }
-
-      if (chk_vs4 ==0){
-        printf("Please check your input for atom group!!\n");
-        po++;
-      }
+    for (k=1; k<=num_AtGr; k++){
+      atnum_AtGr[k] = 0;
     }
 
-    if ( ! input_last("MD.AtomGroup>") ) {
-      /* format error */
-      printf("Format error for MD.AtomGroup\n");
-      po++;
-    }
+    if ( (fp=input_find("<MD.AtomGroup")) != NULL ){
 
-    if (myid==Host_ID && 0<level_stdout){
-      printf("\n");
-      printf("*************************************************************** \n");
-      printf("  Multi heat-bath MD calculation with velocity scaling method   \n");
-      printf("                                                                \n");
-      printf("  Number of atom groups = %d \n", num_AtGr);
-      for (k=1; k<=num_AtGr; k++){
-	printf("  Number of atoms in group  %d  =  %d \n", k, atnum_AtGr[k]);
-      }
       for (i=1; i<=atomnum; i++){
-	printf("  Atom  %d  : group  %d  \n", i, AtomGr[i]);
+	fscanf(fp,"%d %d", &j, &AtomGr[i]);
+	chk_vs4 = 0;
+
+	for (k=1; k<=num_AtGr; k++){
+	  if (AtomGr[i] == k){
+	    atnum_AtGr[k]+=1;
+	    chk_vs4 = 1;
+	  }
+	}
+
+	if (chk_vs4 ==0){
+	  printf("Please check your input for atom group!!\n");
+	  po++;
+	}
       }
-      printf("                                                                \n");
-      printf("*************************************************************** \n");
-      printf("\n");
+
+      if ( ! input_last("MD.AtomGroup>") ) {
+	/* format error */
+	printf("Format error for MD.AtomGroup\n");
+	po++;
+      }
+
+      if (myid==Host_ID && 0<level_stdout){
+	printf("\n");
+	printf("*************************************************************** \n");
+	printf("  Multi heat-bath MD calculation with velocity scaling method   \n");
+	printf("                                                                \n");
+	printf("  Number of atom groups = %d \n", num_AtGr);
+	for (k=1; k<=num_AtGr; k++){
+	  printf("  Number of atoms in group  %d  =  %d \n", k, atnum_AtGr[k]);
+	}
+	for (i=1; i<=atomnum; i++){
+	  printf("  Atom  %d  : group  %d  \n", i, AtomGr[i]);
+	}
+	printf("                                                                \n");
+	printf("*************************************************************** \n");
+	printf("\n");
+      }
     }
   }
 
@@ -2381,7 +2914,7 @@ void Input_std(char *file)
 
   if (Hub_U_switch == 1){                              /* --- MJ */
 
-    if (fp=input_find("<Hubbard.U.values")) {    
+    if ( (fp=input_find("<Hubbard.U.values")) != NULL ) {    
 
       /* initialize the U-values */ 
       for (i=0; i<SpeciesNum; i++){
@@ -2433,7 +2966,7 @@ void Input_std(char *file)
   /* for general LDA+U scheme */ 
 
   if (Hub_U_switch == 1 && Hub_Type == 2 && Yukawa_on!=1){      
-    if (fp=input_find("<Hund.J.values")) {    
+    if ( (fp=input_find("<Hund.J.values")) != NULL ) {    
 
       /* initialize the J values */ 
       for (i=0; i<SpeciesNum; i++){
@@ -2579,7 +3112,7 @@ void Input_std(char *file)
   s_vec[2]="on";       i_vec[2] = 1;   /* switch on explicitly */ 
   s_vec[3]="c2n";      i_vec[3] = 2;   /* restart for non-collinear calc. with a collinear restart file */ 
 
-  input_string2int("scf.restart", &Scf_RestartFromFile, 4, s_vec,i_vec);
+  input_string2int("scf.restart", &Scf_RestartFromFile, 5, s_vec,i_vec);
 
   /* specify the name of restart files, default is the same as System.Name */
 
@@ -2665,8 +3198,9 @@ void Input_std(char *file)
     }
   }
 
-  /****************************************************                                                                        Generalized Bloch 
-   added by T. B. Prayitno and supervised by Prof. F. Ishii
+  /****************************************************                                                                        
+   Generalized Bloch added 
+   by T. B. Prayitno and supervised by Prof. F. Ishii
   ****************************************************/
 
   input_logical("scf.Generalized.Bloch",&GB_switch,0);
@@ -2710,7 +3244,7 @@ void Input_std(char *file)
   if (Band_Nkpath>0) {
 
        Band_kPathUnit=0;
-       if (fp=input_find("<Band.kpath.UnitCell") ) {   
+       if ( (fp=input_find("<Band.kpath.UnitCell")) != NULL ) {   
           Band_kPathUnit=1;
           for (i=1;i<=3;i++) {
             fscanf(fp,"%lf %lf %lf",&Band_UnitCell[i][1],
@@ -2767,7 +3301,7 @@ void Input_std(char *file)
 
     if (myid==Host_ID && 2<=level_stdout) printf("kpath\n");
 
-    if (fp=input_find("<Band.kpath") ) {
+    if ( (fp=input_find("<Band.kpath")) != NULL ) {
       for (i=1; i<=Band_Nkpath; i++) {
         fscanf(fp,"%d %lf %lf %lf %lf %lf %lf %s %s",
          &Band_N_perpath[i]  , 
@@ -2905,7 +3439,7 @@ void Input_std(char *file)
 
   orderN_FNAN_SNAN_flag = 0;
 
-  if (fp=input_find("<orderN.FNAN+SNAN")) {
+  if ( (fp=input_find("<orderN.FNAN+SNAN")) != NULL ) {
 
     orderN_FNAN_SNAN_flag = 1;
 
@@ -2973,10 +3507,10 @@ void Input_std(char *file)
 
   if ((Solver!=2 && Solver!=3 && Solver!=7) && MO_fileout==1){
 
-    s_vec[0]="Recursion";     s_vec[1]="Cluster"; s_vec[2]="Band";
-    s_vec[3]="NEGF";          s_vec[4]="DC";      s_vec[5]="GDC";
-    s_vec[6]="Cluster-DIIS";  s_vec[7]="Krylov";  s_vec[8]="Cluster2";  
-    s_vec[9]="EGAC";          s_vec[10]="DC-LNO";   s_vec[11]="Cluster-LNO";
+    s_vec[0]="Recursion";     s_vec[1]="Cluster";  s_vec[2]="Band";
+    s_vec[3]="NEGF";          s_vec[4]="DC";       s_vec[5]="GDC";
+    s_vec[6]="Cluster-DIIS";  s_vec[7]="Krylov";   s_vec[8]="Cluster2";  
+    s_vec[9]="EGAC";          s_vec[10]="DC-LNO";  s_vec[11]="Cluster-LNO";
 
     printf("MO.fileout=ON is not supported in case of scf.EigenvalueSolver=%s\n",
            s_vec[Solver-1]);  
@@ -3019,7 +3553,7 @@ void Input_std(char *file)
   /* memory allocation */
   Allocate_Arrays(5);
 
-  if (fp=input_find("<MO.kpoint")) {
+  if ( (fp=input_find("<MO.kpoint")) != NULL ) {
     for (i=0; i<MO_Nkpoint; i++){
       fscanf(fp,"%lf %lf %lf",&MO_kpoint[i][1],&MO_kpoint[i][2],&MO_kpoint[i][3]);
 
@@ -3066,7 +3600,7 @@ void Input_std(char *file)
 
     Allocate_Arrays(11);
 
-    if (fp=input_find("<NBO.CenterAtoms")) {
+    if ( (fp=input_find("<NBO.CenterAtoms")) != NULL ) {
       for (i=0; i<Num_NBO_FCenter; i++){
 	fscanf(fp,"%d",&NBO_FCenter[i]);
 	if (NBO_FCenter[i] <= 0 || NBO_FCenter[i] > atomnum){
@@ -3085,7 +3619,7 @@ void Input_std(char *file)
 
     input_logical("NBO.SmallCell.Switch",&NBO_SmallCell_Switch,0);
 
-    if (fp=input_find("<NBO.SmallCell")) {
+    if ( (fp=input_find("<NBO.SmallCell")) != NULL ) {
       for (i=1; i<=3; i++){
 	fscanf(fp,"%lf %lf",&NBO_SmallCellFrac[i][1],&NBO_SmallCellFrac[i][2]);
 
@@ -3142,7 +3676,7 @@ void Input_std(char *file)
 
     unfold_abc=(double**)malloc(sizeof(double*)*3);
     for (i=0; i<3; i++) unfold_abc[i]=(double*)malloc(sizeof(double)*3);
-    if (fp=input_find("<Unfolding.ReferenceVectors")) {
+    if ( (fp=input_find("<Unfolding.ReferenceVectors")) != NULL ) {
       for (i=0; i<3; i++){
         fscanf(fp,"%lf %lf %lf",&unfold_abc[i][0],&unfold_abc[i][1],&unfold_abc[i][2]);
       }
@@ -3169,7 +3703,7 @@ void Input_std(char *file)
     }
 
     unfold_origin=(double*)malloc(sizeof(double)*3);
-    if (fp=input_find("<Unfolding.Referenceorigin")) {
+    if ( (fp=input_find("<Unfolding.Referenceorigin")) != NULL ) {
         fscanf(fp,"%lf %lf %lf",&unfold_origin[0],&unfold_origin[1],&unfold_origin[2]);
       if (!input_last("Unfolding.Referenceorigin>")) {
         /* format error */
@@ -3198,7 +3732,7 @@ void Input_std(char *file)
     unfold_ubound=unfold_ubound/eV2Hartree;
 
     unfold_mapN2n=(int*)malloc(sizeof(int)*atomnum);
-    if (fp=input_find("<Unfolding.Map")) {
+    if ( (fp=input_find("<Unfolding.Map")) != NULL ) {
       for (i=0; i<atomnum; i++){
         fscanf(fp,"%i %i",&j,&unfold_mapN2n[i]);
         if ((j!=i+1)||(unfold_mapN2n[i]<0)) { printf("Format error in Unfolding.Map! (Values cannot be negative.)\n"); po++;}
@@ -3215,9 +3749,9 @@ void Input_std(char *file)
 
     if (Solver!=2 && Solver!=3){
 
-      s_vec[0]="Recursion";     s_vec[1]="Cluster"; s_vec[2]="Band";
-      s_vec[3]="NEGF";          s_vec[4]="DC";      s_vec[5]="GDC";
-      s_vec[6]="Cluster-DIIS";  s_vec[7]="Kryloqv";  s_vec[8]="Cluster2";  
+      s_vec[0]="Recursion";     s_vec[1]="Cluster";   s_vec[2]="Band";
+      s_vec[3]="NEGF";          s_vec[4]="DC";        s_vec[5]="GDC";
+      s_vec[6]="Cluster-DIIS";  s_vec[7]="Kryloqv";   s_vec[8]="Cluster2";  
       s_vec[9]="EGAC";          s_vec[10]="DC-LNO";   s_vec[11]="Cluster-LNO";
 
       printf("Unfolding.fileout=ON is not supported in case of scf.EigenvalueSolver=%s\n",
@@ -3251,7 +3785,7 @@ void Input_std(char *file)
       unfold_kpoint_name[i] = (char*)malloc(sizeof(char)*YOUSO10);
     }
 
-    if (fp=input_find("<Unfolding.kpoint")) {
+    if ( (fp=input_find("<Unfolding.kpoint")) != NULL ) {
       for (i=0; i<unfold_Nkpoint; i++){
         fscanf(fp,"%s %lf %lf %lf",
                unfold_kpoint_name[i],
@@ -3271,6 +3805,79 @@ void Input_std(char *file)
       }
     }
   }
+
+  /* added by M.Fukuda 20231230 */
+  /* for arbitrary path choice as same as the electronic band path */
+  {
+    UnfoldBand_kpath=NULL;
+    UnfoldBand_kname=NULL;
+    UnfoldBand_N_perpath=NULL;
+    input_int("UnfoldBand.Nkpath",&UnfoldBand_Nkpath,0);
+    if (2<=level_stdout) printf("UnfoldBand.Nkpath=%d\n",UnfoldBand_Nkpath);
+
+    if (UnfoldBand_Nkpath>0) {
+
+      /* allocate */
+
+      UnfoldBand_N_perpath=(int*)malloc(sizeof(int)*(UnfoldBand_Nkpath+1));
+      for (i=0; i<(UnfoldBand_Nkpath+1); i++) UnfoldBand_N_perpath[i] = 0;
+
+      UnfoldBand_kpath = (double***)malloc(sizeof(double**)*(UnfoldBand_Nkpath+1));
+      for (i=0; i<(UnfoldBand_Nkpath+1); i++){
+        UnfoldBand_kpath[i] = (double**)malloc(sizeof(double*)*3);
+        for (j=0; j<3; j++){
+          UnfoldBand_kpath[i][j] = (double*)malloc(sizeof(double)*4);
+          for (k=0; k<4; k++) UnfoldBand_kpath[i][j][k] = 0.0;
+        }
+      }
+
+      UnfoldBand_kname = (char***)malloc(sizeof(char**)*(UnfoldBand_Nkpath+1));
+      for (i=0; i<(UnfoldBand_Nkpath+1); i++){
+        UnfoldBand_kname[i] = (char**)malloc(sizeof(char*)*3);
+        for (j=0; j<3; j++){
+          UnfoldBand_kname[i][j] = (char*)malloc(sizeof(char)*YOUSO10);
+        }
+      }
+
+      /* end of allocation */
+
+      if (myid==Host_ID && 2<=level_stdout) printf("kpath\n");
+
+      if (fp=input_find("<UnfoldBand.kpath") ) {
+        for (i=1; i<=UnfoldBand_Nkpath; i++) {
+          fscanf(fp,"%lf %lf %lf %lf %lf %lf %s %s",
+           &UnfoldBand_kpath[i][1][1], &UnfoldBand_kpath[i][1][2],&UnfoldBand_kpath[i][1][3],
+           &UnfoldBand_kpath[i][2][1], &UnfoldBand_kpath[i][2][2],&UnfoldBand_kpath[i][2][3],
+           UnfoldBand_kname[i][1],UnfoldBand_kname[i][2]);
+
+      if (myid==Host_ID && 2<=level_stdout){
+            printf("(%lf %lf %lf) (%lf %lf %lf) %s %s\n",
+            UnfoldBand_kpath[i][1][1], UnfoldBand_kpath[i][1][2],UnfoldBand_kpath[i][1][3],
+            UnfoldBand_kpath[i][2][1], UnfoldBand_kpath[i][2][2],UnfoldBand_kpath[i][2][3],
+            UnfoldBand_kname[i][1],UnfoldBand_kname[i][2]);
+      }
+
+        }
+        if ( ! input_last("UnfoldBand.kpath>") ) {
+           /* format error */
+           printf("Format error near UnfoldBand.kpath>\n");
+           po++;
+        }
+
+        UnfoldBand_path_flag = 1;
+      }
+      else {
+        UnfoldBand_path_flag = 0;
+        /* format error */
+              printf("<UnfoldBand.kpath is necessary.\n");
+              po++;
+      }
+      //if (UnfoldBand_kPathUnit){
+      //  kpath_changeunit( tv, UnfoldBand_UnitCell, UnfoldBand_Nkpath, UnfoldBand_kpath );
+      //}
+    }
+  } /* end Fukuda */
+
   /* end unfolding */
 
 
@@ -3322,8 +3929,6 @@ void Input_std(char *file)
   //printf("DM_energy_range: %lf,%lf\n",DM_energy_range[0],DM_energy_range[1]);
 
   /*  --- end fukuda ---  */
-
-
   /**********************************************************
    control of occupation for orbitals
    The check for the input parameters will be done 
@@ -3340,7 +3945,7 @@ void Input_std(char *file)
     empty_occupation_spin = (int*)malloc(sizeof(int)*empty_occupation_num);
     empty_occupation_orbital = (int*)malloc(sizeof(int)*empty_occupation_num);
 
-    if (fp=input_find("<empty.occupation.orbitals")) {
+    if ( (fp=input_find("<empty.occupation.orbitals")) != NULL ) {
 
        for (i=0; i<empty_occupation_num; i++){
          fscanf(fp,"%d %d",&empty_occupation_spin[i],&empty_occupation_orbital[i]);
@@ -3379,7 +3984,7 @@ void Input_std(char *file)
     char c0,c1,cstr[YOUSO10*3];
     int num,l0;
 
-    if (fp=input_find("<empty.states.orbitals")) {
+    if ( (fp=input_find("<empty.states.orbitals")) != NULL ) {
 
       fscanf(fp,"%d %s %s", &empty_states_atom, Species, empty_states_orbitals) ;
   
@@ -3461,7 +4066,7 @@ void Input_std(char *file)
     input_int("Num.CntOrb.Atoms",&Num_CntOrb_Atoms,1);
     CntOrb_Atoms = (int*)malloc(sizeof(int)*Num_CntOrb_Atoms);      
 
-    if (fp=input_find("<Atoms.Cont.Orbitals")) {
+    if ( (fp=input_find("<Atoms.Cont.Orbitals")) != NULL ) {
       for (i=0; i<Num_CntOrb_Atoms; i++){
         fscanf(fp,"%i",&CntOrb_Atoms[i]);
         if (CntOrb_Atoms[i]<1 || atomnum<CntOrb_Atoms[i]){
@@ -3608,26 +4213,110 @@ void Input_std(char *file)
   input_double("partial.charge.energy.window",&ene_win_partial_charge,0.0); /* in eV */
   ene_win_partial_charge /= eV2Hartree;  /* eV to Hartee */  
 
+  /**************************************************
+     COHP: Crystal Orbital Hamilton Population
+  **************************************************/
+
+  input_logical("COHP.calc.flag",&COHP_calc_flag,0); /* default=off */
+  input_int("COHP.num.pairs",&COHP_num_pairs,1);     /* default=1 */
+
+  if (COHP_calc_flag==1){
+
+    if (Dos_fileout==0){
+      printf("In case of the COHP calculation, Dos.fileout should be switched on.\n");
+      po++;
+    }
+
+    Allocate_Arrays(12);
+
+    if ( (fp=input_find("<COHP.pairs")) != NULL ) {
+
+      for (i=0; i<COHP_num_pairs; i++){
+         fscanf(fp,"%d %d %d %d %d %d",&j,&COHP_AtomA[i],&COHP_AtomB[i],&COHP_CellB1[i],&COHP_CellB2[i],&COHP_CellB3[i]);
+      }
+ 
+      if ( ! input_last("COHP.pairs>") ) {
+	/* format error */
+	printf("Format error for COHP.pairs\n");
+	po++;
+      }
+    }
+  } 
+
+  /**************************************************
+     LNAO (Localized Natural Atomic Orbital)
+     LNBO (Localized Natural Bond Orbital)
+  **************************************************/
+
+  /* LNAO */
+
+  input_logical("LNAO.calc.flag",&LNAO_calc_flag,0);
+  input_int("LNAO.num",&LNAO_num,1);     /* default=1 */
+
+  if (LNAO_calc_flag==1){
+
+    Allocate_Arrays(13);
+
+    if ( (fp=input_find("<LNAO.Atoms")) != NULL ) {
+
+      for (i=0; i<LNAO_num; i++){
+        fscanf(fp,"%d %d",&j,&LNAO_Atoms[i]);
+        if ((i+1)!=j){
+     	  printf("Format error for LNAO.Atoms. Check the serial number.\n");
+  	  po++;
+        }  
+      }
+ 
+      if ( ! input_last("LNAO.Atoms>") ) {
+	/* format error */
+	printf("Format error for LNAO.Atoms\n");
+	po++;
+      }
+    }
+  }
+
+  /* LNBO */
+
+  input_logical("LNBO.calc.flag",&LNBO_calc_flag,0);
+  input_int("LNBO.num",&LNBO_num,1);     /* default=1 */
+
+  if (LNBO_calc_flag==1){
+
+    Allocate_Arrays(14);
+
+    if ( (fp=input_find("<LNBO.Atoms")) != NULL ) {
+
+      for (i=0; i<LNBO_num; i++){
+        fscanf(fp,"%d %d %d %d %d %d",&j,&LNBO_Atoms[i][0],&LNBO_Atoms[i][1],&LNBO_Atoms[i][2],&LNBO_Atoms[i][3],&LNBO_Atoms[i][4]);
+        if ((i+1)!=j){
+     	  printf("Format error for LNBO.Atoms. Check the serial number.\n");
+  	  po++;
+        }  
+      }
+ 
+      if ( ! input_last("LNBO.Atoms>") ) {
+	/* format error */
+	printf("Format error for LNBO.Atoms\n");
+	po++;
+      }
+    }
+
+    if (SpinP_switch==3){
+
+      if (myid==Host_ID){
+        printf("LNBO is not supported for the non-collinear calculation.\n");
+      }
+      MPI_Finalize();
+      exit(0);
+    }  
+  }
+
   /****************************************************
    write a binary file, filename.scfout, which includes
    Hamiltonian, overlap, and density matrices.
   ****************************************************/
  
   input_logical("HS.fileout",&HS_fileout,0);
-
-  /****************************************************
-                   Energy decomposition
-  ****************************************************/
-
-  input_logical("Energy.Decomposition",&Energy_Decomposition_flag,0);
-
-  if (Energy_Decomposition_flag==1 && Cnt_switch==1){
-    if (myid==Host_ID){
-      printf("Energy decomposition is not supported for orbital optimization.\n");
-    }
-    MPI_Finalize();
-    exit(0);
-  }
 
   /****************************************************
                    Voronoi charge
@@ -3714,7 +4403,7 @@ void Input_std(char *file)
 		     &Wannier_unit,3,s_vec,i_vec);
 
 
-    if (fp=input_find("<Wannier.Initial.Projectors")) {
+    if ( (fp=input_find("<Wannier.Initial.Projectors")) != NULL ) {
 
       {
 	int po,num_lines;
@@ -3770,7 +4459,7 @@ void Input_std(char *file)
 
     num_wannier_total_projectors = 0;
    
-    if (fp=input_find("<Wannier.Initial.Projectors")) {
+    if ( (fp=input_find("<Wannier.Initial.Projectors")) != NULL ) {
 
       {
 	char ctmp[YOUSO10];
@@ -3782,7 +4471,6 @@ void Input_std(char *file)
 		 &Wannier_Pos[i][1],
 		 &Wannier_Pos[i][2],
 		 &Wannier_Pos[i][3],
-        
 		 &Wannier_Z_Direction[i][1], 
 		 &Wannier_Z_Direction[i][2], 
 		 &Wannier_Z_Direction[i][3], 
@@ -3931,9 +4619,7 @@ void Input_std(char *file)
       } /*for each kind of projector*/
     }
 
-    i_vec2[0]=4;
-    i_vec2[1]=4;
-    i_vec2[2]=4;
+    i_vec2[0]=4; i_vec2[1]=4; i_vec2[2]=4;
     input_intv("Wannier.Kgrid",3,i_vec,i_vec2);
     Wannier_grid1 = i_vec[0];
     Wannier_grid2 = i_vec[1];
@@ -3961,13 +4647,13 @@ void Input_std(char *file)
     i_vec2[0]=0;  i_vec2[1]=0;  i_vec2[2]=0;
     input_intv("Wannier.Function.Plot.SuperCells",3,Wannier_Plot_SuperCells,i_vec2);
 
-    if (     Wannier_grid1<Wannier_Plot_SuperCells[0]
-          || Wannier_grid2<Wannier_Plot_SuperCells[1]
-	  || Wannier_grid3<Wannier_Plot_SuperCells[2]){
+    if (     Wannier_grid1<(2*Wannier_Plot_SuperCells[0]+1)
+          || Wannier_grid2<(2*Wannier_Plot_SuperCells[1]+1)
+          || Wannier_grid3<(2*Wannier_Plot_SuperCells[2]+1)){
 
         if (myid==Host_ID){
-  	  printf("Error:WF For each component, the following condition should be satisfied\n");
-  	  printf("      Wannier.Function.Plot.SuperCells<=Wannier.Kgrid\n");
+  	  printf("Error:WF, the following condition should be satisfied\n");
+  	  printf("    (2*Wannier.Function.Plot.SuperCells+1)<=Wannier.Kgrid\n");
 
 	}
         MPI_Finalize();
@@ -4023,6 +4709,9 @@ void Input_std(char *file)
     free(tmp_Wannier_Pro_SelMat);
 
     for(i=0; i<Wannier_Num_Kinds_Projectors; i++){
+      for(j=0;j<Max_Num_WF_Projs;j++){
+	free(tmp_Wannier_Projector_Hybridize_Matrix[i][j]);
+      }
       free(tmp_Wannier_Projector_Hybridize_Matrix[i]);
     }
     free(tmp_Wannier_Projector_Hybridize_Matrix);
@@ -4152,6 +4841,24 @@ void Input_std(char *file)
     }    
   }
 
+  if (SpinP_switch==3 && xanes_calc==1) xmcd_calc = 1;
+  input_logical("XMCD.calc",&xmcd_calc,0); // S. An
+
+  /****************************************************
+       The efficient exchange operator method
+  ****************************************************/
+
+  if (XC_switch==4){
+    
+    input_double("scf.Yukawa.exp.Coulomb",&Yukawa_Exponent_Rec_Coulomb,0.1);
+    input_double("scf.xmin.Rec.Coulomb",&xmin_Rec_Coulomb,0.0);
+    input_double("scf.xmax.Rec.Coulomb",&xmax_Rec_Coulomb,12.0);
+    input_int("scf.Ng1.Rec.Coulomb",&Ng1_Rec_Coulomb,9);
+    input_int("scf.Nrank.Rec.Coulomb",&Nrank_Rec_Coulomb,64);
+
+    Allocate_Arrays(15);
+  }
+
   /****************************************************
                        input_close
   ****************************************************/
@@ -4169,7 +4876,7 @@ void Input_std(char *file)
        Atomic positions are not adjusted in Ver. 3.6
   ****************************************************/
 
-  /*  if (Solver!=4) Set_In_First_Cell();  */
+  if (Solver!=4 && GeoOpt_RestartFromFile!=1) Set_In_First_Cell(); 
 
   /****************************************************
                  Gxyz -> His_Gxyz[0]
@@ -4303,6 +5010,9 @@ void Remake_RestartFile(int numprocs_new, int numprocs_old, int N1, int N2, int 
   /*
   printf("myid=%2d numprocs_new=%2d numprocs_old=%2d\n",
           myid,numprocs_new,numprocs_old);
+
+  MPI_Finalize();
+  exit(0);
   */
 
   N2D = N1*N2;
@@ -4602,6 +5312,10 @@ static void Set_In_First_Cell()
                     + Cell_Gxyz[Gc_AN][2]*tv[2][3]
                     + Cell_Gxyz[Gc_AN][3]*tv[3][3] + zc;
   }
+
+
+  
+
 
 }
 

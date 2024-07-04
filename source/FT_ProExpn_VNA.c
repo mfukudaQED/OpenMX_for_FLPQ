@@ -39,7 +39,7 @@ void FT_ProExpn_VNA()
   double RGL[GL_Mesh + 2];
   double *SumTmp;
   double tmp0,tmp1;
-  double **SphB;
+  double **SphB,***TmpPhiF;
   double *tmp_SphB,*tmp_SphBp;
   double TStime, TEtime;
   /* for MPI */
@@ -136,9 +136,23 @@ void FT_ProExpn_VNA()
       Sk = kmax + kmin;
       Dk = kmax - kmin;
 
+      /* calculation of PhiF */
+
+      TmpPhiF = (double***)malloc(sizeof(double**)*(List_YOUSO[35]+1));
+      for (L=0; L<(List_YOUSO[35]+1); L++){
+	TmpPhiF[L] = (double**)malloc(sizeof(double*)*List_YOUSO[34]);
+	for (Mul=0; Mul<List_YOUSO[34]; Mul++){
+  	  TmpPhiF[L][Mul] = (double*)malloc(sizeof(double)*GL_Mesh);
+          for (i=0; i<GL_Mesh; i++){
+	    r = RGL[i];
+            TmpPhiF[L][Mul][i] = PhiF(r, Projector_VNA[spe][L][Mul], Spe_VPS_RV[spe], Spe_Num_Mesh_VPS[spe]);   
+	  }
+	}  
+      }
+
       /* loop for kj */
 
-#pragma omp parallel shared(spe,List_YOUSO,GL_Weight,GL_Abscissae,Dr,Dk,Sk,RGL,Projector_VNA,Spe_VPS_RV,Spe_Num_Mesh_VPS,Spe_VNA_Bessel)  private(SumTmp,SphB,tmp_SphB,tmp_SphBp,OMPID,Nthrds,Nprocs,kj,norm_k,i,r,L,Mul,tmp0,dum0)
+#pragma omp parallel shared(spe,List_YOUSO,GL_Weight,GL_Abscissae,Dr,Dk,Sk,RGL,Projector_VNA,Spe_VPS_RV,Spe_Num_Mesh_VPS,Spe_VNA_Bessel,TmpPhiF)  private(SumTmp,SphB,tmp_SphB,tmp_SphBp,OMPID,Nthrds,Nprocs,kj,norm_k,i,r,L,Mul,tmp0,dum0)
 
       {
 
@@ -172,7 +186,7 @@ void FT_ProExpn_VNA()
 	    Spherical_Bessel(norm_k*r,List_YOUSO[35],tmp_SphB,tmp_SphBp);
 
 	    for(L=0; L<=List_YOUSO[35]; L++){ 
-	      SphB[L][i]  =  tmp_SphB[L]; 
+	      SphB[L][i] = r*r*GL_Weight[i]*tmp_SphB[L]; 
 	    }
 	  }
 
@@ -188,14 +202,9 @@ void FT_ProExpn_VNA()
 
 	    /* Gauss-Legendre quadrature */
 
-	    for (i=0; i<GL_Mesh; i++){
-
-	      r = RGL[i];
-
-	      tmp0 = r*r*GL_Weight[i]*SphB[L][i];
-	      for (Mul=0; Mul<List_YOUSO[34]; Mul++){
-		dum0 = PhiF(r, Projector_VNA[spe][L][Mul], Spe_VPS_RV[spe], Spe_Num_Mesh_VPS[spe]);   
-		SumTmp[Mul] += dum0*tmp0;
+            for (Mul=0; Mul<List_YOUSO[34]; Mul++){
+  	      for (i=0; i<GL_Mesh; i++){
+		SumTmp[Mul] += SphB[L][i]*TmpPhiF[L][Mul][i];
 	      }
 	    }
 
@@ -221,6 +230,17 @@ void FT_ProExpn_VNA()
 #pragma omp flush(Spe_VNA_Bessel)
 
       } /* #pragma omp parallel */
+
+      /* freeing of PhiF */
+
+      for (L=0; L<(List_YOUSO[35]+1); L++){
+	for (Mul=0; Mul<List_YOUSO[34]; Mul++){
+  	  free(TmpPhiF[L][Mul]);
+	}  
+        free(TmpPhiF[L]);
+      }
+      free(TmpPhiF);
+
     } /* Lspe */
 
     /****************************************************
@@ -288,7 +308,7 @@ void FT_ProExpn_VNA()
   dtime(&TEtime);
 
   /*
-  printf("myid=%2d Elapsed Time (s) = %15.12f\n",myid,TEtime-TStime);
+  printf("FT_ProExpn_VNA: myid=%2d Elapsed Time (s) = %15.12f\n",myid,TEtime-TStime);
   MPI_Finalize();
   exit(0);
   */

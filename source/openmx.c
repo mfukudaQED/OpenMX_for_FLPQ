@@ -1,7 +1,6 @@
 /*****************************************************************************
 
   Ver. 3.9 (26/July/2019)
-  modified for FLPQ
 
   OpenMX (Open source package for Material eXplorer) is a program package
   for linear scaling density functional calculations of large-scale materials.
@@ -40,9 +39,6 @@
        Kashiwanoha 5-1-5, Kashiwa, Chiba 277-8581, Japan
 
        e-mail: t-ozaki@issp.u-tokyo.ac.jp
-
-    21/Jul./2023
-    Modified for FLPQ by Masahiro FUKUDA.
     **************************************************************
  
 *****************************************************************************/
@@ -101,6 +97,10 @@ int main(int argc, char *argv[])
   MPI_Comm_get_parent(&mpi_comm_parent);
   if (mpi_comm_parent!=MPI_COMM_NULL) MPI_spawn_flag = 1;
   else                                MPI_spawn_flag = 0;
+
+#ifdef LEAK_DETECT
+  leak_detect_init();
+#endif
 
   /* for measuring elapsed time */
 
@@ -200,6 +200,15 @@ int main(int argc, char *argv[])
   ****************************************************/
 
   if ( strcmp(argv[1],"-runtest")==0){
+
+    if (64<numprocs){
+      if (myid==Host_ID){
+        printf("The number of MPI processes for runtest is limited to upto 64.\n");  
+      }
+      MPI_Finalize();
+      exit(0);
+    }
+    
     Runtest("S",argc,argv);
   }
 
@@ -336,6 +345,32 @@ int main(int argc, char *argv[])
 
   if (strcmp(argv[1],"-runtestC")==0){
     Runtest("C",argc,argv);
+  }
+
+  /****************************************************
+   ./openmx -maketestCWF
+
+    making of *.out files in order to check whether 
+    OpenMX normally runs for generation of closest 
+    Wannier Functions (CWFs) on many platforms or not
+  ****************************************************/
+
+  if ( (argc==2 || argc==3) && strcmp(argv[1],"-maketestCWF")==0){
+    Maketest("CWF",argc,argv);
+    exit(0);
+  }
+
+  /****************************************************
+   ./openmx -runtestCWF
+
+   check whether OpenMX normally runs for generating 
+   closest Wannier functions on many platforms or not 
+   by comparing the stored *.out and generated *.out 
+   on your machine.
+  ****************************************************/
+
+  if (strcmp(argv[1],"-runtestCWF")==0){
+    Runtest("CWF",argc,argv);
   }
 
   /****************************************************
@@ -650,8 +685,9 @@ int main(int argc, char *argv[])
       CompTime[myid][2] += truncation(1,1);  /* EvsLC */
     else if (MD_cellopt_flag==1)
       CompTime[myid][2] += truncation(1,1);  /* cell optimization */
-    else 
+    else{ 
       CompTime[myid][2] += truncation(MD_iter,1);
+    }
 
     if (ML_flag==1 && myid==Host_ID) Get_VSZ(MD_iter);
 
@@ -757,10 +793,7 @@ int main(int argc, char *argv[])
                   Making of output files
   ****************************************************/
 
-  if (OutData_bin_flag) 
-    CompTime[myid][20] = OutData_Binary(argv[1]);
-  else 
-    CompTime[myid][20] = OutData(argv[1]);
+  CompTime[myid][20] = OutData(argv[1]);
 
   /****************************************************
     write connectivity, Hamiltonian, overlap, density
@@ -794,6 +827,12 @@ int main(int argc, char *argv[])
   /* free arrays */
 
   Free_Arrays(0);
+
+#ifdef LEAK_DETECT
+  MPI_Barrier(MPI_COMM_WORLD1);
+  fflush(stdout);
+  leak_detect_check();
+#endif
 
   /* print memory */
 

@@ -137,7 +137,7 @@ void qsort_double_int(long n, double *a, int *b)
     AB[i].b = b[i];
   }
 
-  qsort(AB, n, sizeof(dilists), (int(*)(const void*, const void*))dlists_cmp);
+  qsort(AB, n, sizeof(dilists), (int(*)(const void*, const void*))dlists_cmp); // ascending order
 
   for (i=0; i<n; i++){
     a[i] = AB[i].a;
@@ -159,7 +159,7 @@ void qsort_double_int2(long n, double *a, int *b)
     AB[i].b = b[i];
   }
 
-  qsort(AB, n, sizeof(dilists), (int(*)(const void*, const void*))dlists_cmp2);
+  qsort(AB, n, sizeof(dilists), (int(*)(const void*, const void*))dlists_cmp2); // descending order
 
   for (i=0; i<n; i++){
     a[i] = AB[i].a;

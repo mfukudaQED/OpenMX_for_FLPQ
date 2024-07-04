@@ -672,7 +672,9 @@ void Multiply_OLP(int Mc_AN, int Mj_AN, int k, int kl,
     penalty[i] = (double*)malloc(sizeof(double)*List_YOUSO[7]);
   }
 
-  penalty_value = penalty_value_CoreHole;
+  penalty_value = base_core_hole_penalty_value - core_hole_state_ev;
+
+  //printf("ABC1 %10.5f %10.5f %10.5f\n",penalty_value,base_core_hole_penalty_value,core_hole_state_ev);
 
   /****************************************************
               l-dependent non-local part

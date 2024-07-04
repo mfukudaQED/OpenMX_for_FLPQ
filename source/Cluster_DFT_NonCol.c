@@ -15,11 +15,26 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-#include "openmx_common.h"
 #include "mpi.h"
+#include "openmx_common.h"
+#include "lapack_prototypes.h"
 #include <omp.h>
 
 #define  measure_time   0
+
+void solve_evp_real_( int *n1, int *n2, double *Cs, int *na_rows1, double *a, double *Ss, int *na_rows2, int *nblk, 
+                      int *mpi_comm_rows_int, int *mpi_comm_cols_int);
+
+void elpa_solve_evp_real_2stage_double_impl_( int *n1, int *n2, double *Cs, int *na_rows1, double *a, double *Ss, int *na_rows2, 
+                                              int *nblk, int *na_cols1, int *mpi_comm_rows_int, int *mpi_comm_cols_int, int *mpiworld);
+
+void solve_evp_complex_( int *n2, int *MaxN, dcomplex *Hs2, int *na_rows2_1, double *a, dcomplex *Cs2, int *na_rows2_2, 
+                         int *nblk2, int *mpi_comm_rows_int, int *mpi_comm_cols_int );
+
+void elpa_solve_evp_complex_2stage_double_impl_( int *n2, int *MaxN, dcomplex *Hs2, int *na_rows2_1, double *a, dcomplex *Cs2, 
+                                                 int *na_rows2_2, int *nblk2, int *na_cols2, 
+                                                 int *mpi_comm_rows_int, int *mpi_comm_cols_int, int *mpiworld );
+
 
 
 static void Save_DOS_NonCol(int n, int n2, int MaxN, int *MP, double ****OLP0, dcomplex *EVec1, double *ko);
@@ -79,7 +94,6 @@ double Cluster_DFT_NonCol(
   int ct_AN,k,wanA,tnoA,wanB,tnoB;
   int GA_AN,Anum,loopN;
   int MA_AN,LB_AN,GB_AN,Bnum,MaxN;
-  int *is1,*ie1;
   double TZ,my_sum,sum,sumE,max_x=60.0;
   double My_Eele1[2];
   double Num_State,x,FermiF,Dnum,Dnum2;
@@ -103,6 +117,7 @@ double Cluster_DFT_NonCol(
   int *index_Snd_i,*index_Snd_j,*index_Rcv_i,*index_Rcv_j;
   double *EVec_Snd,*EVec_Rcv;
   int ZERO=0,ONE=1,info;
+  double Re_alpha = 1.0; double Re_beta = 0.0;
   dcomplex alpha = {1.0,0.0}; dcomplex beta = {0.0,0.0};
 
   MPI_Comm mpi_comm_rows, mpi_comm_cols;
@@ -117,9 +132,9 @@ double Cluster_DFT_NonCol(
   MPI_Barrier(mpi_comm_level1);
   dtime(&TStime);
 
-  /* ***************************************************
+  /****************************************************
              calculation of the array size
-  *************************************************** */
+  ****************************************************/
 
   n = 0;
   for (i=1; i<=atomnum; i++){
@@ -128,12 +143,9 @@ double Cluster_DFT_NonCol(
   }
   n2 = 2*n;
 
-  /* ***************************************************
+  /****************************************************
                   allocation of arrays
-  *************************************************** */
-
-  is1 = (int*)malloc(sizeof(int)*numprocs);
-  ie1 = (int*)malloc(sizeof(int)*numprocs);
+  ****************************************************/
 
   Num_Snd_EV = (int*)malloc(sizeof(int)*numprocs);
   Num_Rcv_EV = (int*)malloc(sizeof(int)*numprocs);
@@ -163,32 +175,6 @@ double Cluster_DFT_NonCol(
   /* ***************************************************
          find the numbers of partions for MPI
   *************************************************** */
-
-  if ( numprocs<=n ){
-
-    av_num = (double)n/(double)numprocs;
-
-    for (ID=0; ID<numprocs; ID++){
-      is1[ID] = (int)(av_num*(double)ID) + 1; 
-      ie1[ID] = (int)(av_num*(double)(ID+1)); 
-    }
-
-    is1[0] = 1;
-    ie1[numprocs-1] = n; 
-  }
-
-  else{
-
-    for (ID=0; ID<n; ID++){
-      is1[ID] = ID + 1; 
-      ie1[ID] = ID + 1;
-    }
-
-    for (ID=n; ID<numprocs; ID++){
-      is1[ID] = 1;
-      ie1[ID] = 0;
-    }
-  }
 
   /* find the maximum states in solved eigenvalues */
   
@@ -293,8 +279,6 @@ double Cluster_DFT_NonCol(
   /* print memory size */
 
   if (firsttime && memoryusage_fileout){
-    PrintMemory("Cluster_DFT_NonCol: is1",sizeof(int)*numprocs,NULL);
-    PrintMemory("Cluster_DFT_NonCol: ie1",sizeof(int)*numprocs,NULL);
     PrintMemory("Cluster_DFT_NonCol: Num_Snd_EV",sizeof(int)*numprocs,NULL);
     PrintMemory("Cluster_DFT_NonCol: Num_Ecv_EV",sizeof(int)*numprocs,NULL);
     PrintMemory("Cluster_DFT_NonCol: index_Snd_i",sizeof(int)*Max_Num_Snd_EV,NULL);
@@ -422,72 +406,72 @@ double Cluster_DFT_NonCol(
   for (i=0; i<na_rows*na_cols; i++) Cs[i] = 0.0;
 
   Cblacs_barrier(ictxt1,"A");
-  F77_NAME(pdgemm,PDGEMM)("N","N",&n,&n,&n,&alpha,rHs11,&ONE,&ONE,descH,Ss,&ONE,&ONE,descS,&beta,Cs,&ONE,&ONE,descC);
+  F77_NAME(pdgemm,PDGEMM)("N","N",&n,&n,&n,&Re_alpha,rHs11,&ONE,&ONE,descH,Ss,&ONE,&ONE,descS,&Re_beta,Cs,&ONE,&ONE,descC);
 
   for (i=0; i<na_rows*na_cols; i++) rHs11[i] = 0.0;
   
   Cblacs_barrier(ictxt1,"C");
-  F77_NAME(pdgemm,PDGEMM)("T","N",&n,&n,&n,&alpha,Ss,&ONE,&ONE,descS,Cs,&ONE,&ONE,descC,&beta,rHs11,&ONE,&ONE,descH);
+  F77_NAME(pdgemm,PDGEMM)("T","N",&n,&n,&n,&Re_alpha,Ss,&ONE,&ONE,descS,Cs,&ONE,&ONE,descC,&Re_beta,rHs11,&ONE,&ONE,descH);
 
   /* S^t x rHs12 x S */
 
   for (i=0; i<na_rows*na_cols; i++) Cs[i] = 0.0;
 
   Cblacs_barrier(ictxt1,"A");
-  F77_NAME(pdgemm,PDGEMM)("N","N",&n,&n,&n,&alpha,rHs12,&ONE,&ONE,descH,Ss,&ONE,&ONE,descS,&beta,Cs,&ONE,&ONE,descC);
+  F77_NAME(pdgemm,PDGEMM)("N","N",&n,&n,&n,&Re_alpha,rHs12,&ONE,&ONE,descH,Ss,&ONE,&ONE,descS,&Re_beta,Cs,&ONE,&ONE,descC);
 
   for (i=0; i<na_rows*na_cols; i++) rHs12[i] = 0.0;
 
   Cblacs_barrier(ictxt1,"C");
-  F77_NAME(pdgemm,PDGEMM)("T","N",&n,&n,&n,&alpha,Ss,&ONE,&ONE,descS,Cs,&ONE,&ONE,descC,&beta,rHs12,&ONE,&ONE,descH);
+  F77_NAME(pdgemm,PDGEMM)("T","N",&n,&n,&n,&Re_alpha,Ss,&ONE,&ONE,descS,Cs,&ONE,&ONE,descC,&Re_beta,rHs12,&ONE,&ONE,descH);
 
   /* S^t x rHs22 x S */
 
   for (i=0; i<na_rows*na_cols; i++) Cs[i] = 0.0;
 
   Cblacs_barrier(ictxt1,"A");
-  F77_NAME(pdgemm,PDGEMM)("N","N",&n,&n,&n,&alpha,rHs22,&ONE,&ONE,descH,Ss,&ONE,&ONE,descS,&beta,Cs,&ONE,&ONE,descC);
+  F77_NAME(pdgemm,PDGEMM)("N","N",&n,&n,&n,&Re_alpha,rHs22,&ONE,&ONE,descH,Ss,&ONE,&ONE,descS,&Re_beta,Cs,&ONE,&ONE,descC);
 
   for (i=0; i<na_rows*na_cols; i++) rHs22[i] = 0.0;
   
   Cblacs_barrier(ictxt1,"C");
-  F77_NAME(pdgemm,PDGEMM)("T","N",&n,&n,&n,&alpha,Ss,&ONE,&ONE,descS,Cs,&ONE,&ONE,descC,&beta,rHs22,&ONE,&ONE,descH);
+  F77_NAME(pdgemm,PDGEMM)("T","N",&n,&n,&n,&Re_alpha,Ss,&ONE,&ONE,descS,Cs,&ONE,&ONE,descC,&Re_beta,rHs22,&ONE,&ONE,descH);
 
   /* S^t x iHs11 x S */
 
   for (i=0; i<na_rows*na_cols; i++) Cs[i] = 0.0;
 
   Cblacs_barrier(ictxt1,"A");
-  F77_NAME(pdgemm,PDGEMM)("N","N",&n,&n,&n,&alpha,iHs11,&ONE,&ONE,descH,Ss,&ONE,&ONE,descS,&beta,Cs,&ONE,&ONE,descC);
+  F77_NAME(pdgemm,PDGEMM)("N","N",&n,&n,&n,&Re_alpha,iHs11,&ONE,&ONE,descH,Ss,&ONE,&ONE,descS,&Re_beta,Cs,&ONE,&ONE,descC);
 
   for (i=0; i<na_rows*na_cols; i++) iHs11[i] = 0.0;
 
   Cblacs_barrier(ictxt1,"C");
-  F77_NAME(pdgemm,PDGEMM)("T","N",&n,&n,&n,&alpha,Ss,&ONE,&ONE,descS,Cs,&ONE,&ONE,descC,&beta,iHs11,&ONE,&ONE,descH);
+  F77_NAME(pdgemm,PDGEMM)("T","N",&n,&n,&n,&Re_alpha,Ss,&ONE,&ONE,descS,Cs,&ONE,&ONE,descC,&Re_beta,iHs11,&ONE,&ONE,descH);
 
   /* S^t x iHs12 x S */
 
   for (i=0; i<na_rows*na_cols; i++) Cs[i] = 0.0;
 
   Cblacs_barrier(ictxt1,"A");
-  F77_NAME(pdgemm,PDGEMM)("N","N",&n,&n,&n,&alpha,iHs12,&ONE,&ONE,descH,Ss,&ONE,&ONE,descS,&beta,Cs,&ONE,&ONE,descC);
+  F77_NAME(pdgemm,PDGEMM)("N","N",&n,&n,&n,&Re_alpha,iHs12,&ONE,&ONE,descH,Ss,&ONE,&ONE,descS,&Re_beta,Cs,&ONE,&ONE,descC);
 
   for (i=0; i<na_rows*na_cols; i++) iHs12[i] = 0.0;
   
   Cblacs_barrier(ictxt1,"C");
-  F77_NAME(pdgemm,PDGEMM)("T","N",&n,&n,&n,&alpha,Ss,&ONE,&ONE,descS,Cs,&ONE,&ONE,descC,&beta,iHs12,&ONE,&ONE,descH);
+  F77_NAME(pdgemm,PDGEMM)("T","N",&n,&n,&n,&Re_alpha,Ss,&ONE,&ONE,descS,Cs,&ONE,&ONE,descC,&Re_beta,iHs12,&ONE,&ONE,descH);
 
   /* S^t x iHs22 x S */
 
   for (i=0; i<na_rows*na_cols; i++) Cs[i] = 0.0;
 
   Cblacs_barrier(ictxt1,"A");
-  F77_NAME(pdgemm,PDGEMM)("N","N",&n,&n,&n,&alpha,iHs22,&ONE,&ONE,descH,Ss,&ONE,&ONE,descS,&beta,Cs,&ONE,&ONE,descC);
+  F77_NAME(pdgemm,PDGEMM)("N","N",&n,&n,&n,&Re_alpha,iHs22,&ONE,&ONE,descH,Ss,&ONE,&ONE,descS,&Re_beta,Cs,&ONE,&ONE,descC);
 
   for (i=0; i<na_rows*na_cols; i++) iHs22[i] = 0.0;
   
   Cblacs_barrier(ictxt1,"C");
-  F77_NAME(pdgemm,PDGEMM)("T","N",&n,&n,&n,&alpha,Ss,&ONE,&ONE,descS,Cs,&ONE,&ONE,descC,&beta,iHs22,&ONE,&ONE,descH);
+  F77_NAME(pdgemm,PDGEMM)("T","N",&n,&n,&n,&Re_alpha,Ss,&ONE,&ONE,descS,Cs,&ONE,&ONE,descC,&Re_beta,iHs22,&ONE,&ONE,descH);
 
   if (measure_time){
     dtime(&etime);
@@ -553,7 +537,9 @@ double Cluster_DFT_NonCol(
   }
 
   Cblacs_barrier(ictxt1_2,"A");
-  F77_NAME(pzgemm,PZGEMM)("T","T",&n2,&n2,&n2,&alpha,Cs2,&ONE,&ONE,descC2,Ss2,&ONE,&ONE,descS2,&beta,Hs2,&ONE,&ONE,descH2);
+  F77_NAME(pzgemm,PZGEMM)("T","T", &n2,&n2,&n2,&alpha,Cs2,&ONE,&ONE,
+			           descC2,Ss2,&ONE,&ONE,descS2,&beta,Hs2,
+			           &ONE,&ONE,descH2);
 
   /* MPI communications of Hs2 */
 
@@ -641,9 +627,13 @@ double Cluster_DFT_NonCol(
                   find chemical potential
     ****************************************************/
 
+    double Beta_trial1;
+
     if (measure_time) dtime(&stime);
 
-    /* first, find ChemP at five times large temperatue */
+    /* first, find ChemP at 1200 K */
+
+    Beta_trial1 = 1.0/kB/(1200.0/eV2Hartree);
 
     po = 0;
     loopN = 0;
@@ -656,7 +646,7 @@ double Cluster_DFT_NonCol(
       Num_State = 0.0;
 
       for (i1=1; i1<=MaxN; i1++){
-	x = (ko[i1] - ChemP)*Beta*0.2;
+	x = (ko[i1] - ChemP)*Beta_trial1;
 	if (x<=-max_x) x = -max_x;
 	if (max_x<=x)  x = max_x;
 	FermiF = FermiFunc_NC(x,i1);
@@ -667,7 +657,7 @@ double Cluster_DFT_NonCol(
       Dnum = (TZ - Num_State) - system_charge;
       if (0.0<=Dnum) ChemP_MIN = ChemP;
       else           ChemP_MAX = ChemP;
-      if (fabs(Dnum)<1.0e-14) po = 1;
+      if (fabs(Dnum)<1.0e-12) po = 1;
       loopN++;
     } 
     while (po==0 && loopN<1000); 
@@ -700,7 +690,7 @@ double Cluster_DFT_NonCol(
       Dnum = (TZ - Num_State) - system_charge;
       if (0.0<=Dnum) ChemP_MIN = ChemP;
       else           ChemP_MAX = ChemP;
-      if (fabs(Dnum)<1.0e-14) po = 1;
+      if (fabs(Dnum)<1.0e-12) po = 1;
       loopN++;
     } 
     while (po==0 && loopN<1000); 
@@ -1321,8 +1311,6 @@ double Cluster_DFT_NonCol(
                           Free
   ****************************************************/
 
-  free(is1);
-  free(ie1);
   free(Num_Snd_EV);
   free(Num_Rcv_EV);
 
@@ -1576,7 +1564,7 @@ double Calc_DM_Cluster_non_collinear_ScaLAPACK(
 
               /* Partial_DM22 */
               case 12:
-		Partial_DM[0][MA_AN][LB_AN][i][j] = DM1[p];
+		Partial_DM[1][MA_AN][LB_AN][i][j] = DM1[p];
     	        break;
 	    }
 
@@ -2033,6 +2021,9 @@ void Save_LCAO_NonCol(int n, int n2, int MaxN, int *MP, double ****OLP0, dcomple
     fwrite(HOMO, sizeof(int), 2, fp1);
     fwrite(&SpinP_switch, sizeof(int), 1, fp1);
     fwrite(&Utot, sizeof(double), 1, fp1);
+    fwrite(&Total_SpinSx, sizeof(double),1,fp1); // S. An
+    fwrite(&Total_SpinSy, sizeof(double),1,fp1); // S. An
+    fwrite(&Total_SpinSz, sizeof(double),1,fp1); // S. An
   }
 
   /* calculate N */      
@@ -2626,8 +2617,11 @@ double Calc_Oscillator_Strength( int n, int n2, int UMOmax, int Nocc[2], int *MP
   double fsumr,fsumi;
   double tmpr,tmpi;
   dcomplex tmp,det,sum,allsum;
+  double stime,etime;
   int numprocs,myid;
 
+  dtime(&stime);
+  
   /* MPI */
 
   MPI_Comm_size(mpi_comm_level1,&numprocs);
@@ -2720,6 +2714,9 @@ double Calc_Oscillator_Strength( int n, int n2, int UMOmax, int Nocc[2], int *MP
   XANES_Res[2] = osx;
   XANES_Res[3] = osy;
   XANES_Res[4] = osz;
+
+  dtime(&etime);
+  return (etime-stime);
 }
 
 

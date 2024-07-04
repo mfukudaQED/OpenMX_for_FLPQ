@@ -72,6 +72,7 @@ void init_alloc_first()
      EDM
      PDM
      CntCoes
+     H_XMCD
   ***********************************************/
   alloc_first[4] = 1;
 
@@ -323,5 +324,25 @@ void init_alloc_first()
    C6ab_dftD;
   ***********************************************/
   alloc_first[37] = 1;
+
+  /***********************************************
+   Calc_LNAO.c
+   LNAO_coes;
+   LNAO_pops;
+   LNAO_H;
+  ***********************************************/
+  alloc_first[38] = 1;
+
+  /***********************************************
+   Calc_LNBO.c
+   LNBO_coes;
+   LNBO_pops;
+   LNBO_H;
+  ***********************************************/
+  alloc_first[39] = 1;
+
+  /* Added by N. Yamaguchi ***/
+  alloc_first[40]=1;
+  /* ***/
 
 }

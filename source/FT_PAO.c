@@ -29,14 +29,14 @@ void FT_PAO()
 {
   int numprocs,myid,ID,tag=999;
   int count,NumSpe;
-  int i,kj,num_k;
+  int i,j,kj,num_k;
   int Lspe,spe,GL,Mul,LB;
   int RestartRead_Succeed;
   double dk,norm_k,h;
   double rmin,rmax,r,r2,r3,sum;
   double sy,sjp,syp;
   double Sr,Dr,dum0;
-  double **SphB,**SphB2;
+  double **SphB,***TmpRF;
   double *tmp_SphB,*tmp_SphBp;
   double TStime, TEtime;
   /* for MPI */
@@ -119,22 +119,36 @@ void FT_PAO()
       rmax = Spe_Atom_Cut1[spe] + 0.5;
       h = (rmax - rmin)/(double)OneD_Grid;
 
+      /* calculation of RadialF */
+
+      TmpRF = (double***)malloc(sizeof(double**)*(Spe_MaxL_Basis[spe]+1));
+      for (GL=0; GL<(Spe_MaxL_Basis[spe]+1); GL++){
+	TmpRF[GL] = (double**)malloc(sizeof(double*)*Spe_Num_Basis[spe][GL]);
+	for (Mul=0; Mul<Spe_Num_Basis[spe][GL]; Mul++){
+	  TmpRF[GL][Mul] = (double*)malloc(sizeof(double)*(OneD_Grid+1));
+	}  
+      }
+
+      for (GL=0; GL<=Spe_MaxL_Basis[spe]; GL++){
+	for (Mul=0; Mul<Spe_Num_Basis[spe][GL]; Mul++){
+	  for (i=0; i<=OneD_Grid; i++){
+     	    r = rmin + (double)i*h;
+	    TmpRF[GL][Mul][i] = RadialF(spe,GL,Mul,r);
+	  } 
+	}
+      }
+
       /* kj loop */
 
-#pragma omp parallel shared(List_YOUSO,num_k,dk,spe,rmin,rmax,h,Spe_PAO_RV,Spe_Atom_Cut1,OneD_Grid,Spe_MaxL_Basis,Spe_Num_Basis,Spe_RF_Bessel)  private(OMPID,Nthrds,Nprocs,kj,norm_k,i,r,r2,tmp_SphB,SphB2,tmp_SphBp,GL,SphB,Mul,sum,LB)
+#pragma omp parallel shared(List_YOUSO,num_k,dk,spe,rmin,rmax,h,Spe_PAO_RV,Spe_Atom_Cut1,OneD_Grid,Spe_MaxL_Basis,Spe_Num_Basis,Spe_RF_Bessel,TmpRF)  private(OMPID,Nthrds,Nprocs,kj,norm_k,i,r,r2,tmp_SphB,tmp_SphBp,GL,SphB,Mul,sum,LB)
       {
 
-	/* allocate SphB */
+	/* allocation of arrays */
 
 	SphB = (double**)malloc(sizeof(double*)*(Spe_MaxL_Basis[spe]+3));
 	for(GL=0; GL<(Spe_MaxL_Basis[spe]+3); GL++){ 
 	  SphB[GL] = (double*)malloc(sizeof(double)*(OneD_Grid+1));
 	}
-
-        SphB2 = (double**)malloc(sizeof(double*)*(List_YOUSO[25]*2+3));
-        for(LB=0; LB<(List_YOUSO[25]*2+3); LB++){
-          SphB2[LB] = (double*)malloc(sizeof(double)*(OneD_Grid+1));
-        }
 
 	tmp_SphB  = (double*)malloc(sizeof(double)*(List_YOUSO[25]*2+3));
 	tmp_SphBp = (double*)malloc(sizeof(double)*(List_YOUSO[25]*2+3));
@@ -171,7 +185,6 @@ void FT_PAO()
 
 	  for (GL=0; GL<=Spe_MaxL_Basis[spe]; GL++){
 	    for (Mul=0; Mul<Spe_Num_Basis[spe][GL]; Mul++){
-
 	      /****************************************************
                         \int jL(k*r)RL r^2 dr 
 	      ****************************************************/
@@ -180,11 +193,9 @@ void FT_PAO()
 
 	      sum = 0.0;
 	      for (i=0; i<=OneD_Grid; i++){
-		r = rmin + (double)i*h;
-	        sum += RadialF(spe,GL,Mul,r)*SphB[GL][i];
+	        sum += TmpRF[GL][Mul][i]*SphB[GL][i];
 	      } 
-	      sum = sum*h;
-	      Spe_RF_Bessel[spe][GL][Mul][kj] = sum;
+	      Spe_RF_Bessel[spe][GL][Mul][kj] = sum*h;
 
 	    } /* Mul */
 	  } /* GL */
@@ -201,14 +212,17 @@ void FT_PAO()
 	free(tmp_SphB);
 	free(tmp_SphBp);
 
-        /*** added by Ohwaki ***/
-
-        for(LB=0; LB<(List_YOUSO[25]*2+3); LB++){
-          free(SphB2[LB]);
-        }
-        free(SphB2);
-
       } /* #pragma omp parallel */
+
+      /* free TmpRF */
+
+      for (GL=0; GL<(Spe_MaxL_Basis[spe]+1); GL++){
+	for (Mul=0; Mul<Spe_Num_Basis[spe][GL]; Mul++){
+	  free(TmpRF[GL][Mul]);
+	}  
+        free(TmpRF[GL]);
+      }
+      free(TmpRF);
 
     } /* Lspe */
 
@@ -275,6 +289,12 @@ void FT_PAO()
   ***********************************************************/
 
   dtime(&TEtime);
+
+  /*
+  printf("FT_PAO.c: Time=%15.12f\n",TEtime-TStime);
+  MPI_Finalize();
+  exit(0);
+  */
 
 }
 

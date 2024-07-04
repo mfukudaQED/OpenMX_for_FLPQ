@@ -1,5 +1,5 @@
-#include <stdio.h> 
-#include <stdlib.h> 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
     for (i=0; i<=atomnum; i++){
       ClaOrb[i] = (int*)malloc(sizeof(int)*(TNO_MAX+1));
       for (j=0; j<=TNO_MAX; j++) ClaOrb[i][j]=0;
-    } 
+    }
 
     MPI_Barrier(MPI_COMM_WORLD);
     if (myrank == 0){       Classify_OrbNum(ClaOrb, An2Spe, 1);
@@ -233,20 +233,20 @@ int main(int argc, char *argv[])
     for (i=0; i<=ClaOrb_MAX[1]; i++){
       OrbName[i] = (char*)malloc(sizeof(char)*3);
       if (i == 0){// 0
-	OrbName[i][0]='s';  OrbName[i][1]=(char)(1+48);      OrbName[i][2]='\0';
+        OrbName[i][0]='s';  OrbName[i][1]=(char)(1+48);      OrbName[i][2]='\0';
       }else if(i > 0 && i < 4){// 1,2,3
-	if (ClaOrb_MAX[0] < 1){ ClaOrb_MAX[0] = 1; OrbSym[1][0] = 'p';   OrbSym[1][1] = '\0';}
-	OrbName[i][0]='p';  OrbName[i][1]=(char)((i+0)+48);  OrbName[i][2]='\0';
+        if (ClaOrb_MAX[0] < 1){ ClaOrb_MAX[0] = 1; OrbSym[1][0] = 'p';   OrbSym[1][1] = '\0';}
+        OrbName[i][0]='p';  OrbName[i][1]=(char)((i+0)+48);  OrbName[i][2]='\0';
       }else if(i > 3 && i < 9){// 4,5,6,7,8
-	if (ClaOrb_MAX[0] < 2){ ClaOrb_MAX[0] = 2; OrbSym[2][0] = 'd';   OrbSym[2][1] = '\0';}
-	OrbName[i][0]='d';  OrbName[i][1]=(char)((i-3)+48);  OrbName[i][2]='\0';
+        if (ClaOrb_MAX[0] < 2){ ClaOrb_MAX[0] = 2; OrbSym[2][0] = 'd';   OrbSym[2][1] = '\0';}
+        OrbName[i][0]='d';  OrbName[i][1]=(char)((i-3)+48);  OrbName[i][2]='\0';
       }else if(i >8 && i <16){// 9,10,11,12,13,14,15
-	if (ClaOrb_MAX[0] < 3){ ClaOrb_MAX[0] = 3; OrbSym[3][0] = 'f';   OrbSym[3][1] = '\0';}
-	OrbName[i][0]='f';  OrbName[i][1]=(char)((i-8)+48);  OrbName[i][2]='\0';
+        if (ClaOrb_MAX[0] < 3){ ClaOrb_MAX[0] = 3; OrbSym[3][0] = 'f';   OrbSym[3][1] = '\0';}
+        OrbName[i][0]='f';  OrbName[i][1]=(char)((i-8)+48);  OrbName[i][2]='\0';
       }else{//16
-	OrbName[i][0]=(char)((i-15)/10+48);
-	OrbName[i][1]=(char)((i-15)%10+48);  OrbName[i][2]='\0';
-      } 
+        OrbName[i][0]=(char)((i-15)/10+48);
+        OrbName[i][1]=(char)((i-15)%10+48);  OrbName[i][2]='\0';
+      }
       //      if (myrank == 0) printf("OrbName:%s\n",OrbName[i]);
     }//i
     //    if (myrank == 0) for (i=1; i<=atomnum; i++){  printf("%4d %s\n", i, An2Spe[i]);  }
@@ -271,7 +271,7 @@ int main(int argc, char *argv[])
     for (i=0; i<4; i++){
 
       /* Disabled by N. Yamaguchi ***
-	 Data_MulP[i] = (double***)malloc(sizeof(double**)*n2);
+         Data_MulP[i] = (double***)malloc(sizeof(double**)*n2);
        * ***/
       /* Added by N. Yamaguchi ***/
       Data_MulP[i] = (double***)malloc(sizeof(double**)*l_cal);
@@ -283,21 +283,21 @@ int main(int argc, char *argv[])
 
       for (l=0; l<n2; l++){
 
-	/* Added by N. Yamaguchi ***/
+        /* Added by N. Yamaguchi ***/
 #endif
-	for (l=0; l<l_cal; l++){
-	  /* ***/
+        for (l=0; l<l_cal; l++){
+          /* ***/
 
-	  Data_MulP[i][l] = (double**)malloc(sizeof(double*)*(atomnum+1));
-	  for (j=0; j<=atomnum; j++){
-	    Data_MulP[i][l][j] = (double*)malloc(sizeof(double)*(TNO_MAX+1));
-	    for (k=0; k<=TNO_MAX; k++) Data_MulP[i][l][j][k] = 0.0;
-	  }
+          Data_MulP[i][l] = (double**)malloc(sizeof(double*)*(atomnum+1));
+          for (j=0; j<=atomnum; j++){
+            Data_MulP[i][l][j] = (double*)malloc(sizeof(double)*(TNO_MAX+1));
+            for (k=0; k<=TNO_MAX; k++) Data_MulP[i][l][j][k] = 0.0;
+          }
 
-	  /* Added by N. Yamaguchi ***/
-	}
+          /* Added by N. Yamaguchi ***/
+        }
 #if 0
-	/* ***/
+        /* ***/
 
       }
 
@@ -312,20 +312,20 @@ int main(int argc, char *argv[])
       fscanf(fp,"%d", &Data_size);
 
       /* Disabled by N. Yamaguchi ***
-	 fscanf(fp,"%d", &i);
+         fscanf(fp,"%d", &i);
        * ***/
 
       k_xyz_Cc = (double**)malloc(sizeof(double*)*3);
       for(i=0; i<3; i++){
-	k_xyz_Cc[i] = (double*)malloc(sizeof(double)*(Data_size+1));
+        k_xyz_Cc[i] = (double*)malloc(sizeof(double)*(Data_size+1));
       } NBand_Cc = (int*)malloc(sizeof(int)*(Data_size+1));
       for(j=0; j<Data_size; j++){
-	fscanf(fp,"%lf",&k1);        fscanf(fp,"%lf",&k2);        fscanf(fp,"%lf",&k3);
-	k_xyz_Cc[0][j] = ( tv[1][1]*k1 +tv[1][2]*k2 +tv[1][3]*k3 )/2/PI;
-	k_xyz_Cc[1][j] = ( tv[2][1]*k1 +tv[2][2]*k2 +tv[2][3]*k3 )/2/PI;
-	k_xyz_Cc[2][j] = ( tv[3][1]*k1 +tv[3][2]*k2 +tv[3][3]*k3 )/2/PI;
-	fscanf(fp,"%d",&NBand_Cc[j]);
-	//        if (myrank==0) printf("%10.6lf  %10.6lf  %10.6lf  %4d\n", k_xyz_Cc[0][j], k_xyz_Cc[1][j], k_xyz_Cc[2][j], NBand_Cc[j]);
+        fscanf(fp,"%lf",&k1);        fscanf(fp,"%lf",&k2);        fscanf(fp,"%lf",&k3);
+        k_xyz_Cc[0][j] = ( tv[1][1]*k1 +tv[1][2]*k2 +tv[1][3]*k3 )/2/PI;
+        k_xyz_Cc[1][j] = ( tv[2][1]*k1 +tv[2][2]*k2 +tv[2][3]*k3 )/2/PI;
+        k_xyz_Cc[2][j] = ( tv[3][1]*k1 +tv[3][2]*k2 +tv[3][3]*k3 )/2/PI;
+        fscanf(fp,"%d",&NBand_Cc[j]);
+        //        if (myrank==0) printf("%10.6lf  %10.6lf  %10.6lf  %4d\n", k_xyz_Cc[0][j], k_xyz_Cc[1][j], k_xyz_Cc[2][j], NBand_Cc[j]);
       } fclose(fp);
       // #######################################################
       EIGEN_MP = (double*)malloc(sizeof(double)*((Data_size+1)*n2));
@@ -333,62 +333,62 @@ int main(int argc, char *argv[])
       //    MULP malloc
 
       /* Disabled by N. Yamaguchi ***
-	 MulP_Cc = (double**)malloc(sizeof(double*)*8);
-	 for (i=0; i<8; i++){
-	 MulP_Cc[i] = (double*)malloc(sizeof(double)*((atomnum+1)*(Data_size+1)));
-	 for (k=0; k<((atomnum+1)*(Data_size+1)); k++) MulP_Cc[i][k] = 0.0;
-	 }
-	 OrbMulP_Cc = (double***)malloc(sizeof(double**)*8);
-	 for (i=0; i<8; i++){
-	 OrbMulP_Cc[i] = (double**)malloc(sizeof(double*)*(ClaOrb_MAX[0]+1));
-	 for (j=0; j<=ClaOrb_MAX[0]; j++){
-	 OrbMulP_Cc[i][j] = (double*)malloc(sizeof(double)*((atomnum+1)*(Data_size+1)));
-	 for (k=0; k<((atomnum+1)*(Data_size+1)); k++) OrbMulP_Cc[i][j][k] = 0.0;
-	 }//j
-	 }//i
-	 Orb2MulP_Cc = (double***)malloc(sizeof(double**)*8);
-	 for (i=0; i<8; i++){
-	 Orb2MulP_Cc[i] = (double**)malloc(sizeof(double*)*(ClaOrb_MAX[1]+1));
-	 for (j=0; j<=ClaOrb_MAX[1]; j++){
-	 Orb2MulP_Cc[i][j] = (double*)malloc(sizeof(double)*((atomnum+1)*(Data_size+1)));
-	 for (k=0; k<((atomnum+1)*(Data_size+1)); k++) Orb2MulP_Cc[i][j][k] = 0.0;
-	 }//j
-	 }//i
+         MulP_Cc = (double**)malloc(sizeof(double*)*8);
+         for (i=0; i<8; i++){
+         MulP_Cc[i] = (double*)malloc(sizeof(double)*((atomnum+1)*(Data_size+1)));
+         for (k=0; k<((atomnum+1)*(Data_size+1)); k++) MulP_Cc[i][k] = 0.0;
+         }
+         OrbMulP_Cc = (double***)malloc(sizeof(double**)*8);
+         for (i=0; i<8; i++){
+         OrbMulP_Cc[i] = (double**)malloc(sizeof(double*)*(ClaOrb_MAX[0]+1));
+         for (j=0; j<=ClaOrb_MAX[0]; j++){
+         OrbMulP_Cc[i][j] = (double*)malloc(sizeof(double)*((atomnum+1)*(Data_size+1)));
+         for (k=0; k<((atomnum+1)*(Data_size+1)); k++) OrbMulP_Cc[i][j][k] = 0.0;
+         }//j
+         }//i
+         Orb2MulP_Cc = (double***)malloc(sizeof(double**)*8);
+         for (i=0; i<8; i++){
+         Orb2MulP_Cc[i] = (double**)malloc(sizeof(double*)*(ClaOrb_MAX[1]+1));
+         for (j=0; j<=ClaOrb_MAX[1]; j++){
+         Orb2MulP_Cc[i][j] = (double*)malloc(sizeof(double)*((atomnum+1)*(Data_size+1)));
+         for (k=0; k<((atomnum+1)*(Data_size+1)); k++) Orb2MulP_Cc[i][j][k] = 0.0;
+         }//j
+         }//i
        * ***/
 
       /* Added by N. Yamaguchi ***/
       MulP_Cc=(double**)malloc(sizeof(double*)*sizeMulP);
       for (i=0; i<sizeMulP; i++){
-	if (myrank==0){
-	  MulP_Cc[i]=(double*)malloc(sizeof(double)*(atomnum+1)*(Data_size+1));
-	  for (k=0; k<(atomnum+1)*(Data_size+1); k++){
-	    MulP_Cc[i][k]=0.0;
-	  }
-	}
+        if (myrank==0){
+          MulP_Cc[i]=(double*)malloc(sizeof(double)*(atomnum+1)*(Data_size+1));
+          for (k=0; k<(atomnum+1)*(Data_size+1); k++){
+            MulP_Cc[i][k]=0.0;
+          }
+        }
       }
       OrbMulP_Cc=(double***)malloc(sizeof(double**)*sizeMulP);
       for (i=0; i<sizeMulP; i++){
-	OrbMulP_Cc[i]=(double**)malloc(sizeof(double*)*(ClaOrb_MAX[0]+1));
-	for (j=0; j<=ClaOrb_MAX[0]; j++){
-	  if (myrank==0){
-	    OrbMulP_Cc[i][j]=(double*)malloc(sizeof(double)*(atomnum+1)*(Data_size+1));
-	    for (k=0; k<(atomnum+1)*(Data_size+1); k++){
-	      OrbMulP_Cc[i][j][k]=0.0;
-	    }
-	  }
-	}
+        OrbMulP_Cc[i]=(double**)malloc(sizeof(double*)*(ClaOrb_MAX[0]+1));
+        for (j=0; j<=ClaOrb_MAX[0]; j++){
+          if (myrank==0){
+            OrbMulP_Cc[i][j]=(double*)malloc(sizeof(double)*(atomnum+1)*(Data_size+1));
+            for (k=0; k<(atomnum+1)*(Data_size+1); k++){
+              OrbMulP_Cc[i][j][k]=0.0;
+            }
+          }
+        }
       }
       Orb2MulP_Cc=(double***)malloc(sizeof(double**)*sizeMulP);
       for (i=0; i<sizeMulP; i++){
-	Orb2MulP_Cc[i]=(double**)malloc(sizeof(double*)*(ClaOrb_MAX[1]+1));
-	for (j=0; j<=ClaOrb_MAX[1]; j++){
-	  if (myrank==0){
-	    Orb2MulP_Cc[i][j]=(double*)malloc(sizeof(double)*(atomnum+1)*(Data_size+1));
-	    for (k=0; k<((atomnum+1)*(Data_size+1)); k++){
-	      Orb2MulP_Cc[i][j][k]=0.0;
-	    }
-	  }
-	}
+        Orb2MulP_Cc[i]=(double**)malloc(sizeof(double*)*(ClaOrb_MAX[1]+1));
+        for (j=0; j<=ClaOrb_MAX[1]; j++){
+          if (myrank==0){
+            Orb2MulP_Cc[i][j]=(double*)malloc(sizeof(double)*(atomnum+1)*(Data_size+1));
+            for (k=0; k<((atomnum+1)*(Data_size+1)); k++){
+              Orb2MulP_Cc[i][j][k]=0.0;
+            }
+          }
+        }
       }
       /* ***/
 
@@ -396,434 +396,434 @@ int main(int argc, char *argv[])
       T_knum = Data_size;  //
       // Division CALC_PART
       for(i=0; i<num_procs; i++){
-	if (T_knum <= i){                   S_knum[i] = -10;   E_knum[i] = -100;
+        if (T_knum <= i){                   S_knum[i] = -10;   E_knum[i] = -100;
 
-	  /* Added by N. Yamaguchi ***/
+          /* Added by N. Yamaguchi ***/
 #if 0
-	  /* ***/
+          /* ***/
 
-	} else if (T_knum < num_procs) {   S_knum[i] = i;     E_knum[i] = i;
+        } else if (T_knum < num_procs) {   S_knum[i] = i;     E_knum[i] = i;
 
-	  /* Added by N. Yamaguchi ***/
+          /* Added by N. Yamaguchi ***/
 #endif
-	} else if (T_knum<=num_procs){
-	  S_knum[i]=i;     E_knum[i]=i;
-	  /* ***/
+        } else if (T_knum<=num_procs){
+          S_knum[i]=i;     E_knum[i]=i;
+          /* ***/
 
-	} else {
-	  d0 = (double)T_knum/(double)num_procs;
-	  S_knum[i] = (int)((double)i*(d0+0.0001));
-	  E_knum[i] = (int)((double)(i+1)*(d0+0.0001)) - 1;
-	  if (i==(num_procs-1)) E_knum[i] = T_knum - 1;
-	  if (E_knum[i]<0)      E_knum[i] = 0;
-	}
+        } else {
+          d0 = (double)T_knum/(double)num_procs;
+          S_knum[i] = (int)((double)i*(d0+0.0001));
+          E_knum[i] = (int)((double)(i+1)*(d0+0.0001)) - 1;
+          if (i==(num_procs-1)) E_knum[i] = T_knum - 1;
+          if (E_knum[i]<0)      E_knum[i] = 0;
+        }
       }
 
       /* Added by N. Yamaguchi ***/
       numK=(int*)malloc(sizeof(int)*num_procs);
       for (j=0; j<num_procs; j++){
-	numK[j]=E_knum[j]-S_knum[j]+1;
-	if (numK[j]<=0){
-	  numK[j]=0;
-	}
+        numK[j]=E_knum[j]-S_knum[j]+1;
+        if (numK[j]<=0){
+          numK[j]=0;
+        }
       }
       MulP_CcDivision=(double**)malloc(sizeof(double*)*sizeMulP);
       for (i=0; i<sizeMulP; i++){
-	MulP_CcDivision[i]=(double*)malloc(sizeof(double)*(atomnum+1)*numK[myrank]);
-	for (j=0; j<(atomnum+1)*numK[myrank]; j++) MulP_CcDivision[i][j]=0.0;
+        MulP_CcDivision[i]=(double*)malloc(sizeof(double)*(atomnum+1)*numK[myrank]);
+        for (j=0; j<(atomnum+1)*numK[myrank]; j++) MulP_CcDivision[i][j]=0.0;
       }
       OrbMulP_CcDivision=(double***)malloc(sizeof(double**)*sizeMulP);
       for (i=0; i<sizeMulP; i++){
-	OrbMulP_CcDivision[i]=(double**)malloc(sizeof(double*)*(ClaOrb_MAX[0]+1));
-	for (j=0; j<=ClaOrb_MAX[0]; j++){
-	  OrbMulP_CcDivision[i][j]=(double*)malloc(sizeof(double)*(atomnum+1)*numK[myrank]);
-	  for (k=0; k<(atomnum+1)*numK[myrank]; k++) OrbMulP_CcDivision[i][j][k]=0.0;
-	}
+        OrbMulP_CcDivision[i]=(double**)malloc(sizeof(double*)*(ClaOrb_MAX[0]+1));
+        for (j=0; j<=ClaOrb_MAX[0]; j++){
+          OrbMulP_CcDivision[i][j]=(double*)malloc(sizeof(double)*(atomnum+1)*numK[myrank]);
+          for (k=0; k<(atomnum+1)*numK[myrank]; k++) OrbMulP_CcDivision[i][j][k]=0.0;
+        }
       }
       Orb2MulP_CcDivision=(double***)malloc(sizeof(double**)*sizeMulP);
       for (i=0; i<sizeMulP; i++){
-	Orb2MulP_CcDivision[i]=(double**)malloc(sizeof(double*)*(ClaOrb_MAX[1]+1));
-	for (j=0; j<=ClaOrb_MAX[1]; j++){
-	  Orb2MulP_CcDivision[i][j]=(double*)malloc(sizeof(double)*(atomnum+1)*numK[myrank]);
-	  for (k=0; k<(atomnum+1)*numK[myrank]; k++) Orb2MulP_CcDivision[i][j][k]=0.0;
-	}
+        Orb2MulP_CcDivision[i]=(double**)malloc(sizeof(double*)*(ClaOrb_MAX[1]+1));
+        for (j=0; j<=ClaOrb_MAX[1]; j++){
+          Orb2MulP_CcDivision[i][j]=(double*)malloc(sizeof(double)*(atomnum+1)*numK[myrank]);
+          for (k=0; k<(atomnum+1)*numK[myrank]; k++) Orb2MulP_CcDivision[i][j][k]=0.0;
+        }
       }
       /* ***/
 
       // #######################################################
       for (j = S_knum[myrank]; j <= E_knum[myrank]; j++){
 
-	//        k1 = (tv[1][1]*k_xyz_Cc[0][j] +tv[1][2]*k_xyz_Cc[1][j] +tv[1][3]*k_xyz_Cc[2][j] )/2/PI;
-	//        k2 = (tv[2][1]*k_xyz_Cc[0][j] +tv[2][2]*k_xyz_Cc[1][j] +tv[2][3]*k_xyz_Cc[2][j] )/2/PI;
-	//        k3 = (tv[3][1]*k_xyz_Cc[0][j] +tv[3][2]*k_xyz_Cc[1][j] +tv[3][3]*k_xyz_Cc[2][j] )/2/PI;
-	//        EigenValue_Problem(k1 ,k2 ,k3 ,1);
+        //        k1 = (tv[1][1]*k_xyz_Cc[0][j] +tv[1][2]*k_xyz_Cc[1][j] +tv[1][3]*k_xyz_Cc[2][j] )/2/PI;
+        //        k2 = (tv[2][1]*k_xyz_Cc[0][j] +tv[2][2]*k_xyz_Cc[1][j] +tv[2][3]*k_xyz_Cc[2][j] )/2/PI;
+        //        k3 = (tv[3][1]*k_xyz_Cc[0][j] +tv[3][2]*k_xyz_Cc[1][j] +tv[3][3]*k_xyz_Cc[2][j] )/2/PI;
+        //        EigenValue_Problem(k1 ,k2 ,k3 ,1);
 
-	/* Added by N. Yamaguchi ***/
-	if (!Spin_Dege){
-	  l_min=l_max=NBand_Cc[j];
-	} else {
-	  l_min=NBand_Cc[j]%2 ? NBand_Cc[j] : NBand_Cc[j]-1;
-	  l_max=NBand_Cc[j]%2 ? NBand_Cc[j]+1 : NBand_Cc[j];
-	}
-	/* ***/
+        /* Added by N. Yamaguchi ***/
+        if (!Spin_Dege){
+          l_min=l_max=NBand_Cc[j];
+        } else {
+          l_min=NBand_Cc[j]%2 ? NBand_Cc[j] : NBand_Cc[j]-1;
+          l_max=NBand_Cc[j]%2 ? NBand_Cc[j]+1 : NBand_Cc[j];
+        }
+        /* ***/
 
-	EigenValue_Problem( k_xyz_Cc[0][j], k_xyz_Cc[1][j], k_xyz_Cc[2][j], 1);
-	//      kotaka
-	for(l=1; l<=2*n; l++){ EIGEN_MP[j*n2+l] = EIGEN[l]; }//l
+        EigenValue_Problem( k_xyz_Cc[0][j], k_xyz_Cc[1][j], k_xyz_Cc[2][j], 1);
+        //      kotaka
+        for(l=1; l<=2*n; l++){ EIGEN_MP[j*n2+l] = EIGEN[l]; }//l
 
-	/* Disabled by N. Yamaguchi ***
-	   if     (NBand_Cc[j]%2==1) {l2 = NBand_Cc[j] +1;}
-	   else if(NBand_Cc[j]%2==0) {l2 = NBand_Cc[j] -1;}
-	   else {}
-	 * ***/
+        /* Disabled by N. Yamaguchi ***
+           if     (NBand_Cc[j]%2==1) {l2 = NBand_Cc[j] +1;}
+           else if(NBand_Cc[j]%2==0) {l2 = NBand_Cc[j] -1;}
+           else {}
+         * ***/
 
-	/* Added by N. Yamaguchi ***/
-	if (!Spin_Dege){
-	  l1=0;
-	} else {
-	  l1=NBand_Cc[j]%2 ? 0 : 1;
-	  l2=NBand_Cc[j]%2 ? 1 : 0;
-	}
+        /* Added by N. Yamaguchi ***/
+        if (!Spin_Dege){
+          l1=0;
+        } else {
+          l1=NBand_Cc[j]%2 ? 0 : 1;
+          l2=NBand_Cc[j]%2 ? 1 : 0;
+        }
 
-	for (i=0; i < atomnum; i++){
-	  for (j1=0; j1<4; j1++){
+        for (i=0; i < atomnum; i++){
+          for (j1=0; j1<4; j1++){
 
-	    /* Disabled by N. Yamaguchi ***
-	       MulP_Cc[j1][j*(atomnum+1)+i] = 0.0;            MulP_Cc[j1+4][j*(atomnum+1)+i] = 0.0;
-	     * ***/
+            /* Disabled by N. Yamaguchi ***
+               MulP_Cc[j1][j*(atomnum+1)+i] = 0.0;            MulP_Cc[j1+4][j*(atomnum+1)+i] = 0.0;
+             * ***/
 
-	    for (i1=0; i1 < Total_NumOrbs[i+1]; i1++){
+            for (i1=0; i1 < Total_NumOrbs[i+1]; i1++){
 
-	      /* Disabled by N. Yamaguchi ***
-		 Orb2MulP_Cc[j1][ClaOrb[i+1][i1]][j*(atomnum+1)+i]+= Data_MulP[j1][NBand_Cc[j]][i+1][i1];
-		 MulP_Cc[j1][j*(atomnum+1)+i]+= Data_MulP[j1][NBand_Cc[j]][i+1][i1];
-	       * ***/
+              /* Disabled by N. Yamaguchi ***
+                 Orb2MulP_Cc[j1][ClaOrb[i+1][i1]][j*(atomnum+1)+i]+= Data_MulP[j1][NBand_Cc[j]][i+1][i1];
+                 MulP_Cc[j1][j*(atomnum+1)+i]+= Data_MulP[j1][NBand_Cc[j]][i+1][i1];
+               * ***/
 
-	      /* Added by N. Yamaguchi ***/
-	      Orb2MulP_CcDivision[j1][ClaOrb[i+1][i1]][(j-S_knum[myrank])*(atomnum+1)+i]+=Data_MulP[j1][l1][i+1][i1];
-	      MulP_CcDivision[j1][(j-S_knum[myrank])*(atomnum+1)+i]+=Data_MulP[j1][l1][i+1][i1];
-	      if (ClaOrb[i+1][i1]==0){
-		OrbMulP_CcDivision[j1][0][(j-S_knum[myrank])*(atomnum+1)+i]+=Data_MulP[j1][l1][i+1][i1];
-	      } else if (ClaOrb[i+1][i1]>=1 && ClaOrb[i+1][i1]<=3){
-		OrbMulP_CcDivision[j1][1][(j-S_knum[myrank])*(atomnum+1)+i]+=Data_MulP[j1][l1][i+1][i1];
-	      } else if (ClaOrb[i+1][i1]>=4 && ClaOrb[i+1][i1]<=8){
-		OrbMulP_CcDivision[j1][2][(j-S_knum[myrank])*(atomnum+1)+i]+=Data_MulP[j1][l1][i+1][i1];
-	      } else if (ClaOrb[i+1][i1]>=9 && ClaOrb[i+1][i1]<=15){
-		OrbMulP_CcDivision[j1][3][(j-S_knum[myrank])*(atomnum+1)+i]+=Data_MulP[j1][l1][i+1][i1];
-	      }
-	      /* ***/
+              /* Added by N. Yamaguchi ***/
+              Orb2MulP_CcDivision[j1][ClaOrb[i+1][i1]][(j-S_knum[myrank])*(atomnum+1)+i]+=Data_MulP[j1][l1][i+1][i1];
+              MulP_CcDivision[j1][(j-S_knum[myrank])*(atomnum+1)+i]+=Data_MulP[j1][l1][i+1][i1];
+              if (ClaOrb[i+1][i1]==0){
+                OrbMulP_CcDivision[j1][0][(j-S_knum[myrank])*(atomnum+1)+i]+=Data_MulP[j1][l1][i+1][i1];
+              } else if (ClaOrb[i+1][i1]>=1 && ClaOrb[i+1][i1]<=3){
+                OrbMulP_CcDivision[j1][1][(j-S_knum[myrank])*(atomnum+1)+i]+=Data_MulP[j1][l1][i+1][i1];
+              } else if (ClaOrb[i+1][i1]>=4 && ClaOrb[i+1][i1]<=8){
+                OrbMulP_CcDivision[j1][2][(j-S_knum[myrank])*(atomnum+1)+i]+=Data_MulP[j1][l1][i+1][i1];
+              } else if (ClaOrb[i+1][i1]>=9 && ClaOrb[i+1][i1]<=15){
+                OrbMulP_CcDivision[j1][3][(j-S_knum[myrank])*(atomnum+1)+i]+=Data_MulP[j1][l1][i+1][i1];
+              }
+              /* ***/
 
-	      /* Added by N. Yamaguchi ***/
-	      if (Spin_Dege){
-		/* ***/
+              /* Added by N. Yamaguchi ***/
+              if (Spin_Dege){
+                /* ***/
 
-		//Spin_Dege
+                //Spin_Dege
 
-		/* Disabled by N. Yamaguchi ***
-		   Orb2MulP_Cc[j1+4][ClaOrb[i+1][i1]][j*(atomnum+1)+i]+= Data_MulP[j1][l2][i+1][i1];
-		   MulP_Cc[j1+4][j*(atomnum+1)+i]+= Data_MulP[j1][l2][i+1][i1];
-		 * ***/
+                /* Disabled by N. Yamaguchi ***
+                   Orb2MulP_Cc[j1+4][ClaOrb[i+1][i1]][j*(atomnum+1)+i]+= Data_MulP[j1][l2][i+1][i1];
+                   MulP_Cc[j1+4][j*(atomnum+1)+i]+= Data_MulP[j1][l2][i+1][i1];
+                 * ***/
 
-		/* Added by N. Yamaguchi ***/
-		Orb2MulP_Cc[j1+4][ClaOrb[i+1][i1]][j*(atomnum+1)+i]+=Data_MulP[j1][l2][i+1][i1];
-		MulP_Cc[j1+4][j*(atomnum+1)+i]+=Data_MulP[j1][l2][i+1][i1];
-		/* ***/
+                /* Added by N. Yamaguchi ***/
+                Orb2MulP_Cc[j1+4][ClaOrb[i+1][i1]][j*(atomnum+1)+i]+=Data_MulP[j1][l2][i+1][i1];
+                MulP_Cc[j1+4][j*(atomnum+1)+i]+=Data_MulP[j1][l2][i+1][i1];
+                /* ***/
 
-		/* Added by N. Yamaguchi ***/
-	      }
-	      /* ***/
+                /* Added by N. Yamaguchi ***/
+              }
+              /* ***/
 
-	    }//for(i1)
-	  }//for(j1)
-	}//for(i)
+            }//for(i1)
+          }//for(j1)
+        }//for(i)
       }//for(j)
       // ### MPI part ##########################################
 
       /* Disabled by N. Yamaguchi ***
-	 for (i=0; i<num_procs; i++){
-	 k = S_knum[i]*n2;
-	 l = abs(E_knum[i]-S_knum[i]+1)*n2;
-	 MPI_Barrier(MPI_COMM_WORLD);
-	 MPI_Bcast(&EIGEN_MP[k], l, MPI_DOUBLE, i, MPI_COMM_WORLD);
-	 }
-	 MPI_Barrier(MPI_COMM_WORLD);
-	 for (i=0; i<num_procs; i++){
-	 k = S_knum[i]*(atomnum+1);
-	 i2 = abs(E_knum[i]-S_knum[i]+1)*(atomnum+1);
-	 MPI_Barrier(MPI_COMM_WORLD);
-	 for (j1=0; j1<8; j1++){
-	 MPI_Bcast(&MulP_Cc[j1][k], i2, MPI_DOUBLE, i, MPI_COMM_WORLD);
-	 for (i1=0; i1 <=ClaOrb_MAX[1]; i1++){
-	 MPI_Bcast(&Orb2MulP_Cc[j1][i1][k], i2, MPI_DOUBLE, i, MPI_COMM_WORLD);
-	 }//for(i1)
-	 }//for(j1)
-	 }//i
-	 for(j=0; j<Data_size; j++){
-	 for (i=0; i<atomnum; i++){
-	 for (i1=0; i1 <=ClaOrb_MAX[0]; i1++){
-	 for (i2=0; i2 <=ClaOrb_MAX[1]; i2++){
-	 if (OrbSym[i1][0] == OrbName[i2][0]){
-	 for (j1=0; j1<8; j1++){
-	 OrbMulP_Cc[j1][i1][j*(atomnum+1)+i]+= Orb2MulP_Cc[j1][i2][j*(atomnum+1)+i];
-	 }//j1
-	 }//if
-	 }//i2
-	 }//i1
-	 }//j
-	 }//i
+         for (i=0; i<num_procs; i++){
+         k = S_knum[i]*n2;
+         l = abs(E_knum[i]-S_knum[i]+1)*n2;
+         MPI_Barrier(MPI_COMM_WORLD);
+         MPI_Bcast(&EIGEN_MP[k], l, MPI_DOUBLE, i, MPI_COMM_WORLD);
+         }
+         MPI_Barrier(MPI_COMM_WORLD);
+         for (i=0; i<num_procs; i++){
+         k = S_knum[i]*(atomnum+1);
+         i2 = abs(E_knum[i]-S_knum[i]+1)*(atomnum+1);
+         MPI_Barrier(MPI_COMM_WORLD);
+         for (j1=0; j1<8; j1++){
+         MPI_Bcast(&MulP_Cc[j1][k], i2, MPI_DOUBLE, i, MPI_COMM_WORLD);
+         for (i1=0; i1 <=ClaOrb_MAX[1]; i1++){
+         MPI_Bcast(&Orb2MulP_Cc[j1][i1][k], i2, MPI_DOUBLE, i, MPI_COMM_WORLD);
+         }//for(i1)
+         }//for(j1)
+         }//i
+         for(j=0; j<Data_size; j++){
+         for (i=0; i<atomnum; i++){
+         for (i1=0; i1 <=ClaOrb_MAX[0]; i1++){
+         for (i2=0; i2 <=ClaOrb_MAX[1]; i2++){
+         if (OrbSym[i1][0] == OrbName[i2][0]){
+         for (j1=0; j1<8; j1++){
+         OrbMulP_Cc[j1][i1][j*(atomnum+1)+i]+= Orb2MulP_Cc[j1][i2][j*(atomnum+1)+i];
+         }//j1
+         }//if
+         }//i2
+         }//i1
+         }//j
+         }//i
        * ***/
 
       /* Added by N. Yamaguchi ***/
-      if (S_knum[i]>=0){
-	k=S_knum[i]*n2;
-	l=numK[i]*n2;
-      } else {
-	k=0;
-	l=0;
+      for (i=0; i<num_procs; i++){
+        if (S_knum[i]>=0){
+          k=S_knum[i]*n2;
+          l=numK[i]*n2;
+        } else {
+          k=0;
+          l=0;
+        }
+        MPI_Bcast(EIGEN_MP+k, l, MPI_DOUBLE, i, MPI_COMM_WORLD);
       }
-      MPI_Bcast(EIGEN_MP+k, l, MPI_DOUBLE, i, MPI_COMM_WORLD);
-      MPI_Barrier(MPI_COMM_WORLD);
       recvCount=(int*)malloc(sizeof(int)*num_procs);
       displs=(int*)malloc(sizeof(int)*num_procs);
       i2=(atomnum+1)*numK[myrank];
       for (j=0; j<num_procs; j++){
-	recvCount[j]=(atomnum+1)*numK[j];
-	displs[j]=S_knum[j]*(atomnum+1);
+        recvCount[j]=(atomnum+1)*numK[j];
+        displs[j]=S_knum[j]*(atomnum+1);
       }
       for (j1=0; j1<sizeMulP; j1++){
-	MPI_Gatherv(MulP_CcDivision[j1], i2, MPI_DOUBLE, MulP_Cc[j1], recvCount, displs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	for (i1=0; i1<=ClaOrb_MAX[0]; i1++){
-	  MPI_Gatherv(OrbMulP_CcDivision[j1][i1], i2, MPI_DOUBLE, OrbMulP_Cc[j1][i1], recvCount, displs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	}
-	for (i1=0; i1<=ClaOrb_MAX[1]; i1++){
-	  MPI_Gatherv(Orb2MulP_CcDivision[j1][i1], i2, MPI_DOUBLE, Orb2MulP_Cc[j1][i1], recvCount, displs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	}
+        MPI_Gatherv(MulP_CcDivision[j1], i2, MPI_DOUBLE, MulP_Cc[j1], recvCount, displs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        for (i1=0; i1<=ClaOrb_MAX[0]; i1++){
+          MPI_Gatherv(OrbMulP_CcDivision[j1][i1], i2, MPI_DOUBLE, OrbMulP_Cc[j1][i1], recvCount, displs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        }
+        for (i1=0; i1<=ClaOrb_MAX[1]; i1++){
+          MPI_Gatherv(Orb2MulP_CcDivision[j1][i1], i2, MPI_DOUBLE, Orb2MulP_Cc[j1][i1], recvCount, displs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        }
       }
-      return 0;
       /* ***/
 
       // #######################################################
       if (myrank == 0){
-	strcpy(fname_MP,fname_out);    strcat(fname_MP,".AtomMulP");
-	fp1= fopen(fname_MP,"w");
+        strcpy(fname_MP,fname_out);    strcat(fname_MP,".AtomMulP");
+        fp1= fopen(fname_MP,"w");
 
-	/* Disabled by N. Yamaguchi ***
-	   fprintf(fp1,"                                      \n");
-	 * ***/
+        /* Disabled by N. Yamaguchi ***
+           fprintf(fp1,"                                      \n");
+         * ***/
 
-	/* Added by N. Yamaguchi ***/
-	fputs("                                    \n", fp1);
-	/* ***/
+        /* Added by N. Yamaguchi ***/
+        fputs("                                    \n", fp1);
+        /* ***/
 
-	fclose(fp1);
+        fclose(fp1);
 
-	/* Added by N. Yamaguchi ***/
-	if (Spin_Dege){
-	  /* ***/
+        /* Added by N. Yamaguchi ***/
+        if (Spin_Dege){
+          /* ***/
 
-	  strcpy(fname_MP,fname_out);    strcat(fname_MP,".AtomMulP_Dege");
-	  fp1= fopen(fname_MP,"w");
+          strcpy(fname_MP,fname_out);    strcat(fname_MP,".AtomMulP_Dege");
+          fp1= fopen(fname_MP,"w");
 
-	  /* Disabled by N. Yamaguchi ***
-	     fprintf(fp1,"                                      \n");
-	   * ***/
+          /* Disabled by N. Yamaguchi ***
+             fprintf(fp1,"                                      \n");
+           * ***/
 
-	  /* Added by N. Yamaguchi ***/
-	  fputs("                                    \n", fp1);
-	  /* ***/
+          /* Added by N. Yamaguchi ***/
+          fputs("                                    \n", fp1);
+          /* ***/
 
-	  fclose(fp1);
+          fclose(fp1);
 
-	  /* Added by N. Yamaguchi ***/
-	}
-	/* ***/
+          /* Added by N. Yamaguchi ***/
+        }
+        /* ***/
 
-	// #############
-	for (i1=0; i1 <=ClaOrb_MAX[0]; i1++){
-	  strcpy(fname_MP,fname_out);     strcat(fname_MP,".MulP_");      strcat(fname_MP,OrbSym[i1]);
-	  fp1= fopen(fname_MP,"w");
-	  fprintf(fp1,"                                    \n");
-	  fclose(fp1);
-	}//i1
-	for (i1=1; i1 <=ClaOrb_MAX[1]; i1++){
-	  strcpy(fname_MP,fname_out);     strcat(fname_MP,".MulP_");     strcat(fname_MP,OrbName[i1]);
-	  fp1= fopen(fname_MP,"w");
-	  fprintf(fp1,"                                    \n");
-	  fclose(fp1);
-	}//i1
-	// ###################################################
-	strcpy(fname_MP,fname_out);  strcat(fname_MP,".AtomMulP");
-	fp1= fopen(fname_MP,"a");
-	for(j=0; j<Data_size; j++){
-	  Print_kxyzEig(Pdata_s, k_xyz_Cc[0][j], k_xyz_Cc[1][j], k_xyz_Cc[2][j], NBand_Cc[j], EIGEN_MP[j*n2+NBand_Cc[j]]);
-	  fprintf(fp1, "%s", Pdata_s);
-	  for (i=0; i<atomnum; i++){
-	    fprintf(fp1,"%10.6lf %10.6lf ", MulP_Cc[0][j*(atomnum+1)+i], MulP_Cc[1][j*(atomnum+1)+i]);
-	    fprintf(fp1,"%10.6lf %10.6lf ", MulP_Cc[2][j*(atomnum+1)+i], MulP_Cc[3][j*(atomnum+1)+i]);
-	  } fprintf(fp1,"\n");
-	}//j
-	fclose(fp1);
-	// ###################################################
+        // #############
+        for (i1=0; i1 <=ClaOrb_MAX[0]; i1++){
+          strcpy(fname_MP,fname_out);     strcat(fname_MP,".MulP_");      strcat(fname_MP,OrbSym[i1]);
+          fp1= fopen(fname_MP,"w");
+          fprintf(fp1,"                                    \n");
+          fclose(fp1);
+        }//i1
+        for (i1=1; i1 <=ClaOrb_MAX[1]; i1++){
+          strcpy(fname_MP,fname_out);     strcat(fname_MP,".MulP_");     strcat(fname_MP,OrbName[i1]);
+          fp1= fopen(fname_MP,"w");
+          fprintf(fp1,"                                    \n");
+          fclose(fp1);
+        }//i1
+        // ###################################################
+        strcpy(fname_MP,fname_out);  strcat(fname_MP,".AtomMulP");
+        fp1= fopen(fname_MP,"a");
+        for(j=0; j<Data_size; j++){
+          Print_kxyzEig(Pdata_s, k_xyz_Cc[0][j], k_xyz_Cc[1][j], k_xyz_Cc[2][j], NBand_Cc[j], EIGEN_MP[j*n2+NBand_Cc[j]]);
+          fprintf(fp1, "%s", Pdata_s);
+          for (i=0; i<atomnum; i++){
+            fprintf(fp1,"%10.6lf %10.6lf ", MulP_Cc[0][j*(atomnum+1)+i], MulP_Cc[1][j*(atomnum+1)+i]);
+            fprintf(fp1,"%10.6lf %10.6lf ", MulP_Cc[2][j*(atomnum+1)+i], MulP_Cc[3][j*(atomnum+1)+i]);
+          } fprintf(fp1,"\n");
+        }//j
+        fclose(fp1);
+        // ###################################################
 
-	/* Added by N. Yamaguchi ***/
-	if (Spin_Dege){
-	  strcpy(fname_MP,fname_out);  strcat(fname_MP,".AtomMulP_Dege");
-	  fp1= fopen(fname_MP,"a");
-	  for(j=0; j<Data_size; j++){
-	    if     (NBand_Cc[j]%2==1) {l2 = NBand_Cc[j] +1;}
-	    else if(NBand_Cc[j]%2==0) {l2 = NBand_Cc[j] -1;}
-	    else {}
-	    Print_kxyzEig(Pdata_s, k_xyz_Cc[0][j], k_xyz_Cc[1][j], k_xyz_Cc[2][j], l2, EIGEN_MP[j*n2+l2] );
-	    fprintf(fp1, "%s", Pdata_s);
-	    for (i=0; i<atomnum; i++){
-	      fprintf(fp1,"%10.6lf %10.6lf ", MulP_Cc[4][j*(atomnum+1)+i], MulP_Cc[5][j*(atomnum+1)+i]);
-	      fprintf(fp1,"%10.6lf %10.6lf ", MulP_Cc[6][j*(atomnum+1)+i], MulP_Cc[7][j*(atomnum+1)+i]);
-	    } fprintf(fp1,"\n");
-	  }//j
-	  fclose(fp1);
+        /* Added by N. Yamaguchi ***/
+        if (Spin_Dege){
+          strcpy(fname_MP,fname_out);  strcat(fname_MP,".AtomMulP_Dege");
+          fp1= fopen(fname_MP,"a");
+          for(j=0; j<Data_size; j++){
+            if     (NBand_Cc[j]%2==1) {l2 = NBand_Cc[j] +1;}
+            else if(NBand_Cc[j]%2==0) {l2 = NBand_Cc[j] -1;}
+            else {}
+            Print_kxyzEig(Pdata_s, k_xyz_Cc[0][j], k_xyz_Cc[1][j], k_xyz_Cc[2][j], l2, EIGEN_MP[j*n2+l2] );
+            fprintf(fp1, "%s", Pdata_s);
+            for (i=0; i<atomnum; i++){
+              fprintf(fp1,"%10.6lf %10.6lf ", MulP_Cc[4][j*(atomnum+1)+i], MulP_Cc[5][j*(atomnum+1)+i]);
+              fprintf(fp1,"%10.6lf %10.6lf ", MulP_Cc[6][j*(atomnum+1)+i], MulP_Cc[7][j*(atomnum+1)+i]);
+            } fprintf(fp1,"\n");
+          }//j
+          fclose(fp1);
 
-	  /* Added by N. Yamaguchi ***/
-	}
-	/* ***/
+          /* Added by N. Yamaguchi ***/
+        }
+        /* ***/
 
-	// ###################################################
-	for (i1=0; i1 <=ClaOrb_MAX[0]; i1++){
-	  strcpy(fname_MP,fname_out);  strcat(fname_MP,".MulP_");  strcat(fname_MP,OrbSym[i1]);
-	  fp1= fopen(fname_MP,"a");
-	  for(j=0; j<Data_size; j++){
-	    Print_kxyzEig(Pdata_s, k_xyz_Cc[0][j], k_xyz_Cc[1][j], k_xyz_Cc[2][j], NBand_Cc[j], EIGEN_MP[j*n2+NBand_Cc[j]]);
-	    fprintf(fp1, "%s", Pdata_s);
-	    for (i=0; i<atomnum; i++){
-	      fprintf(fp1,"%10.6lf %10.6lf ", OrbMulP_Cc[0][i1][j*(atomnum+1)+i], OrbMulP_Cc[1][i1][j*(atomnum+1)+i]);
-	      fprintf(fp1,"%10.6lf %10.6lf ", OrbMulP_Cc[2][i1][j*(atomnum+1)+i], OrbMulP_Cc[3][i1][j*(atomnum+1)+i]);
-	    } fprintf(fp1,"\n");
-	  }//j
-	  fclose(fp1);
-	}//i1
-	// ###################################################
-	for (i1=1; i1 <=ClaOrb_MAX[1]; i1++){
-	  strcpy(fname_MP,fname_out);  strcat(fname_MP,".MulP_");  strcat(fname_MP,OrbName[i1]);
-	  fp1= fopen(fname_MP,"a");
-	  for(j=0; j<Data_size; j++){
-	    Print_kxyzEig(Pdata_s, k_xyz_Cc[0][j], k_xyz_Cc[1][j], k_xyz_Cc[2][j], NBand_Cc[j], EIGEN_MP[j*n2+NBand_Cc[j]]);
-	    fprintf(fp1, "%s", Pdata_s);
-	    for (i=0; i<atomnum; i++){
-	      fprintf(fp1,"%10.6lf %10.6lf ", Orb2MulP_Cc[0][i1][j*(atomnum+1)+i], Orb2MulP_Cc[1][i1][j*(atomnum+1)+i]);
-	      fprintf(fp1,"%10.6lf %10.6lf ", Orb2MulP_Cc[2][i1][j*(atomnum+1)+i], Orb2MulP_Cc[3][i1][j*(atomnum+1)+i]);
-	    } fprintf(fp1,"\n");
-	  }//j
-	  fclose(fp1);
-	}//i1
-	// ###################################################
+        // ###################################################
+        for (i1=0; i1 <=ClaOrb_MAX[0]; i1++){
+          strcpy(fname_MP,fname_out);  strcat(fname_MP,".MulP_");  strcat(fname_MP,OrbSym[i1]);
+          fp1= fopen(fname_MP,"a");
+          for(j=0; j<Data_size; j++){
+            Print_kxyzEig(Pdata_s, k_xyz_Cc[0][j], k_xyz_Cc[1][j], k_xyz_Cc[2][j], NBand_Cc[j], EIGEN_MP[j*n2+NBand_Cc[j]]);
+            fprintf(fp1, "%s", Pdata_s);
+            for (i=0; i<atomnum; i++){
+              fprintf(fp1,"%10.6lf %10.6lf ", OrbMulP_Cc[0][i1][j*(atomnum+1)+i], OrbMulP_Cc[1][i1][j*(atomnum+1)+i]);
+              fprintf(fp1,"%10.6lf %10.6lf ", OrbMulP_Cc[2][i1][j*(atomnum+1)+i], OrbMulP_Cc[3][i1][j*(atomnum+1)+i]);
+            } fprintf(fp1,"\n");
+          }//j
+          fclose(fp1);
+        }//i1
+        // ###################################################
+        for (i1=1; i1 <=ClaOrb_MAX[1]; i1++){
+          strcpy(fname_MP,fname_out);  strcat(fname_MP,".MulP_");  strcat(fname_MP,OrbName[i1]);
+          fp1= fopen(fname_MP,"a");
+          for(j=0; j<Data_size; j++){
+            Print_kxyzEig(Pdata_s, k_xyz_Cc[0][j], k_xyz_Cc[1][j], k_xyz_Cc[2][j], NBand_Cc[j], EIGEN_MP[j*n2+NBand_Cc[j]]);
+            fprintf(fp1, "%s", Pdata_s);
+            for (i=0; i<atomnum; i++){
+              fprintf(fp1,"%10.6lf %10.6lf ", Orb2MulP_Cc[0][i1][j*(atomnum+1)+i], Orb2MulP_Cc[1][i1][j*(atomnum+1)+i]);
+              fprintf(fp1,"%10.6lf %10.6lf ", Orb2MulP_Cc[2][i1][j*(atomnum+1)+i], Orb2MulP_Cc[3][i1][j*(atomnum+1)+i]);
+            } fprintf(fp1,"\n");
+          }//j
+          fclose(fp1);
+        }//i1
+        // ###################################################
 
       }//if(myrank)
       // #######################################################
-      //      if (myrank == 0){      
+      //      if (myrank == 0){
       //        for(j=0; j<Data_size; j++){
       //          Print_kxyzEig(Pdata_s, k_xyz_Cc[0][j], k_xyz_Cc[1][j], k_xyz_Cc[2][j], NBand_Cc[j], EIGEN_MP[j*n2 + NBand_Cc[j]]);
       //          printf("%s\n", Pdata_s);
       //        }
       //      }//if (myrank)
       // #####################################################
-      if (myrank == 0){      
-	//### atomnum & data_size ###
-	strcpy(fname_MP,fname_out);     strcat(fname_MP,".AtomMulP");
-	fp1= fopen(fname_MP,"r+");
-	fseek(fp1, 0L, SEEK_SET);
-	fprintf(fp1,"%6d %4d", Data_size, atomnum);
-	fclose(fp1);
+      if (myrank == 0){
+        //### atomnum & data_size ###
+        strcpy(fname_MP,fname_out);     strcat(fname_MP,".AtomMulP");
+        fp1= fopen(fname_MP,"r+");
+        fseek(fp1, 0L, SEEK_SET);
+        fprintf(fp1,"%6d %4d", Data_size, atomnum);
+        fclose(fp1);
 
-	/* Added by N. Yamaguchi ***/
-	if (Spin_Dege){
-	  /* ***/
+        /* Added by N. Yamaguchi ***/
+        if (Spin_Dege){
+          /* ***/
 
-	  strcpy(fname_MP,fname_out);     strcat(fname_MP,".AtomMulP_Dege");
-	  fp1= fopen(fname_MP,"r+");
-	  fseek(fp1, 0L, SEEK_SET);
-	  fprintf(fp1,"%6d %4d", Data_size, atomnum);
-	  fclose(fp1);
+          strcpy(fname_MP,fname_out);     strcat(fname_MP,".AtomMulP_Dege");
+          fp1= fopen(fname_MP,"r+");
+          fseek(fp1, 0L, SEEK_SET);
+          fprintf(fp1,"%6d %4d", Data_size, atomnum);
+          fclose(fp1);
 
-	  /* Added by N. Yamaguchi ***/
-	}
-	/* ***/
+          /* Added by N. Yamaguchi ***/
+        }
+        /* ***/
 
-	//###########################
-	for (i1=0; i1 <=ClaOrb_MAX[0]; i1++){
-	  strcpy(fname_MP,fname_out);    strcat(fname_MP,".MulP_");    strcat(fname_MP,OrbSym[i1]);
-	  fp1= fopen(fname_MP,"r+");
-	  fseek(fp1, 0L, SEEK_SET);
-	  fprintf(fp1,"%6d %4d", Data_size, atomnum);
-	  fclose(fp1);
-	}//i1
-	for (i1=1; i1 <=ClaOrb_MAX[1]; i1++){
-	  strcpy(fname_MP,fname_out);    strcat(fname_MP,".MulP_");    strcat(fname_MP,OrbName[i1]);
-	  fp1= fopen(fname_MP,"r+");
-	  fseek(fp1, 0L, SEEK_SET);
-	  fprintf(fp1,"%6d %4d", Data_size, atomnum);
-	  fclose(fp1);
-	}//i1
+        //###########################
+        for (i1=0; i1 <=ClaOrb_MAX[0]; i1++){
+          strcpy(fname_MP,fname_out);    strcat(fname_MP,".MulP_");    strcat(fname_MP,OrbSym[i1]);
+          fp1= fopen(fname_MP,"r+");
+          fseek(fp1, 0L, SEEK_SET);
+          fprintf(fp1,"%6d %4d", Data_size, atomnum);
+          fclose(fp1);
+        }//i1
+        for (i1=1; i1 <=ClaOrb_MAX[1]; i1++){
+          strcpy(fname_MP,fname_out);    strcat(fname_MP,".MulP_");    strcat(fname_MP,OrbName[i1]);
+          fp1= fopen(fname_MP,"r+");
+          fseek(fp1, 0L, SEEK_SET);
+          fprintf(fp1,"%6d %4d", Data_size, atomnum);
+          fclose(fp1);
+        }//i1
       }//if(myrank)
       // #######################################################
       for(i=0; i<3; i++){
-	free(k_xyz_Cc[i]);
+        free(k_xyz_Cc[i]);
       } free(k_xyz_Cc);
       free(NBand_Cc);
       free(EIGEN_MP);
 
       /* Disabled by N. Yamaguchi ***
-	 for (i=0; i<8; i++){
-	 free(MulP_Cc[i]);
-	 } free(MulP_Cc);
-	 for (i=0; i<8; i++){
-	 for (j=0; j<=ClaOrb_MAX[0]; j++){
-	 free(OrbMulP_Cc[i][j]);
-	 } free(OrbMulP_Cc[i]);
-	 } free(OrbMulP_Cc);
-	 for (i=0; i<8; i++){
-	 for (j=0; j<=ClaOrb_MAX[1]; j++){
-	 free(Orb2MulP_Cc[i][j]);
-	 } free(Orb2MulP_Cc[i]);
-	 } free(Orb2MulP_Cc);
+         for (i=0; i<8; i++){
+         free(MulP_Cc[i]);
+         } free(MulP_Cc);
+         for (i=0; i<8; i++){
+         for (j=0; j<=ClaOrb_MAX[0]; j++){
+         free(OrbMulP_Cc[i][j]);
+         } free(OrbMulP_Cc[i]);
+         } free(OrbMulP_Cc);
+         for (i=0; i<8; i++){
+         for (j=0; j<=ClaOrb_MAX[1]; j++){
+         free(Orb2MulP_Cc[i][j]);
+         } free(Orb2MulP_Cc[i]);
+         } free(Orb2MulP_Cc);
        * ***/
 
       /* Added by N. Yamaguchi ***/
       for (i=0; i<sizeMulP; i++){
-	if (myrank==0){
-	  free(MulP_Cc[i]);
-	}
+        if (myrank==0){
+          free(MulP_Cc[i]);
+        }
       } free(MulP_Cc);
       for (i=0; i<sizeMulP; i++){
-	for (j=0; j<=ClaOrb_MAX[0]; j++){
-	  if (myrank==0){
-	    free(OrbMulP_Cc[i][j]);
-	  }
-	} free(OrbMulP_Cc[i]);
+        for (j=0; j<=ClaOrb_MAX[0]; j++){
+          if (myrank==0){
+            free(OrbMulP_Cc[i][j]);
+          }
+        } free(OrbMulP_Cc[i]);
       } free(OrbMulP_Cc);
       for (i=0; i<sizeMulP; i++){
-	for (j=0; j<=ClaOrb_MAX[1]; j++){
-	  if (myrank==0){
-	    free(Orb2MulP_Cc[i][j]);
-	  }
-	} free(Orb2MulP_Cc[i]);
+        for (j=0; j<=ClaOrb_MAX[1]; j++){
+          if (myrank==0){
+            free(Orb2MulP_Cc[i][j]);
+          }
+        } free(Orb2MulP_Cc[i]);
       } free(Orb2MulP_Cc);
       for (i=0; i<sizeMulP; i++){
-	if (numK[myrank]>0){
-	  free(MulP_CcDivision[i]);
-	}
+        if (numK[myrank]>0){
+          free(MulP_CcDivision[i]);
+        }
       } free(MulP_CcDivision);
       for (i=0; i<sizeMulP; i++){
-	for (j=0; j<=ClaOrb_MAX[0]; j++){
-	  if (numK[myrank]>0){
-	    free(OrbMulP_CcDivision[i][j]);
-	  }
-	} free(OrbMulP_CcDivision[i]);
+        for (j=0; j<=ClaOrb_MAX[0]; j++){
+          if (numK[myrank]>0){
+            free(OrbMulP_CcDivision[i][j]);
+          }
+        } free(OrbMulP_CcDivision[i]);
       } free(OrbMulP_CcDivision);
       for (i=0; i<sizeMulP; i++){
-	for (j=0; j<=ClaOrb_MAX[1]; j++){
-	  if (numK[myrank]>0){
-	    free(Orb2MulP_CcDivision[i][j]);
-	  }
-	} free(Orb2MulP_CcDivision[i]);
+        for (j=0; j<=ClaOrb_MAX[1]; j++){
+          if (numK[myrank]>0){
+            free(Orb2MulP_CcDivision[i][j]);
+          }
+        } free(Orb2MulP_CcDivision[i]);
       } free(Orb2MulP_CcDivision);
       /* ***/
 
@@ -854,9 +854,9 @@ int main(int argc, char *argv[])
      * ***/
     for (i=0; i<4; i++){
       for (l=0; l<l_cal; l++){
-	for (j=0; j<=atomnum; j++){
-	  free(Data_MulP[i][l][j]);
-	} free(Data_MulP[i][l]);
+        for (j=0; j<=atomnum; j++){
+          free(Data_MulP[i][l][j]);
+        } free(Data_MulP[i][l]);
       } free(Data_MulP[i]);
     } free(Data_MulP);
 

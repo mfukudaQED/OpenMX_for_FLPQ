@@ -17,7 +17,6 @@
 
 void ReLU_inverse(int n, double **a, double **ia)
 {
-
   static int i,j,k;
   static double w;
   static double *x,*y;

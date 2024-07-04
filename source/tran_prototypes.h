@@ -28,7 +28,7 @@ typedef struct { double r,i; } dcomplex;
 #endif
 
 #ifndef Shift_K_Point
-#define Shift_K_Point    1.0e-6      /* disturbance for stabilization of eigenvalue routine */
+#define Shift_K_Point    1.0e-8      /* disturbance for stabilization of eigenvalue routine */
 #endif
 
 

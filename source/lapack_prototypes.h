@@ -19,6 +19,9 @@ typedef struct { double r,i; } dcomplex;
 #define ___dcomplex_definition___ 
 #endif
 
+
+typedef logical (*L_fp)();
+
 void zhegv_(INTEGER *itype, char *jobz, char *uplo,
             INTEGER *n, dcomplex *a, INTEGER *lda,
             dcomplex *b, INTEGER *ldb,
@@ -106,7 +109,7 @@ int dgemm_(char *transa, char *transb, int *m, int *n, int *k,
 	   int *ldc);
 
 void zgemm_(char* TRANSA, char* TRANSB, int * M, int * N,int *K, dcomplex *alpha, 
-         dcomplex *A, int *LDA, dcomplex *B, int*LDB, dcomplex *beta, dcomplex *C, int *LDC);
+            dcomplex *A, int *LDA, dcomplex *B, int*LDB, dcomplex *beta, dcomplex *C, int *LDC);
 void zgetrf_(int *m, int *n, dcomplex *a,int *lda,int *ipvt, int *info );
 void zgetri_(int *n,dcomplex *a,int *lda, int *ipvt, dcomplex *work, int *lwork, int *info);
 int zcopy_(int *n, dcomplex *zx, int *incx, dcomplex *zy, int *incy);
@@ -132,6 +135,13 @@ void dggevx_(char *balanc, char *jobvl, char *jobvr, char *sense,
 
 void dsytrd_(char *uplo, INTEGER *n, double *a, INTEGER *lda, double *d__, double *e, 
              double *tau, double *work, INTEGER *lwork, INTEGER *info);
+
+int dgeesx_( char *jobvs, char *sort, L_fp select, char *sense, 
+             INTEGER *n, double *a, INTEGER *lda, INTEGER *sdim,
+             double *wr, double *wi, double *vs, INTEGER *ldvs,
+             double *rconde, double *rcondv, double *work, INTEGER *lwork, 
+             INTEGER *iwork, INTEGER *liwork, logical *bwork, INTEGER *info);
+
 
 
 typedef enum {CblasRowMajor=101, CblasColMajor=102} CBLAS_ORDER;
@@ -184,3 +194,51 @@ void DGEMM(const char *transa, const char *transb, const MKL_INT *m, const MKL_I
 void dgemm(const char *transa, const char *transb, const MKL_INT *m, const MKL_INT *n, const MKL_INT *k,
            const double *alpha, const double *a, const MKL_INT *lda, const double *b, const MKL_INT *ldb,
            const double *beta, double *c, const MKL_INT *ldc);
+
+
+void pdgemm( char *TRANSA, char *TRANSB,
+             int * M, int * N, int * K,
+             double * ALPHA,
+             double * A, int * IA, int * JA, int * DESCA,
+             double * B, int * IB, int * JB, int * DESCB,
+             double * BETA,
+             double * C, int * IC, int * JC, int * DESCC );
+
+void pdgemm_( char *TRANSA, char *TRANSB,
+              int * M, int * N, int * K,
+              double * ALPHA,
+              double * A, int * IA, int * JA, int * DESCA,
+              double * B, int * IB, int * JB, int * DESCB,
+              double * BETA,
+              double * C, int * IC, int * JC, int * DESCC );
+
+void pzgemm_( char *TRANSA, char *TRANSB,
+              int *M, int *N, int *K, 
+              dcomplex *alpha, dcomplex *s, int *ONE1, int *ONE2,
+              int descH[9], dcomplex *Ss, int *ONE3, int *ONE4,
+              int descS[9], dcomplex *beta, dcomplex *Cs, int *ONE5, int *ONE6, int descC[9]);
+
+void pdgesvd_( char *jobu, char *jobvt, int *m, int *n,
+	       double *A, int *ia, int *ja, int *descA,
+	       double *s,
+	       double *U, int *iu, int *ju, int *descU,
+	       double *VT, int *ivt, int *jvt, int *descVT,
+	       double *work, int *lwork, int *info);
+
+void pzgesvd_(char *jobu , char *jobvt , int *m , int *n ,
+	      dcomplex *a , int *ia , int *ja , int *desca ,
+	      double *s , dcomplex *u , int *iu , int *ju ,
+	      int *descu , dcomplex *vt , int *ivt , int *jvt ,
+	      int *descvt , dcomplex *work , int *lwork ,
+	      double *rwork , int *info );
+
+void Cblacs_barrier (int, char *);
+
+int numroc_( int *n, int *nb, int *iproc, int *isrcproc, int *nprocs);
+int Csys2blacs_handle(MPI_Comm comm);
+int Cblacs_gridinit( int* context, char * order, int np_row, int np_col); 
+void descinit_( int *desc, int *m, int *n, int *mb, int *nb, int *irsrc, int *icsrc,
+                int *ictxt, int *lld, int *info);
+void Cfree_blacs_system_handle(int ISysCtxt);
+void Cblacs_gridexit( int context);
+

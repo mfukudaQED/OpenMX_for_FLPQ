@@ -15,7 +15,6 @@
 #include "mpi.h"
 
 
-
 void Make_Comm_Worlds(
    MPI_Comm MPI_Curret_Comm_WD,   
    int myid0,
@@ -224,6 +223,35 @@ void Make_Comm_Worlds2(
 }
 
 
+void Make_Comm_Worlds3(
+   MPI_Comm MPI_Curret_Comm_WD,   
+   int myid0,
+   int numprocs0,
+   int new_numprocs0,
+   MPI_Comm *MPI_New_Comm_WD )
+{
+  int i;
+  int *new_ranks; 
+  MPI_Group new_group,old_group; 
 
+  if (numprocs0<new_numprocs0){
+    if (myid0==0){
+      printf("In Make_Comm_Worlds3, the required procs exceeds the current procs.\n");
+    }
+    MPI_Finalize();
+    exit(0);
+  }
+
+  new_ranks = (int*)malloc(sizeof(int)*new_numprocs0);
+  for (i=0; i<new_numprocs0; i++) new_ranks[i] = i;
+
+  MPI_Comm_group(MPI_Curret_Comm_WD, &old_group);
+
+  /* define a new group */
+  MPI_Group_incl(old_group,new_numprocs0,new_ranks,&new_group);
+  MPI_Comm_create(MPI_Curret_Comm_WD,new_group,MPI_New_Comm_WD);
+  MPI_Group_free(&new_group);
+  free(new_ranks); /* never forget cleaning! */
+}
 
 

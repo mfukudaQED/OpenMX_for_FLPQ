@@ -26,6 +26,13 @@
 #define  measure_time  0
 
 
+void solve_evp_complex_( int *n2, int *MaxN, dcomplex *Hs2, int *na_rows2_1, double *a, dcomplex *Cs2, int *na_rows2_2, 
+                         int *nblk2, int *mpi_comm_rows_int, int *mpi_comm_cols_int );
+
+void elpa_solve_evp_complex_2stage_double_impl_( int *n2, int *MaxN, dcomplex *Hs2, int *na_rows2_1, double *a, dcomplex *Cs2, 
+                                                 int *na_rows2_2, int *nblk2, int *na_cols2, 
+                                                 int *mpi_comm_rows_int, int *mpi_comm_cols_int, int *mpiworld );
+
 static void Construct_Band_Ms( int cpx_flag, double ****Mat, double *M1, double *M2, dcomplex *Ms, 
                                int *MP, double k1, double k2, double k3);
 

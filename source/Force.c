@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
+#include <string.h>
 #include "openmx_common.h"
 #include "mpi.h"
 #include <omp.h>
@@ -2801,83 +2802,84 @@ void Force3()
       time1 += current_time - last_time;
       last_time = current_time;
 
-      double sumx1 = 0.0;
-      double sumy1 = 0.0;
-      double sumz1 = 0.0;
-
-      int h_AN;
-      for (h_AN = 0; h_AN <= FNAN[Gc_AN]; h_AN++) {
-
-	int Gh_AN = natn[Gc_AN][h_AN];
-	int Mh_AN = F_G2M[Gh_AN];
-	int Rnh = ncn[Gc_AN][h_AN];
-	int Hwan = WhatSpecies[Gh_AN];
-	int NO1 = Spe_Total_CNO[Hwan];
-
-	int Nog;
-
-	for (Nog = 0; Nog<NumOLG[Mc_AN][h_AN]; Nog++) {
-
-	  int Nc = GListTAtoms1[Mc_AN][h_AN][Nog];
-	  int Nh = GListTAtoms2[Mc_AN][h_AN][Nog];
-
-	  double** const ai_dorbs0 = dChi0[Nc];
-
-	  /* set orbs1 */
-
-	  if (G2ID[Gh_AN] == myid) {
-	    int j;
-	    for (j = 0; j<NO1; j++) {
-	      orbs1[j] = Orbs_Grid[Mh_AN][Nh][j];
-	    }
-	  } else {
-	    int j;
-	    for (j = 0; j<NO1; j++) {
-	      orbs1[j] = Orbs_Grid_FNAN[Mc_AN][h_AN][Nog][j];
-	    }
-	  }
-
-	  int spin;
-	  for (spin = 0; spin <= SpinP_switch; spin++) {
-
-	    double tmpx = 0.0;
-	    double tmpy = 0.0;
-	    double tmpz = 0.0;
-
-	    int i;
-	    for (i = 0; i<NO0; i++) {
-	      double tmp0 = 0.0;
-	      int j;
-	      for (j = 0; j<NO1; j++) {
-		tmp0 += orbs1[j] * DM[0][spin][Mc_AN][h_AN][i][j];
-	      }
-
-	      tmpx += ai_dorbs0[i][0] * tmp0;
-	      tmpy += ai_dorbs0[i][1] * tmp0;
-	      tmpz += ai_dorbs0[i][2] * tmp0;
-	    }
-
-	    /* due to difference in the definition between density matrix and density */
-	    double Vpt = Vpot_grid[spin][Nc];
-	    sumx1 += tmpx * Vpt;
-	    sumy1 += tmpy * Vpt;
-	    sumz1 += tmpz * Vpt;
-
-	  } /* spin */
-	} /* Nog */
-
-      } /* h_AN, here omp barrier is called implicitly because of end of for loop  */
-
-      /***********************************
-                  calc force #3
-      ***********************************/
-
 #pragma omp master
       {
+	double sumx1 = 0.0;
+	double sumy1 = 0.0;
+	double sumz1 = 0.0;
+
+	int h_AN;
+	for (h_AN = 0; h_AN <= FNAN[Gc_AN]; h_AN++) {
+
+	  int Gh_AN = natn[Gc_AN][h_AN];
+	  int Mh_AN = F_G2M[Gh_AN];
+	  int Rnh = ncn[Gc_AN][h_AN];
+	  int Hwan = WhatSpecies[Gh_AN];
+	  int NO1 = Spe_Total_CNO[Hwan];
+
+	  int Nog;
+
+	  for (Nog = 0; Nog<NumOLG[Mc_AN][h_AN]; Nog++) {
+
+	    int Nc = GListTAtoms1[Mc_AN][h_AN][Nog];
+	    int Nh = GListTAtoms2[Mc_AN][h_AN][Nog];
+
+	    double** const ai_dorbs0 = dChi0[Nc];
+
+	    /* set orbs1 */
+
+	    if (G2ID[Gh_AN] == myid) {
+	      int j;
+	      for (j = 0; j<NO1; j++) {
+		orbs1[j] = Orbs_Grid[Mh_AN][Nh][j];
+	      }
+	    } else {
+	      int j;
+	      for (j = 0; j<NO1; j++) {
+		orbs1[j] = Orbs_Grid_FNAN[Mc_AN][h_AN][Nog][j];
+	      }
+	    }
+
+	    int spin;
+	    for (spin = 0; spin <= SpinP_switch; spin++) {
+
+	      double tmpx = 0.0;
+	      double tmpy = 0.0;
+	      double tmpz = 0.0;
+
+	      int i;
+	      for (i = 0; i<NO0; i++) {
+		double tmp0 = 0.0;
+		int j;
+		for (j = 0; j<NO1; j++) {
+		  tmp0 += orbs1[j] * DM[0][spin][Mc_AN][h_AN][i][j];
+		}
+
+		tmpx += ai_dorbs0[i][0] * tmp0;
+		tmpy += ai_dorbs0[i][1] * tmp0;
+		tmpz += ai_dorbs0[i][2] * tmp0;
+	      }
+
+	      /* due to difference in the definition between density matrix and density */
+	      double Vpt = Vpot_grid[spin][Nc];
+	      sumx1 += tmpx * Vpt;
+	      sumy1 += tmpy * Vpt;
+	      sumz1 += tmpz * Vpt;
+
+	    } /* spin */
+	  } /* Nog */
+
+	} /* h_AN, here omp barrier is called implicitly because of end of for loop  */
+
+	/***********************************
+                  calc force #3
+	***********************************/
+
 	Gxyz[Gc_AN][17] += sumx1*GridVol;
 	Gxyz[Gc_AN][18] += sumy1*GridVol;
 	Gxyz[Gc_AN][19] += sumz1*GridVol;
-      }
+
+      } /* end of #pragma omp master */
 
       dtime(&current_time);
       time2 += current_time - last_time;
@@ -9042,7 +9044,7 @@ void dHCH(int where_flag,
 
   /* set penalty */
 
-  penalty_value = penalty_value_CoreHole;
+  penalty_value = base_core_hole_penalty_value - core_hole_state_ev;
 
   penalty = (double**)malloc(sizeof(double*)*2);
   for (i=0; i<2; i++){

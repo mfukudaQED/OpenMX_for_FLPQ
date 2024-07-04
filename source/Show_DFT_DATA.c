@@ -145,7 +145,7 @@ void Show_DFT_DATA(char *argv[])
 
     /* read Definition.of.Atomic.Species */
 
-    if (fp=input_find("<Definition.of.Atomic.Species")) {
+    if ( (fp=input_find("<Definition.of.Atomic.Species")) != NULL ) {
 
       for (k=0; k<SpeciesNum; k++){
         fscanf(fp,"%s %s %s",SN[k],SB[k],SV[k]);

@@ -16,9 +16,9 @@
 #include <math.h>
 #include <time.h>
 #include <complex.h>
+#include "mpi.h"
 #include "openmx_common.h"
 #include "lapack_prototypes.h"
-#include "mpi.h"
 #include <omp.h>
 
 #define  measure_time       0
@@ -1019,9 +1019,9 @@ static void Bisection_System(
               if (fabs(n1-n0)<=diff_n) then, update parameters
       **********************************************************/
 
-      if (fabs(n1-n0)<=diff_n){
+      if (abs(n1-n0)<=diff_n){
 
-	diff_n = fabs(n1-n0);
+	diff_n = abs(n1-n0);
 	OG_min0 = OG_min;
 	OG_max0 = OG_max;
 	nmin0 = nmin;
@@ -1069,9 +1069,9 @@ static void Bisection_System(
      set up OG2G
   **********************************************************/
 
-  abc_mag[1] = fabs(abc_n0[1]-abc_n1[1])+abc_nb[1];
-  abc_mag[2] = fabs(abc_n0[2]-abc_n1[2])+abc_nb[2];
-  abc_mag[3] = fabs(abc_n0[3]-abc_n1[3])+abc_nb[3];
+  abc_mag[1] = abs(abc_n0[1]-abc_n1[1])+abc_nb[1];
+  abc_mag[2] = abs(abc_n0[2]-abc_n1[2])+abc_nb[2];
+  abc_mag[3] = abs(abc_n0[3]-abc_n1[3])+abc_nb[3];
 
   /*
   printf("abc_mag[1]=%2d\n",abc_mag[1]);

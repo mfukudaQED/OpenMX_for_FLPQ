@@ -15,14 +15,16 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-#include "openmx_common.h"
 #include "mpi.h"
+#include "openmx_common.h"
+#include "lapack_prototypes.h"
 #include <omp.h>
 #include <complex.h>
 
 #define  measure_time   0
 
 
+int Lapack_LU_Zinverse(int , dcomplex *);
 
 static void EGAC_Col(char *mode,
 		     int SCF_iter,

@@ -22,12 +22,12 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include "mpi.h"
 #include "openmx_common.h"
 #include "lapack_prototypes.h"
-#include "mpi.h"
 
 
-#define Criterion_Max_Step            0.20
+#define Criterion_Max_Step            0.50
 
  
 static void NoMD(int iter);
@@ -604,7 +604,7 @@ void VerletXYZ(int iter)
 
           /* r( t+dt ) */
           Gxyz[Gc_AN][20+j] = Gxyz[Gc_AN][j];
- 	  Gxyz[Gc_AN][j] =  Gxyz[Gc_AN][j] + Gxyz[Gc_AN][26+j]*dt;
+ 	  Gxyz[Gc_AN][j] = Gxyz[Gc_AN][j] + Gxyz[Gc_AN][26+j]*dt;
 
 	}
       }
@@ -1784,19 +1784,19 @@ void Cell_Opt_RF(int iter)
 	  sum += Gxyz[iatom][16+j]*tv[i][j];
 	}
 
-        if (atom_Fixed_XYZ[iatom][i]==1){
+	if (atom_Fixed_XYZ[iatom][i]==1){
 	  Gxyz[iatom][13+i] = 0.0;
-        }
-        else{
-    	  Gxyz[iatom][13+i] = sum;
+	}
+	else{
+	  Gxyz[iatom][13+i] = sum;
 	}
       }
 
       /* add Cell_Gxyz and dE_dq */
 
       for (k=1; k<=3; k++) {
-        GxyzHistoryIn[0][iatom][k] = Cell_Gxyz[iatom][k];
-        GxyzHistoryR[0][iatom][k]  = Gxyz[iatom][13+k];
+	GxyzHistoryIn[0][iatom][k] = Cell_Gxyz[iatom][k];
+	GxyzHistoryR[0][iatom][k]  = Gxyz[iatom][13+k];
       }
     }
 
@@ -4443,6 +4443,10 @@ void RFC5(int iter, int iter0, double dE_da[4][4], double itv[4][4])
 
 
 
+
+
+
+
 void GDIIS_BFGS(int iter, int iter0)
 {
   /* 1au=2.4189*10^-2 fs, 1fs=41.341105 au */
@@ -6693,7 +6697,7 @@ void NVT_VS4(int iter)
   if(iter!=1) {
 
   for (k=1; k<=num_AtGr; k++){
-      AtomGr_Scale[k] = 1.0;
+    AtomGr_Scale[k] = 1.0;
   }
 
     for (i=1; i<=TempNum; i++) {

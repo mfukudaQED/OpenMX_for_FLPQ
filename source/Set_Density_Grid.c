@@ -1246,7 +1246,7 @@ void Density_Grid_Copy_B2D(double **Density_Grid_B0)
     }
   }
 
-  /* if (SpinP_switch==0), copy Density_Grid to Density_Grid? */
+  /* if (SpinP_switch==0), copy Density_Grid[0] to Density_Grid[1] */
 
   if (SpinP_switch==0){
     for (BN=0; BN<My_NumGridB_AB; BN++){
@@ -1294,17 +1294,6 @@ void diagonalize_nc_density(double **Density_Grid_B0)
       Im12 = Density_Grid_B0[3][BN];
 
       EulerAngle_Spin( 1, Re11, Re22, Re12, Im12, Re12, -Im12, Nup, Ndown, theta, phi );
-
-      /*
-      if (    1.0e-7<fabs(Re11-Nup[0]) 
-	   || 1.0e-7<fabs(Re22-Ndown[0])
-	   || 1.0e-7<fabs(Re12-theta[0])
-	   || 1.0e-7<fabs(Im12-phi[0]) ){
-
-        printf("ZZZ1 BN=%2d Re11=%15.12f Re22=%15.12f Re12=%15.12f Im12=%15.12f\n",BN,Re11,Re22,Re12,Im12);
-        printf("ZZZ2 BN=%2d Nup =%15.12f Ndn =%15.12f thet=%15.12f phi =%15.12f\n",BN,Nup[0],Ndown[0],theta[0],phi[0]);
-      }
-      */
 
       Density_Grid_B0[0][BN] = Nup[0];
       Density_Grid_B0[1][BN] = Ndown[0];

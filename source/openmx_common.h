@@ -1,5 +1,8 @@
-static char Version_OpenMX[30] = "3.9.8"; /* version of OpenMX */ 
-   
+static char Version_OpenMX[30] = "3.9.23"; /* version of OpenMX */ 
+#ifdef LEAK_DETECT
+#include "leakdetect.h"
+#endif
+
 #define PI              3.1415926535897932384626
 #define BYTESIZE        8                        /* Don't change!! */
 #define kB              0.00008617251324000000   /* eV/K           */          
@@ -57,14 +60,10 @@ static char Version_OpenMX[30] = "3.9.8"; /* version of OpenMX */
 
 #define Threshold_OLP_Eigen  1.0e-9  /* threshold for cutting off eigenvalues of OLP */
 #define fp_bsize         2097152     /* buffer size for setvbuf */
-#define Shift_K_Point    1.0e-6     /* disturbance for stabilization of eigenvalue routine */
+#define Shift_K_Point    1.0e-8      /* disturbance for stabilization of eigenvalue routine */
 
 #define LAPACK_ABSTOL     6.0e-15    /* absolute error tolerance for lapack routines */
-
-#define penalty_value_CoreHole   100    /* penalty value for creation of core hole */
-
 #define Host_ID             0        /* ID of the host CPU in MPI */
-
 
 typedef float     Type_DS_VNA;          /* type of DS_VNA */
 #define MPI_Type_DS_VNA  MPI_FLOAT      /* type of DS_VNA */
@@ -96,7 +95,7 @@ static int fundamentalNum[4]={2,3,5,7};
 #ifdef nompi
 
 #ifndef ___MPI_Comm_definition___
-typedef int MPI_Comm;
+typedef struct ompi_communicator_t *MPI_Comm;
 #define ___MPI_Comm_definition___ 
 #endif
 
@@ -1352,6 +1351,128 @@ double ***LNO_pops;
 int *LNO_Num;
 
 /*******************************************************
+ int ***CWF_Guiding_AO;
+  the specification of guiding AOs for CWF
+  size: CWF_Guiding_AO[SpeciesNum][Spe_MaxL_Basis[i]+1][Spe_MaxL_Basis[i]+1]
+  allocation: allocate in Allocation_Arrays.c
+  free:       Free_Arrays(0) in openmx.c
+*******************************************************/
+int ***CWF_Guiding_AO;
+
+/*******************************************************
+ int *CWF_Num_predefined;
+  the number of CWF for each element that user defines
+  size: CWF_Num_predefined[SpeciesNum]
+  allocation: Allocate_Arrays.c
+  free:       Free_Arrays.c
+*******************************************************/
+int *CWF_Num_predefined;
+
+/*******************************************************
+ int *CWF_file_Atoms;
+  atoms for which CWFs are output in the cube format.
+  size: CWF_file_Atoms[CWF_fileout_Num]
+  allocation: Input_std.c
+  free:       Free_Arrays(0) in openmx.c
+*******************************************************/
+int *CWF_file_Atoms;
+
+/*******************************************************
+ int *CWF_file_MOs;
+  groups for which CWFs are output in the cube format.
+  size: CWF_file_MOs[CWF_fileout_Num]
+  allocation: Input_std.c
+  free:       Free_Arrays(0) in openmx.c
+*******************************************************/
+int *CWF_file_MOs;
+
+/*******************************************************
+ int **CWF_MO_Selection;
+  index of MOs to be selected as the guiding functions
+  for CWFs in case of MO. 
+  size: CWF_MO_Selection[Num_CWF_Grouped_Atoms][num]
+  allocation: Input_std.c
+  free:       Free_Arrays(0) in openmx.c
+*******************************************************/
+int **CWF_MO_Selection;
+
+/*******************************************************
+ double *******CWF_Coef;
+  LNO_WF coefficients w.r.t. PAOs for generation of cube files 
+  size: CWF_Coef[(SpinP_switch+1)]
+                 [CWF_fileout_Num]
+                 [CWF_Num_predefined[wan1]]
+                 [2*CWF_Plot_SuperCells[0]+1]
+                 [2*CWF_Plot_SuperCells[1]+1]
+                 [2*CWF_Plot_SuperCells[2]+1]
+                 [n] 
+  allocation: SetPara_DFT.c
+  free:       Free_Arrays(0) in openmx.c
+*******************************************************/
+double *******CWF_Coef;
+
+/*******************************************************
+ int **CWF_Grouped_Atoms;
+  The global index of atoms belonging to each group
+  size: CWF_Grouped_Atoms[Num_CWF_Grouped_Atoms]
+                         [CWF_Grouped_Atoms_EachNum[i]]
+  allocation: Input_std.c
+  free:       Free_Arrays(0) in openmx.c
+*******************************************************/
+int **CWF_Grouped_Atoms;
+
+/*******************************************************
+ int *CWF_Grouped_Atoms_EachNum;
+  The number of atoms included in each grouped atoms.
+  size: CWF_Grouped_Atoms_EachNum[Num_CWF_Grouped_Atoms]
+  allocation: Input_std.c
+  free:       Free_Arrays(0) in openmx.c
+*******************************************************/
+int *CWF_Grouped_Atoms_EachNum;
+
+/*******************************************************
+ int *Num_CWF_MOs_Group;
+  The number of MOs for each group, which are used as 
+  guiding MOs for the CWF calculation.
+  size: Num_CWF_MOs_Group[Num_CWF_Grouped_Atoms]
+  allocation: Input_std.c
+  free:       Free_Arrays(0) in openmx.c
+*******************************************************/
+int *Num_CWF_MOs_Group;
+
+/*******************************************************
+ double ***CWF_Guiding_MOs;
+  The energy range and a threshold which are used for 
+  size: CWF_Guiding_MOs[Num_CWF_Grouped_Atoms]
+                       [Num_CWF_MOs_Group[gidx][spin]]
+                       [dim]
+  allocation: Cluster_DFT_Col_CWF.c
+  free:       Free_Arrays(0) in openmx.c
+*******************************************************/
+double ***CWF_Guiding_MOs;
+
+/*******************************************************
+ double **CWF_Charge;
+  Charges calculated by closest Wannier functions (CWFs) 
+  size: CWF_Charge[spinsize]
+                  [TNum_CWFs]
+  allocation: Input_std.c
+  free:       Free_Arrays(0) in openmx.c
+*******************************************************/
+double **CWF_Charge;
+
+/*******************************************************
+ double **CWF_Energy;
+  Decomposed band energies calculated by closest Wannier 
+  functions (CWFs) 
+  size: CWF_Energy[spinsize]
+                  [TNum_CWFs]
+  allocation: Input_std.c
+  free:       Free_Arrays(0) in openmx.c
+*******************************************************/
+double **CWF_Energy;
+
+/*******************************************************
  double *****H0;
   matrix elements of basis orbitals for T+VNL
   size: H0[4]
@@ -1900,7 +2021,7 @@ double *****EDM;
 double *****PDM;
 
 /*******************************************************
- double *****iDM;
+ double ******iDM;
   imaginary density matrix
   size: iDM[List_YOUSO[16]]
            [2]
@@ -2518,7 +2639,41 @@ int *empty_occupation_spin;
 *******************************************************/
 int *empty_occupation_orbital;
 
+/*******************************************************
+ double ***QAO_coes;
+  storing QAO coefficients in Cluter_DFT_Col_CWF.c 
+  size: QAO_coes[SpinP_switch+1][atomnum+1]
+        [Spe_Total_CNO[wan1]*LNOs_Num_predefined[wan1]]
+  allocation: in Cluter_DFT_Col_CWF.c
+  free:       in Cluter_DFT_Col_CWF.c
+*******************************************************/
+double ***QAO_coes;
 
+/*******************************************************
+ double ***LNAO1_pops;
+  storing LNAO populations in
+  Cluter_DFT_Col_CWF.c 
+  or
+  Band_DFT_Col_CWF.c.  
+  size: LNAO1_coes[SpinP_switch+1][Matomnum+1]
+        [LNOs_Num_predefined[wan1]]
+  allocation: in Cluter_DFT_Col_CWF.c
+  free:       in Cluter_DFT_Col_CWF.c
+*******************************************************/
+double ***LNAO1_pops;
+
+/*******************************************************
+ double **QAO2_coes;
+  storing QAO2 coefficients in Cluter_DFT_NonCol_CWF.c 
+  size: QAO2_coes[Matomnum+1]
+        [4*Spe_Total_CNO[wan1]*LNOs_Num_predefined[wan1]]
+  allocation: in Cluter_DFT_NonCol_CWF.c
+  free:       in Cluter_DFT_NonCol_CWF.c
+*******************************************************/
+dcomplex **QAO2_coes;
+
+double *pre_spin_moment; // S. An 
+double *****H_XMCD;      // S. An 
 dcomplex *zp,*Ep,*Rp;
 double GL_Abscissae[GL_Mesh+2],GL_Weight[GL_Mesh+2];
 double FineGL_Abscissae[FineGL_Mesh+2],FineGL_Weight[FineGL_Mesh+2];
@@ -2542,7 +2697,7 @@ double dipole_moment[4][4];
 double TempPara[30][3],PrePara[30][3];
 double MD_TimeStep,ChemP,Beta;
 double CN_Error,E_Temp,Original_E_Temp,FCR,BCR,LNO_Occ_Cutoff,orderN_LNO_Buffer;
-double GP,GT,T,Weight,Cell_Volume,Uele,Uele2,Ukc,Uvdw,Uch;
+double GP,GT,T,Weight,Cell_Volume,Uele,Uele0,Uele1,Ukc,Uvdw,Uch,UH_dc,Uxc0_dc,Uxc1_dc;
 double Uele_OS0,Uele_OS1,Uele_IS0,Uele_IS1,Uxc0,Uxc1;
 double UH0,UH1,UH2,Ucore,Uhub,Ucs,Uef,Ukin,Unl,Una,Uzs,Uzo,UvdW;
 double Ucc,Ucoh,Uatom,Udc,Utot,Uxc,Given_Total_Charge,Calc_Total_Charge;
@@ -2591,9 +2746,10 @@ int GB_switch;
 double q1_GB,q2_GB,q3_GB;
 
 int NUMPROCS_MPI_COMM_WORLD,MYID_MPI_COMM_WORLD;
-int alloc_first[40],Last_TNumGrid;
+int alloc_first[50],Last_TNumGrid;
 int Scf_RestartFromFile,Band_disp_switch,Use_of_Collinear_Restart;
-int GeoOpt_RestartFromFile,OutData_bin_flag,LNO_flag,LNOs_Num_predefined_flag;
+int GeoOpt_RestartFromFile,OutData_bin_flag;
+int LNO_flag,LNOs_Num_predefined_flag;
 int coordinates_unit,unitvector_unit;
 int Size_Total_Matrix,SP_PEV,EKC_core_size_max;
 int specified_system,MO_fileout,num_HOMOs,num_LUMOs;
@@ -2621,7 +2777,7 @@ int POLES,rlmax,Solver,dste_flag,Ngrid_fixed_flag,scf_eigen_lib_flag;
 int KrylovH_order,KrylovS_order,recalc_EM,EKC_invS_flag;
 int EC_Sub_Dim,Energy_Decomposition_flag;
 int EKC_Exact_invS_flag,EKC_expand_core_flag,orderN_FNAN_SNAN_flag;
-int MD_switch,PeriodicGamma_flag;
+int MD_switch,PeriodicGamma_flag,Exc0_correction_flag;
 int Max_FNAN,Max_FSNAN,Max_GridN_Atom,Max_NumOLG,Max_OneD_Grids;
 int Max_Nd,Max_TGN_EH0,CellNN_flag;
 int NN_B_AB2CA_S,NN_B_AB2CA_R,NN_B_CA2CB_S,NN_B_CA2CB_R;
@@ -2645,7 +2801,7 @@ int NEB_Num_Images,neb_type_switch;
 double NEB_Spring_Const;
 int Min_Grid_Index[4],Max_Grid_Index[4];
 int Min_Grid_Index_D[4],Max_Grid_Index_D[4];
-int SO_factor_flag;
+int SO_factor_flag,Num_Leb_Grid;
 int Cell_Fixed_XYZ[4][4];
 int empty_occupation_flag,empty_occupation_num;
 int empty_states_flag,empty_states_atom;
@@ -2668,12 +2824,30 @@ int F_dVHart_flag,F_Vxc_flag,F_VNA_flag;
 int F_VEF_flag,F_Kin_flag,F_NL_flag,F_CH_flag,F_U_flag;
 int F_dftD_flag; /* okuno */
 
+/* Closest Wannier Functions */
+int CWF_fileout_flag,CWF_fileout_Num,CWF_unoccupied_factor,CWF_Dis_vs_H;
+int TNum_CWFs,CWF_Kgrid1,CWF_Kgrid2,CWF_Kgrid3,CWF_Plot_SuperCells[3];
+int CWF_Calc,Num_CWF_Grouped_Atoms,CWF_Guiding_Orbital,CWF_Energy_Decomposition;
+int *CWF_Grouped_Atoms_EachNum,**CWF_Grouped_Atoms;
+double CWF_disentangling_smearing_kBT0,CWF_disentangling_smearing_kBT1;
+double CWF_disentangling_smearing_bound;
+double CWF_disentangling_Erange[2];
+
+/* COHP */
+int COHP_calc_flag,COHP_num_pairs;
+int *COHP_AtomA,*COHP_AtomB,*COHP_CellB1,*COHP_CellB2,*COHP_CellB3;
+
+/* LNAO and LNBO */
+int LNAO_calc_flag,LNAO_num,*LNAO_Atoms;
+double ***LNAO_coes,***LNAO_pops,***LNAO_H;
+int LNBO_calc_flag,LNBO_num,**LNBO_Atoms;
+double ***LNBO_coes,***LNBO_pops,***LNBO_H;
 
 /* calculation with a core hole state */
 int core_hole_state_flag,Core_Hole_Atom;
 int Core_Hole_J,scf_coulomb_cutoff,scf_coulomb_cutoff_CoreHole;
 char Core_Hole_Orbital[40];
-double Shortest_CellVec;
+double base_core_hole_penalty_value,core_hole_state_ev,Shortest_CellVec;
 
 /* XANES */
 char xanes_gs_file[YOUSO10];
@@ -2682,6 +2856,7 @@ int xanes_calc;
 int HOMO_XANES[2];
 double ChemP_XANES[2];
 double xanes_energy_range;
+int xmcd_calc; // S. An 
 
 /* partial charge for STM simulation */
 int cal_partial_charge;
@@ -2710,6 +2885,7 @@ double E_Field[3];
 int ON2_Npoles,ON2_Npoles_f;
 dcomplex *ON2_zp,*ON2_Rp,*ON2_zp_f,*ON2_Rp_f;
 int *ON2_method,*ON2_method_f;
+
 
 /* EGAC method */
 
@@ -2786,6 +2962,15 @@ double ***Wannier_Projector_Hybridize_Matrix;
 int Wannier90_fileout;
 /*-------------------------------------------------------------Wannier*/
 
+/* The efficient exchange operator method */
+
+int Nrank_Rec_Coulomb,Ng1_Rec_Coulomb; 
+double xmin_Rec_Coulomb,xmax_Rec_Coulomb,Yukawa_Exponent_Rec_Coulomb;
+double *SVals_Rec_Coulomb,**SVecs_Rec_Coulomb,*xgrid_Rec_Coulomb;
+
+
+
+
 void Show_DFT_DATA(char *argv[]);
 void Maketest(char *mode, int argc, char *argv[]);
 void Runtest(char *mode, int argc, char *argv[]);
@@ -2846,11 +3031,9 @@ void Data_Grid_Copy_B2C_2(double **data_B, double **data_C);
 void Density_Grid_Copy_B2D(double **Density_Grid_B0);
 double Set_Initial_DM(double *****CDM, double *****H);
 double Mulliken_Charge( char *mode );
-double LNO(char *mode,
-           int SCF_iter,
-           double ****OLP0,
-           double *****Hks,
-           double *****CDM);
+double LNO(char *mode, int SCF_iter, double ****OLP0, double *****Hks, double *****CDM);
+double Calc_LNAO( double ****OLP0, double *****Hks, double *****CDM);
+double Calc_LNBO( double ****OLP0, double *****Hks, double *****CDM);
 
 /* added by MJ */
 void Occupation_Number_LDA_U(int SCF_iter, int SucceedReadingDMfile, double dUele, double ECE[], char *mode);
@@ -2937,6 +3120,7 @@ void DIIS_Mixing_Rhok(int SCF_iter,
  
 void Overlap_Cluster(double ****OLP, double **S,int *MP);
 void Overlap_Cluster_Ss(double ****OLP0, double *Ss, int *MP, int myworld1);
+void Overlap_Cluster_LNO_Ss(double ****OLP0, double *Ss, int *MP, int spin, int myworld1);
 
 void Set_ContMat_Cluster_LNO(double ****OLP0, double *****nh, double ***S, double ***H, int *MP);
 
@@ -2990,6 +3174,8 @@ void Cont_Matrix1(double ****Mat, double ****CMat);
 void Cont_Matrix2(Type_DS_VNA ****Mat, Type_DS_VNA ****CMat);
 void Cont_Matrix3(double ****Mat, double ****CMat);
 void Cont_Matrix4(double ****Mat, double ****CMat);
+
+double Calc_polarization();
 
 /* hmweng */
 void Generate_Wannier();
@@ -3114,6 +3300,7 @@ double Stress(double *****H0,
 double Set_OLP_Kin(double *****OLP, double *****H0);
 double Set_Nonlocal(double *****HNL, double ******DS_NL);
 double Set_CoreHoleMatrix(double *****HCH);
+double Set_XMCD_penalty(int mode,double *pre_spin_moment,int SCF_iter);  // S. An 
 double Set_OLP_p(double *****OLP_p);
 
 double Set_ProExpn_VNA(double ****HVNA, double *****HVNA2, Type_DS_VNA *****DS_VNA);
@@ -3140,7 +3327,7 @@ void Set_XC_NL1_Grid(int SCF_iter, int XC_P_switch, int XC_switch,
 
 double Pot_NeutralAtom(int ct_AN, double Gx, double Gy, double Gz);
 double XC_Ceperly_Alder(double den, int P_switch);
-void XC_CA_LSDA(int SCF_iter, double den0, double den1, double XC[2],int P_switch);
+void XC_CA_LSDA(int SCF_iter, double den0, double den1, double XC[2], double X[2], double C[2], int P_switch);
 void XC_PW92C(int SCF_iter, double dens[2], double Ec[1], double Vc[2]);
 void XC_PBE(int SCF_iter, double dens[2], double GDENS[3][2], double Exc[2],
             double DEXDD[2], double DECDD[2],
@@ -3216,6 +3403,7 @@ double readfile(char *argv[]);
 void Input_std(char *filename);
 
 double truncation(int MD_iter, int UCell_flag);
+double truncation_FEF(int MD_iter, int UCell_flag);
 double DFT(int MD_iter, int Cnt_Now);
 
 double Cluster_DFT_Col(
@@ -3238,6 +3426,39 @@ double Cluster_DFT_Col(
 		   int *is2,
 		   int *ie2,
 		   double *Ss,
+		   double *Cs,
+		   double *Hs,
+		   double *CDM1,
+		   double *EDM1,
+		   double *PDM1,
+		   int size_H1,
+                   int *SP_NZeros,
+                   int *SP_Atoms,
+                   double **EVec1,
+                   double *Work1);
+
+double Cluster_DFT_Col_LNO(
+                   char *mode,
+                   int SCF_iter,
+                   int SpinP_switch,
+		   int n,
+		   int TNum_LNOs,
+                   double **ko,
+                   double *****nh, 
+                   double ****CntOLP,
+                   double *****CDM,
+                   double *****EDM,
+                   double Eele0[2], double Eele1[2],
+		   int myworld1,
+		   int *NPROCS_ID1,
+		   int *Comm_World1,
+		   int *NPROCS_WD1,
+		   int *Comm_World_StartID1,
+		   MPI_Comm *MPI_CommWD1,
+                   int *MP,
+		   int *is2,
+		   int *ie2,
+		   double **Ss_LNO,
 		   double *Cs,
 		   double *Hs,
 		   double *CDM1,
@@ -3425,6 +3646,156 @@ double Band_DFT_NonCol(
 		    int *Comm_World_StartID2,
 		    MPI_Comm *MPI_CommWD2);
 
+double Band_DFT_NonCol_CWF(
+                    int SCF_iter,
+                    int knum_i, int knum_j, int knum_k,
+		    int SpinP_switch,
+		    double *****nh,
+		    double *****ImNL,
+		    double ****CntOLP,
+		    double *****CDM,
+		    double *****EDM,
+		    double Eele0[2], double Eele1[2], 
+		    int *MP,
+		    int *order_GA,
+		    double *ko,
+		    double *koS,
+		    double ***EIGEN,
+		    double *H1,   
+		    double *S1,
+		    dcomplex *rHs11,   
+		    dcomplex *rHs22,   
+		    dcomplex *rHs12,   
+		    dcomplex *iHs11,   
+		    dcomplex *iHs22,   
+		    dcomplex *iHs12, 
+		    dcomplex **EVec1,
+		    dcomplex *Ss,
+		    dcomplex *Cs,
+                    dcomplex *Hs,
+		    dcomplex *Ss2,
+		    dcomplex *Cs2,
+                    dcomplex *Hs2,
+		    int ***k_op,
+		    int *T_k_op,
+		    int **T_k_ID,
+		    double *T_KGrids1,
+		    double *T_KGrids2,
+		    double *T_KGrids3,
+                    int myworld1,
+		    int *NPROCS_ID1,
+		    int *Comm_World1,
+		    int *NPROCS_WD1,
+		    int *Comm_World_StartID1,
+		    MPI_Comm *MPI_CommWD1,
+                    int myworld2,
+		    int *NPROCS_ID2,
+		    int *NPROCS_WD2,
+		    int *Comm_World2,
+		    int *Comm_World_StartID2,
+		    MPI_Comm *MPI_CommWD2,
+                    int nkpath, int *n_perk, 
+                    double ***kpath, char ***kname);
+
+double Band_DFT_Col_CWF(
+                    int SCF_iter,
+                    int knum_i, int knum_j, int knum_k,
+		    int SpinP_switch,
+		    double *****nh,
+		    double *****ImNL,
+		    double ****CntOLP,
+		    double *****CDM,
+		    double *****EDM,
+		    double Eele0[2], double Eele1[2], 
+		    int *MP,
+		    int *order_GA,
+		    double *ko,
+		    double *koS,
+		    double *H1,   
+		    double *S1,   
+		    double *CDM1,  
+		    double *EDM1,
+		    dcomplex **EVec1,
+		    dcomplex *Ss,
+		    dcomplex *Cs,
+                    dcomplex *Hs,
+                    int myworld1,
+		    int *NPROCS_ID1,
+		    int *Comm_World1,
+		    int *NPROCS_WD1,
+		    int *Comm_World_StartID1,
+		    MPI_Comm *MPI_CommWD1,
+                    int myworld2,
+		    int *NPROCS_ID2,
+		    int *NPROCS_WD2,
+		    int *Comm_World2,
+		    int *Comm_World_StartID2,
+		    MPI_Comm *MPI_CommWD2,
+                    int nkpath, int *n_perk, 
+                    double ***kpath, char ***kname);
+
+
+double Cluster_DFT_Col_CWF(
+                   int SCF_iter,
+                   int SpinP_switch,
+                   double **ko,
+                   double *****nh, 
+                   double ****CntOLP,
+                   double *****CDM,
+                   double *****EDM,
+                   double Eele0[2], double Eele1[2],
+		   int myworld1,
+		   int *NPROCS_ID1,
+		   int *Comm_World1,
+		   int *NPROCS_WD1,
+		   int *Comm_World_StartID1,
+		   MPI_Comm *MPI_CommWD1,
+                   int *MP,
+		   int *is2,
+		   int *ie2,
+		   double *Ss,
+		   double *Cs,
+		   double *Hs,
+		   double *CDM1,
+		   double *EDM1,
+		   double *PDM1,
+		   int size_H1,
+                   int *SP_NZeros,
+                   int *SP_Atoms,
+                   double **EVec1,
+                   double *Work1);
+
+
+double Cluster_DFT_NonCol_CWF(
+                   int SCF_iter,
+                   int SpinP_switch,
+                   double *ko,
+                   double *****nh,
+                   double *****ImNL,
+                   double ****CntOLP,
+                   double *****CDM,
+                   double *****EDM,
+                   double Eele0[2], double Eele1[2],
+                   int *MP,
+		   int *is2,
+		   int *ie2,
+		   double *Ss,
+		   double *Cs,
+		   double *rHs11,
+		   double *rHs12,
+		   double *rHs22,
+		   double *iHs11,
+		   double *iHs12,
+		   double *iHs22,
+                   dcomplex *Ss2,
+                   dcomplex *Hs2,
+                   dcomplex *Cs2,
+		   double *DM1,
+		   int size_H1, 
+                   dcomplex *EVec1,
+                   double *Work1);
+
+
 
 /*
   For generalized Bloch Theorem 
@@ -3473,11 +3844,11 @@ double Band_DFT_Dosout( int knum_i, int knum_j, int knum_k,
                         double *****ImNL,
                         double ****CntOLP );
 
-void Unfolding_Bands( int nkpoint, double **kpoint,
-		      int SpinP_switch, 
-		      double *****nh,
-		      double *****ImNL,
-		      double ****CntOLP);
+void Unfolding_Bands(
+		     int SpinP_switch, 
+		     double *****nh,
+		     double *****ImNL,
+		     double ****CntOLP);
 
 double MD_pac(int iter, char *fname_input);
 void Calc_Temp_Atoms(int iter);
@@ -3548,17 +3919,20 @@ void Init_List_YOUSO();
 void Allocate_Arrays(int wherefrom);
 void Free_Arrays(int dokokara);
 double OutData(char *inputfile);
-double OutData_Binary(char *inputfile);
 void init_alloc_first();
 int File_CntCoes(char *mode);
 void SCF2File(char *mode, char *inputfile);
 void Determine_Cell_from_ECutoff(double tv[4][4], double ECut);
+
+/*
 #ifdef kcomp
 void Spherical_Bessel( double x, int lmax, double *sb, double *dsb );
 #else
 inline void Spherical_Bessel( double x, int lmax, double *sb, double *dsb ) ;
 #endif
+*/
 
+void Spherical_Bessel( double x, int lmax, double *sb, double *dsb );
 
 void Generating_MP_Special_Kpt(/* input */
                                int atomnum,
@@ -3599,6 +3973,14 @@ void Make_Comm_Worlds2(
    int *Comm_World1,         /* size: numprocs0 */
    int *NPROCS1_WD           /* size: Num_Comm_World */
 		       );
+
+
+void Make_Comm_Worlds3(
+   MPI_Comm MPI_Curret_Comm_WD,   
+   int myid0,
+   int numprocs0,
+   int new_numprocs0,
+   MPI_Comm *MPI_New_Comm_WD );
 
 
  
@@ -3650,6 +4032,10 @@ dcomplex Cexp(dcomplex a);
 
 double FermiFunc(double x, int spin, int orb, int *index, double *popn);
 double FermiFunc_NC(double x, int orb);
+void Set_Lebedev_Grid(int Np, double **Leb_Grid_XYZW);
+
+void Vecs_Rec_Coulomb_Cubic_Hermite(double x, double y, double z, double *vecs);
+void Vecs_Rec_Coulomb_Tricubic(double x, double y, double z, double *vecs);
 
 void PrintMemory_Fix();
 void PrintMemory(char *name, long int size0, char *mode);
@@ -4358,8 +4744,12 @@ int unfold_Nkpoint;
 int unfold_nkpts;
 double **unfold_kpoint;
 char **unfold_kpoint_name;
+int UnfoldBand_path_flag;/* added by Fukuda 20231230 */
+int UnfoldBand_Nkpath;/* added by Fukuda 20231230 */
+int *UnfoldBand_N_perpath;/* added by Fukuda 20231230 */
+double ***UnfoldBand_kpath;/* added by Fukuda 20231230 */
+char ***UnfoldBand_kname; /* added by Fukuda 20231230 */
 /* end unfolding */
-
 
 /* scalapack */
 
@@ -4375,6 +4765,36 @@ int nblk2,np_rows2,np_cols2,na_rows2,na_cols2,na_rows_max2,na_cols_max2;
 int my_prow2,my_pcol2;
 int bhandle1_2,bhandle2_2,ictxt1_2,ictxt2_2;
 int descS2[9],descH2[9],descC2[9];
+
+/* CWF1: TNum_CWFs x TNum_CWFs used in Cluster_DFT_Col_CWF.c and Band_DFT_Col_CWF.c */
+int nblk_CWF1,np_rows_CWF1,np_cols_CWF1,na_rows_CWF1,na_cols_CWF1,na_rows_max_CWF1,na_cols_max_CWF1;
+int my_prow_CWF1,my_pcol_CWF1;
+int bhandle1_CWF1,bhandle2_CWF1,ictxt1_CWF1,ictxt2_CWF1;
+int desc_CWF1[9];
+
+/* CWF2: n x TNum_CWFs used in Cluster_DFT_Col_CWF.c and Band_DFT_Col_CWF.c */
+int nblk_CWF2,np_rows_CWF2,np_cols_CWF2,na_rows_CWF2,na_cols_CWF2,na_rows_max_CWF2,na_cols_max_CWF2;
+int my_prow_CWF2,my_pcol_CWF2;
+int bhandle1_CWF2,bhandle2_CWF2,ictxt1_CWF2,ictxt2_CWF2;
+int desc_CWF2[9];
+
+/* CWF3: MaxN x TNum_CWFs used in Cluster_DFT_Col_CWF.c and Band_DFT_Col_CWF.c */
+int nblk_CWF3,np_rows_CWF3,np_cols_CWF3,na_rows_CWF3,na_cols_CWF3,na_rows_max_CWF3,na_cols_max_CWF3;
+int my_prow_CWF3,my_pcol_CWF3;
+int bhandle1_CWF3,bhandle2_CWF3,ictxt1_CWF3,ictxt2_CWF3;
+int desc_CWF3[9];
+
+/* CWF4: n x MaxN used in Cluster_DFT_Col_CWF.c and Band_DFT_Col_CWF.c */
+int nblk_CWF4,np_rows_CWF4,np_cols_CWF4,na_rows_CWF4,na_cols_CWF4,na_rows_max_CWF4,na_cols_max_CWF4;
+int my_prow_CWF4,my_pcol_CWF4;
+int bhandle1_CWF4,bhandle2_CWF4,ictxt1_CWF4,ictxt2_CWF4;
+int desc_CWF4[9];
+
+/* CWF5: TNum_CWFs x TNum_CWFs used for the calculation of band dispersion in Band_DFT_Col_CWF.c */
+int nblk_CWF5,np_rows_CWF5,np_cols_CWF5,na_rows_CWF5,na_cols_CWF5,na_rows_max_CWF5,na_cols_max_CWF5;
+int my_prow_CWF5,my_pcol_CWF5;
+int bhandle1_CWF5,bhandle2_CWF5,ictxt1_CWF5,ictxt2_CWF5;
+int desc_CWF5[9];
 
 
 /* YTL-start */

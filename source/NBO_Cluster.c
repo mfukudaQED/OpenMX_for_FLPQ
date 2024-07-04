@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
+#include "mpi.h"
 #include "openmx_common.h"
 #include "lapack_prototypes.h"
 #include "f77func.h"
@@ -974,7 +975,7 @@ void Calc_NAO_Cluster(double *****CDM){
       }
 
       int SizeMat0;
-      SizeMat0 = 18;
+      SizeMat0 = SizeMat + 1;
 
       if (outputlev==1){
 	printf("### Overlap Matrix (full size) ###\n");fflush(stdout);
@@ -1329,7 +1330,7 @@ void Calc_NAO_Cluster(double *****CDM){
 	}
       }
 
-      SizeMat0 = 18;
+      SizeMat0 = SizeMat + 1;
 
       if (outputlev==1){
 	printf("### Overlap Matrix (full size) 2 ###\n");fflush(stdout);

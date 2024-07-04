@@ -46,7 +46,6 @@ void TRAN_Set_IntegPath( MPI_Comm comm1,
   else if (TRAN_integration==1){
     OLD(comm1, TRAN_eV2Hartree, kBvalue, Electronic_Temperature); 
   }
-
 }
 
 
@@ -195,10 +194,11 @@ void CF( MPI_Comm comm1, double TRAN_eV2Hartree,
     tran_omega_n_scf = tran_num_poles + 1;
   }
 
+
   /* allocation */
-  tran_omega_scf = (dcomplex*)malloc(sizeof(dcomplex)*tran_omega_n_scf);
-  tran_omega_weight_scf = (dcomplex*)malloc(sizeof(dcomplex)*tran_omega_n_scf);
-  tran_integ_method_scf = (int*)malloc(sizeof(int)*tran_omega_n_scf);
+  tran_omega_scf = (dcomplex*)malloc(sizeof(dcomplex)*(tran_omega_n_scf+10));
+  tran_omega_weight_scf = (dcomplex*)malloc(sizeof(dcomplex)*(tran_omega_n_scf+10));
+  tran_integ_method_scf = (int*)malloc(sizeof(int)*(tran_omega_n_scf+10));
 
   zero_fermi( tran_num_poles, tran_omega_scf, tran_omega_weight_scf ); 
 

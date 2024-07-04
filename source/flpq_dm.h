@@ -163,3 +163,20 @@ double Cluster_DFT_NonCol_DMmu(
                    int size_H1, 
                    dcomplex *EVec1,
                    double *Work1);
+
+double Calc_DMmu_Cluster_non_collinear_ScaLAPACK(
+    int calc_flag,
+    int myid,
+    int numprocs,
+    int size_H1,
+    int *is2,
+    int *ie2,
+    int *MP,
+    int n,
+    int n2,
+    double *****CDM,
+    double *****iDM0,
+    double *ko,
+    double *DM1,
+    double *Work1,
+    dcomplex *EVec1 );

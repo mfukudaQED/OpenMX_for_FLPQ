@@ -9,7 +9,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <complex.h>
-
+#include "mpi.h"
 #include "lapack_prototypes.h"
 #include "read_scfout.h"
 #include "Tools_BandCalc.h"

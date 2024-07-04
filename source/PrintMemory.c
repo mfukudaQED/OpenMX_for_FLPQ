@@ -19,7 +19,6 @@ static void PrintMemory_Output(char *name, long int size0, char *mode);
 
 void PrintMemory(char *name, long int size0, char *mode)
 {
-
   if (memoryusage_fileout){
     PrintMemory_Output(name, size0, mode);
   }

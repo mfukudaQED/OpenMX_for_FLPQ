@@ -12,10 +12,11 @@ Refer to arXiv:1907.08341 for details.
 #include <sys/time.h>
 #include <string.h>
 
+#include "mpi.h"
+#include <omp.h>
 #include "read_scfout.h"
 #include "lapack_prototypes.h"
 #include "f77func.h"
-#include "mpi.h"
 
 #include "jx.h"
 #include "jx_tools.h"

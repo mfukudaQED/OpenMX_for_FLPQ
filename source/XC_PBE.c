@@ -254,19 +254,22 @@ void XC_PBE(int SCF_iter, double dens[2], double GDENS[3][2], double Exc[2],
       DFXDGD[IX][IS] = DS[IS]*Ex_unif[0]*DFDGD;
     }
   }
+  
   Fx = HALF*Fx/dt;
 
   /****************************************************
-                   Set output arguments
+                   set output arguments
   ****************************************************/
 
-  Exc[0] = Fx;
+  double coe = 1.0;
+  
+  Exc[0] = coe*Fx;
   Exc[1] = Fc;
   for (IS=0; IS<=1; IS++){
-    DEXDD[IS] = DFXDD[IS];
+    DEXDD[IS] = coe*DFXDD[IS];
     DECDD[IS] = DFCDD[IS];
     for (IX=0; IX<=2; IX++){
-      DEXDGD[IX][IS] = DFXDGD[IX][IS];
+      DEXDGD[IX][IS] = coe*DFXDGD[IX][IS];
       DECDGD[IX][IS] = DFCDGD[IX][IS];
     } 
   }

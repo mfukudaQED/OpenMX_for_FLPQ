@@ -111,7 +111,7 @@ void TRAN_Input_std_Atoms(  MPI_Comm comm1, int Solver )
 		   &coordinates_unit,2,s_vec,i_vec);
 
   /* center */
-  if (fp=input_find("<Atoms.SpeciesAndCoordinates") ) {
+  if ( (fp=input_find("<Atoms.SpeciesAndCoordinates")) != NULL ) {
     for (i=1; i<=Catomnum; i++){
 
       fgets(buf,MAXBUF,fp);
@@ -237,7 +237,7 @@ void TRAN_Input_std_Atoms(  MPI_Comm comm1, int Solver )
     i_vec[0]=0;  i_vec[1]=1;
     input_string2int("Atoms.UnitVectors.Unit",&unitvector_unit,2,s_vec,i_vec);
 
-    if (fp=input_find("<Atoms.Unitvectors")) {
+    if ( (fp=input_find("<Atoms.Unitvectors")) != NULL ) {
 
       for (i=1; i<=3; i++){
         fscanf(fp,"%lf %lf %lf",&tv[i][1],&tv[i][2],&tv[i][3]);
@@ -264,7 +264,7 @@ void TRAN_Input_std_Atoms(  MPI_Comm comm1, int Solver )
 
     /* left lead */
 
-    if (fp=input_find("<LeftLeadAtoms.SpeciesAndCoordinates") ) {
+    if ( (fp=input_find("<LeftLeadAtoms.SpeciesAndCoordinates")) != NULL ) {
 
       for (i=1; i<=Latomnum; i++){
 
@@ -387,7 +387,7 @@ void TRAN_Input_std_Atoms(  MPI_Comm comm1, int Solver )
 
     /* right */
 
-    if (fp=input_find("<RightLeadAtoms.SpeciesAndCoordinates") ) {
+    if ( (fp=input_find("<RightLeadAtoms.SpeciesAndCoordinates")) != NULL ) {
 
       for (i=1; i<=Ratomnum; i++){
 

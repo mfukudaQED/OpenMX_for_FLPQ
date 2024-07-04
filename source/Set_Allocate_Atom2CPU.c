@@ -112,7 +112,7 @@ void Allocation_Atoms_3D(int MD_iter, int weight_flag)
 
   if (weight_flag==0){
     for (i=1; i<=atomnum; i++){
-      weight[i] = 1.0;
+      weight[i] = 1.0 + 1.0e-6*cos((double)i);;
     }
   }
   else if (weight_flag==1){

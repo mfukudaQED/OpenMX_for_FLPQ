@@ -18,10 +18,9 @@
 #include <sys/types.h>
 #include <sys/times.h>
 #include <sys/time.h> 
-
+#include "mpi.h"
 #include "openmx_common.h"
 #include "lapack_prototypes.h"
-#include "mpi.h"
 #include <omp.h>
  
 
@@ -32,7 +31,7 @@
 #define AU2Mucm    5721.52891433 /* 100 e/bohr/bohr */
 #define BohrR_Wannier    0.529177249              /* Angstrom */
 #define eV2Hartree 27.2113845
-#define smallvalue   1.0e-6 /*smallvalue close to zero*/
+#define smallvalue   1.0e-5 /*smallvalue close to zero*/
 #define BUFFSIZE    2048
 
 #define debug1  0  /* Interpolating */
@@ -45,7 +44,7 @@
 #define debugcg 1
 #define debugdis 0 /* for disentangling */
 #define debugdis_z 0 /* for disentangling */
-#define MIN(a,b) ((a)<(b))?  (a):(b)
+#define MIN(a,b) (((a)<(b))?  (a):(b))
 
 
 struct timeval2 {
@@ -97,7 +96,7 @@ void Udis_projector_frozen(dcomplex ****Uk,int ***Nk,int ***innerNk,int kpt_num,
 void Disentangling_Bands(dcomplex ****Uk, dcomplex *****Mmnkb_zero, int spinsize, int kpt_num, int band_num, int wan_num, int ***Nk, int ***innerNk, double **kg, double **bvector, double *wb, int **kplusb, int tot_bvector, double ***eigen);
 void Getting_Zmatrix(dcomplex **Zmat,int presentk, double *wb,int tot_bvector,dcomplex ****Mmnkb, dcomplex ***Udis, int **kplusb, int band_num, int wan_num, int Mk, int **nbandwin, int **nbandfroz);
 void Initial_Guess_Mmnkb(dcomplex ****Uk, int spinsize, int kpt_num, int band_num, int wan_num, dcomplex *****Mmnkb, dcomplex *****Mmnkb_zero, double **kg, double **bvector, int tot_bvector, int **kplusb, int ***Nk);
-void Getting_Utilde(dcomplex ****Amnk, int spinsize, int kpt_num, int band_num, int wan_num, dcomplex ****Uk);
+void Getting_Utilde(dcomplex ****Amnk, int spinsize, int kpt_num, int band_num, int wan_num, dcomplex ****Uk, double ***eigen);
 void Updating_Mmnkb(dcomplex ***Uk, int kpt_num, int band_num, int wan_num, dcomplex ****Mmnkb, dcomplex ****Mmnkb_zero, double **kg, double **bvector, int tot_bvector, int **kplusb);
 void Cal_Omega(double *omega_I, double *omega_OD, double *omega_D, dcomplex ****Mmnkb,
 	       double **wann_center, int wan_num, double **bvector, double *wb, int kpt_num, int tot_bvector);
@@ -480,7 +479,7 @@ void Set_OLP_Projector_Basis(double ****OLP_WP)
 
       /****************************************************
           overlap integral
-              \int RL(k)*RL'(k)*jl(k*R) k^2 dk^3,
+          \int RL(k)*RL'(k)*jl(k*R) k^2 dk^3,
       ****************************************************/
 
       kmin = Radial_kmin;
@@ -1382,7 +1381,7 @@ void Wannier(int Solver,
  
   if      (SpinP_switch==0){ spinsize=1; fsize2=fsize;  fsize3=fsize+2; fsize4=Valence_Electrons/2;}
   else if (SpinP_switch==1){ spinsize=2; fsize2=fsize;  fsize3=fsize+2; 
-    fsize4=Valence_Electrons/2+abs(floor(Total_SpinS))*2+1;}
+                             fsize4=(int)(Valence_Electrons/2+fabs(floor(Total_SpinS))*2+1);}
   else if (SpinP_switch==3){ spinsize=1; fsize2=2*fsize;fsize3=2*fsize+2; fsize4=Valence_Electrons;}
 
   /******************************************
@@ -1651,7 +1650,10 @@ void Wannier(int Solver,
   tmp_shellnum=shell_num;
   searched_shell=0;
   find_w=0;
-  find_w=Cal_Weight_of_Shell(klatt, tmp_M_s, tmp_bvector, &shell_num, tmp_wb, Reject_Shell, &searched_shell) ;
+  find_w = Cal_Weight_of_Shell(klatt, tmp_M_s, tmp_bvector, &shell_num, tmp_wb, Reject_Shell, &searched_shell) ;
+
+  //printf("ABC5 shell_num=%2d MAXSHELL=%2d find_w=%2d\n",shell_num, MAXSHELL,find_w);fflush(stdout);
+
   if(find_w==0){/* wb is not found within these shells */
     if (myid==Host_ID){
        printf("*************************** Error ****************************\n");
@@ -1967,6 +1969,12 @@ void Wannier(int Solver,
     }
   }
 
+  /*
+  printf("ABC6 shell_num=%2d MAXSHELL=%2d\n",shell_num, MAXSHELL);fflush(stdout);
+  MPI_Finalize();
+  exit(0);
+  */
+
   /*************************************************
        calculate eigenvalue and wave-function
   *************************************************/
@@ -2186,6 +2194,7 @@ void Wannier(int Solver,
       }
       free(fiHks);
     }
+
   } /* if (lreadMmnk==0) */
 
   /*************************************************
@@ -3090,10 +3099,23 @@ void Wannier(int Solver,
 
   Getting_Uk(Amnk, spinsize, kpt_num, BANDNUM, WANNUM, Uk, Nk); 
 
+  /*
+  for (i=0; i<BANDNUM; i++){
+    for (j=0; j<WANNUM; j++){
+      printf("%8.4f ",Amnk[0][0][i][j]);
+    }
+    printf("\n");
+  }
+  */
+
+  //printf("ABC1 myid=%2d BANDNUM=%2d WANNUM=%2d\n",myid,BANDNUM,WANNUM);
+  //MPI_Finalize();
+  //exit(0);
+
   /* If this is a mixed bands case, we need to disentangle the mixed band and 
      iteratively find out the proper Uk which minimize gauge invariant part of spread function. */
 
-  if(BANDNUM>WANNUM){
+  if (BANDNUM>WANNUM){
 
     Disentangling_Bands(Uk, Mmnkb_zero, spinsize, kpt_num, 
                         BANDNUM, WANNUM, Nk, innerNk, kg, 
@@ -3132,8 +3154,8 @@ void Wannier(int Solver,
         }
       }/* kpt */
     }/* spin */
-    /* Then we can find the initial guess for Utilde matrix which is usded for optimizing the omega_Tilde part */
-    Getting_Utilde(Amnk, spinsize, kpt_num, WANNUM, WANNUM, Utilde); 
+    /* Then we can find the initial guess for Utilde matrix which is used for optimizing the omega_Tilde part */
+    Getting_Utilde(Amnk, spinsize, kpt_num, WANNUM, WANNUM, Utilde, eigen); 
     /* and update Mmnk matrix to that with intial guess M_opt= Utilde^dagger * M_zero * Utilde(k+b) */
 
     Initial_Guess_Mmnkb(Utilde, spinsize, kpt_num, WANNUM, WANNUM, Mmnkb_zero, Mmnkb_dis, kg, frac_bv, tot_bvector, kplusb, Nk);
@@ -4073,6 +4095,38 @@ void Wannier(int Solver,
   free(rvect);
 
   free(MP);
+
+  if (lreadMmnk==0){   
+
+    int b;
+
+    for (b=0; b<tot_bvector; b++){
+
+      FNAN[0] = 0;
+
+      for (Gc_AN=0; Gc_AN<=atomnum; Gc_AN++){
+
+	if (Gc_AN==0){
+	  Gc_AN = 0;
+	  tno0 = 1;
+	}
+	else{
+	  Cwan = WhatSpecies[Gc_AN];
+	  tno0 = Spe_Total_CNO[Cwan];  
+	}   
+
+	for (h_AN=0; h_AN<=FNAN[Gc_AN]; h_AN++){
+	  for (i=0; i<tno0; i++){
+	    free(OLPe[b][Gc_AN][h_AN][i]);
+	  }
+	  free(OLPe[b][Gc_AN][h_AN]);
+	}
+	free(OLPe[b][Gc_AN]);
+      }
+      free(OLPe[b]);
+    }
+    free(OLPe);
+  }
 
 }/* End of main */
 
@@ -5221,7 +5275,7 @@ void Getting_Uk(dcomplex ****Amnk, int spinsize, int kpt_num, int band_num, int 
 
 #pragma optimization_level 1
 void Getting_Utilde(dcomplex ****Amnk, int spinsize, int kpt_num, 
-                    int band_num, int wan_num, dcomplex ****Uk)
+                    int band_num, int wan_num, dcomplex ****Uk, double ***eigen)
 {
   int spin, mu1, nindx, k, ia, info, i,j,lwork;
   dcomplex **Amatrix;/* [band_num][wan_num];*/ /* for Amatrix[BANDNUM][WANNUM] */ 
@@ -5299,8 +5353,18 @@ void Getting_Utilde(dcomplex ****Amnk, int spinsize, int kpt_num,
 	for(mu1=0;mu1<band_num;mu1++){ /* band index */
 	  Uk[spin][k][mu1][nindx].r=0.0;Uk[spin][k][mu1][nindx].i=0.0;
 	  /* convert from 2-D arrays to 1-D arrays */
+
 	  da[ia].r=Amnk[spin][k][mu1][nindx].r;
 	  da[ia].i=Amnk[spin][k][mu1][nindx].i;
+
+	  /*
+          static double x,FermiF;
+          x = (eigen[spin][k][mu1] - ChemP)*Beta;  
+          FermiF = 1.0/(1.0 + exp(x));
+          da[ia].r = FermiF*Amnk[spin][k][mu1][nindx].r;
+          da[ia].i = FermiF*Amnk[spin][k][mu1][nindx].i;
+	  */
+
 	  ia++;
 	}/* band index */
       }/* wan num */ 
@@ -7177,6 +7241,7 @@ void Shell_Structure(double **klatt, int *M_s, int **bvector, int *shell_num, in
       printf("(%2d,%2d,%2d)(%10.5f%10.5f%10.5f)%10.5f\n",combination[kindx][0],combination[kindx][1],combination[kindx][2],dx/BohrR_Wannier,dy/BohrR_Wannier,dz/BohrR_Wannier,distance[kindx]/BohrR_Wannier);
     }
   }
+
   Ascend_Ordering(distance, ordering, tot_kpt);
 	  
   for(kindx=0;kindx<tot_kpt;kindx++){
@@ -7256,6 +7321,7 @@ void Shell_Structure(double **klatt, int *M_s, int **bvector, int *shell_num, in
   free(distance);
   free(ordered_com);
   free(combination);
+
 }/*End of Shell_Structure subroutine*/
                          
                          
@@ -7708,23 +7774,35 @@ int Cal_Weight_of_Shell(double **klatt, int *M_s, int **bvector, int *num_shell,
 }/*Cal_Weight_of_Shell */
 
 
+
+
+
 #pragma optimization_level 1
 static void Ascend_Ordering(double *xyz_value, int *ordering, int tot_atom){
-  int i,j,k, tmp_order;
+  int i,j,k, tmp_order,myid;
   double tmp_xyz;
 	
-  for(i=1;i<tot_atom; i++){/* taking one value */
-    for(j=i;j>0;j--){ /* compare with all the other lower index value */
-      if(xyz_value[j]<xyz_value[j-1]){/* if it is smaller than lower index value, exchange */
-	tmp_xyz=xyz_value[j];
-	xyz_value[j]=xyz_value[j-1];
-	xyz_value[j-1]=tmp_xyz;
-	tmp_order = ordering[j];
-	ordering[j]=ordering[j-1];
-	ordering[j-1]=tmp_order;
+  MPI_Comm_rank(mpi_comm_level1,&myid);
+
+  if (1){
+    qsort_double_int(tot_atom, xyz_value, ordering);
+  }
+  else{ 
+
+    for (i=1;i<tot_atom; i++){/* taking one value */
+      for (j=i;j>0;j--){ /* compare with all the other lower index value */
+	if (xyz_value[j]<xyz_value[j-1]){/* if it is smaller than lower index value, exchange */
+	  tmp_xyz=xyz_value[j];
+	  xyz_value[j]=xyz_value[j-1];
+	  xyz_value[j-1]=tmp_xyz;
+	  tmp_order = ordering[j];
+	  ordering[j]=ordering[j-1];
+	  ordering[j-1]=tmp_order;
+	}
       }
     }
   }
+
   return;
 }
 
@@ -8213,6 +8291,7 @@ void Disentangling_Bands(dcomplex ****Uk, dcomplex *****Mmnkb_zero, int spinsize
       }
     }
   }
+
   if(have_frozen){
     Udis_projector_frozen(Uk,Nk,innerNk,kpt_num,spinsize,band_num,wan_num);
   }
@@ -8942,15 +9021,20 @@ void Wannier_Interpolation(dcomplex ****Uk, double ***eigen, int spinsize, int S
   za = (dcomplex*)malloc(sizeof(dcomplex)*wan_num*wan_num);
   dw = (double*)malloc(sizeof(double)*wan_num);
 
+  double x,FermiF; 
+
   /* start calc. */
 
   BAND=band_num;
   jobz='V';
   uplo='U';
   lwork=3*wan_num;
+
   for(spin=0;spin<spinsize;spin++){
     for(k=0;k<kpt_num;k++){
-      band_num=Nk[spin][k][1]-Nk[spin][k][0];
+
+      band_num = Nk[spin][k][1]-Nk[spin][k][0];
+
       /* tmpH is the Hamiltonian in origianl Nk dimensional full space, which is 
 	 diagnonal with eigen values at the diagonal site. */
       for(i=0;i<band_num;i++){
@@ -8958,7 +9042,16 @@ void Wannier_Interpolation(dcomplex ****Uk, double ***eigen, int spinsize, int S
           tmpH[i][j].r=0.0;
           tmpH[i][j].i=0.0;
           if(i==j){
-            tmpH[i][j].r=eigen[spin][k][i];
+
+            tmpH[i][j].r = eigen[spin][k][i];
+
+            /* for the calculation of charges, enable the following commented out part  */
+
+            x = (eigen[spin][k][i] - ChemP)*Beta;  
+ 	    FermiF = 1.0/(1.0 + exp(x));
+            tmpH[i][j].r = FermiF;
+
+
           }
         }
       }
@@ -8993,6 +9086,7 @@ void Wannier_Interpolation(dcomplex ****Uk, double ***eigen, int spinsize, int S
       */
     }/* kpt */ 
   }/* spin */ 
+
 
   /* out put the Hamiltonian in Wannier gauge at k=0.0*/
   if(debug1){

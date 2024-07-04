@@ -34,7 +34,7 @@ double Set_Aden_Grid()
   int size_AtomDen_Grid;
   int size_AtomDen_Snd_Grid_A2B;
   int size_AtomDen_Rcv_Grid_A2B;
-  double DenA,x,dx,dy,dz,r;
+  double DenA,DenA0,x,dx,dy,dz,r;
   double Nele,Nu,Nd,M,ocupcy_u,ocupcy_d;
   double rho,mag,magx,magy,magz,theta,phi;
   double time0,TStime,TEtime;
@@ -319,6 +319,10 @@ double Set_Aden_Grid()
 
   /* initialize arrays */
 
+  for (BN=0; BN<My_NumGridB_AB; BN++){
+    ADensity_Grid_B[BN] = 0.0;
+  }
+
   if (SpinP_switch==3){
     for (BN=0; BN<My_NumGridB_AB; BN++){
       Density_Grid_B[0][BN] = 0.0;
@@ -355,7 +359,9 @@ double Set_Aden_Grid()
       Nu    = InitN_USpin[Gc_AN];
       Nd    = InitN_DSpin[Gc_AN];
 
-      DenA = AtomDen_Rcv_Grid_A2B[ID][LN];
+      DenA0 = AtomDen_Rcv_Grid_A2B[ID][LN];
+      if (1.0e-10<Spe_Core_Charge[spe]) DenA = DenA0*Nele/Spe_Core_Charge[spe];
+      else                              DenA = 0.0;
 
       if (1.0e-15<Nele){
 	ocupcy_u = Nu/Nele;
@@ -367,6 +373,9 @@ double Set_Aden_Grid()
       }
 
       if (Solver!=4 || (Solver==4 && atv_ijk[GRc][1]==0 )){
+
+	/* set ADensity_Grid_B */
+        ADensity_Grid_B[BN] += 0.5*DenA0;
 
 	/* spin collinear non-polarization */
 	if ( SpinP_switch==0 ){
@@ -443,21 +452,6 @@ double Set_Aden_Grid()
       Density_Grid_B[1][BN] = 0.5*(rho - magz);
       Density_Grid_B[2][BN] = 0.5*magx;
       Density_Grid_B[3][BN] =-0.5*magy;
-    }
-  }
-
-  /******************************************************
-            Density_Grid_B to ADensity_Grid_B
-  ******************************************************/
-
-  if ( SpinP_switch==0 ){
-    for (BN=0; BN<My_NumGridB_AB; BN++){
-      ADensity_Grid_B[BN] = Density_Grid_B[0][BN];
-    }
-  } 
-  else if ( SpinP_switch==1 || SpinP_switch==3 ){
-    for (BN=0; BN<My_NumGridB_AB; BN++){
-      ADensity_Grid_B[BN] = 0.5*(Density_Grid_B[0][BN] + Density_Grid_B[1][BN]);
     }
   }
 

@@ -17,6 +17,7 @@
 #include <math.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 #include "openmx_common.h"
 #include "mpi.h"
 #include <omp.h>
@@ -1464,6 +1465,10 @@ void out_Bulk_MO()
   free(RMO_Grid_tmp);
   free(IMO_Grid_tmp);
 } 
+
+
+
+
 
 
 

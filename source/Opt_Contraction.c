@@ -15,9 +15,9 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
+#include "mpi.h"
 #include "openmx_common.h"
 #include "lapack_prototypes.h"
-#include "mpi.h"
 
 
 static void D_RCntCoes(double ***CntCoes0, double ***D_CntCoes,

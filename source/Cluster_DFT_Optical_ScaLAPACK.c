@@ -15,11 +15,19 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-#include "openmx_common.h"
 #include "mpi.h"
+#include "openmx_common.h"
+#include "lapack_prototypes.h"
 #include <omp.h>
 
 #define  measure_time   0
+
+
+void solve_evp_real_( int *n1, int *n2, double *Cs, int *na_rows1, double *a, double *Ss, int *na_rows2, int *nblk, 
+                      int *mpi_comm_rows_int, int *mpi_comm_cols_int);
+
+void elpa_solve_evp_real_2stage_double_impl_( int *n1, int *n2, double *Cs, int *na_rows1, double *a, double *Ss, int *na_rows2, 
+                                              int *nblk, int *na_cols1, int *mpi_comm_rows_int, int *mpi_comm_cols_int, int *mpiworld);
 
 
 

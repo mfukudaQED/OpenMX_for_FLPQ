@@ -3,8 +3,9 @@
 #include <math.h>
 #include <time.h>
 #include <string.h>
-#include "openmx_common.h"
 #include "mpi.h"
+#include "openmx_common.h"
+#include "lapack_prototypes.h"
 
 
 static void Simple_Mixing_H(int MD_iter, int SCF_iter, int SCF_iter0 );

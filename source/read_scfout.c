@@ -347,11 +347,20 @@ void Input( FILE *fp )
 
     Kohn-Sham Hamiltonian
 
-    dooble Hks[SpinP_switch+1]
+    double Hks[SpinP_switch+1]
     [atomnum+1]
     [FNAN[ct_AN]+1]
     [Total_NumOrbs[ct_AN]]
     [Total_NumOrbs[h_AN]];
+
+    matrix elements of the exchange-correlation potential 
+
+    double HVxc
+    [SpinP_switch+1]
+    [atomnum+1]
+    [FNAN[ct_AN]+1]
+    [Total_NumOrbs[ct_AN]]
+    [Total_NumOrbs[h_AN]] 
 
     Overlap matrix
 
@@ -444,6 +453,34 @@ void Input( FILE *fp )
     /* Added by N. Yamaguchi ***/
   }
   /* ***/
+
+  /* matrix elements of the exchange-correlation potential */
+
+  HVxc = (double*****)malloc(sizeof(double****)*(SpinP_switch+1));
+  for (spin=0; spin<=SpinP_switch; spin++){
+
+    HVxc[spin] = (double****)malloc(sizeof(double***)*(atomnum+1));
+    for (ct_AN=0; ct_AN<=atomnum; ct_AN++){
+      TNO1 = Total_NumOrbs[ct_AN];
+      HVxc[spin][ct_AN] = (double***)malloc(sizeof(double**)*(FNAN[ct_AN]+1));
+      for (h_AN=0; h_AN<=FNAN[ct_AN]; h_AN++){
+	HVxc[spin][ct_AN][h_AN] = (double**)malloc(sizeof(double*)*TNO1);
+
+	if (ct_AN==0){
+	  TNO2 = 1;
+	}
+	else{
+	  Gh_AN = natn[ct_AN][h_AN];
+	  TNO2 = Total_NumOrbs[Gh_AN];
+	}
+	for (i=0; i<TNO1; i++){
+	  HVxc[spin][ct_AN][h_AN][i] = (double*)malloc(sizeof(double)*TNO2);
+	}
+      }
+    }
+  }
+
+  /* overlap matrix */
 
   OLP = (double****)malloc(sizeof(double***)*(atomnum+1));
   for (ct_AN=0; ct_AN<=atomnum; ct_AN++){
@@ -730,6 +767,23 @@ void Input( FILE *fp )
     }
     fclose(fp_makeinp);
   }
+
+  /******************************************************
+   matrix elements of the exchange-correlation potential 
+  ******************************************************/
+
+  for (spin=0; spin<=SpinP_switch; spin++){
+    for (ct_AN=1; ct_AN<=atomnum; ct_AN++){
+      TNO1 = Total_NumOrbs[ct_AN];
+      for (h_AN=0; h_AN<=FNAN[ct_AN]; h_AN++){
+	Gh_AN = natn[ct_AN][h_AN];
+	TNO2 = Total_NumOrbs[Gh_AN];
+	for (i=0; i<TNO1; i++){
+	  FREAD(HVxc[spin][ct_AN][h_AN][i],sizeof(double),TNO2,fp);
+	}
+      }
+    }
+  }
 }
 
 
@@ -777,6 +831,22 @@ void free_scfout()
     free(Hks[spin]);
   }
   free(Hks);
+
+  for (spin=0; spin<=SpinP_switch; spin++){
+
+    for (ct_AN=0; ct_AN<=atomnum; ct_AN++){
+      TNO1 = Total_NumOrbs[ct_AN];
+      for (h_AN=0; h_AN<=FNAN[ct_AN]; h_AN++){
+	for (i=0; i<TNO1; i++){
+	  free(HVxc[spin][ct_AN][h_AN][i]);
+	}
+        free(HVxc[spin][ct_AN][h_AN]);
+      }
+      free(HVxc[spin][ct_AN]);
+    }
+    free(HVxc[spin]);
+  }
+  free(HVxc);
 
   if (SpinP_switch==3){
 

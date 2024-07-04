@@ -28,10 +28,10 @@
 #include <sys/types.h>
 #include <sys/times.h>
 #include <sys/time.h> 
+#include "mpi.h"
 #include "read_scfout.h"
 #include "lapack_prototypes.h"
 #include "f77func.h"
-#include "mpi.h"
 
 #define Host_ID       0         /* ID of the host CPU in MPI */
 
@@ -57,6 +57,9 @@ struct timeval2 {
   long tv_sec;    /* second */
   long tv_usec;   /* microsecond */
 };
+
+void read_scfout(char *argv[]);
+
 
 /* Added by N. Yamaguchi ***/
 dcomplex ****expOLP;

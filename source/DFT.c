@@ -14,17 +14,20 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
+#include <string.h>
 #include "openmx_common.h"
 #include "Inputtools.h"
 #include "mpi.h"
 #include "tran_prototypes.h"
+#include "lapack_prototypes.h"
 #include "flpq_dm.h"
 #include <sys/stat.h>
+
 
 int TRAN_SCF_Iter_Band;
 
 /* variables for cluster and band calculations  */
-double *Ss_Re,*Cs_Re,*Hs_Re;
+double *Ss_Re,*Cs_Re,*Hs_Re,**Ss_LNO_Re;
 double *rHs11_Re,*rHs12_Re,*rHs22_Re,*iHs11_Re,*iHs12_Re,*iHs22_Re;
 double *CDM1,*EDM1,*PDM1,*Work1;
 dcomplex *EVec1_NonCol;
@@ -33,6 +36,7 @@ double *H1,*S1;
 double ***EIGEN_Band;
 int *My_NZeros,*SP_NZeros,*SP_Atoms,*is2,*ie2,*MP,*order_GA;
 int n,n2,size_H1,myworld1,myworld2,T_knum;
+int TNum_LNOs;
 MPI_Comm *MPI_CommWD1,*MPI_CommWD2;
 int *Comm_World_StartID1,*Comm_World_StartID2;
 int Num_Comm_World1,Num_Comm_World2;
@@ -59,14 +63,10 @@ double ****His_CntCoes,****His_D_CntCoes;
 double ****His_CntCoes_Species,****His_D_CntCoes_Species;
 double **OrbOpt_Hessian,*His_OrbOpt_Etot;
 
-/* for Cluster_DFT_LNO, Cluster_ReCoes is not allocated. */
-double ***Cluster_ReCoes; 
-
 /* for Band_DFT_NonCol_GB (added by T. B. Prayitno and supervised by Prof. F. Ishii)*/
 double *koSU,*koSL;
 dcomplex **SU_Band,**SL_Band;
 
- 
 static double Calc_optical_conductivities_dielectric_functions(
   int myid0,
   double **ko_col,
@@ -116,6 +116,7 @@ static void Read_SCF_keywords();
 
 void Allocate_Free_Cluster_Col(int todo_flag);
 void Allocate_Free_Cluster_NonCol(int todo_flag);
+void Allocate_Free_Cluster_Col_LNO(int todo_flag);
 void Allocate_Free_Band_Col(int todo_flag);
 void Allocate_Free_Band_NonCol(int todo_flag);
 void Allocate_Free_NEGF_NonCol(int todo_flag);
@@ -147,7 +148,6 @@ double DFT(int MD_iter, int Cnt_Now)
   char file_DFTSCF[YOUSO10] = ".DFTSCF";
   char file_OrbOpt[YOUSO10] = ".OrbOpt";
   char operate[200];
-  char operate_flpq[200];
   char *s_vec[20];
   double TStime,TEtime;
   FILE *fp_DFTSCF;
@@ -175,7 +175,8 @@ double DFT(int MD_iter, int Cnt_Now)
   else if (Solver==2 && SpinP_switch==3)  Allocate_Free_Cluster_NonCol(1);        
   else if (Solver==3 && SpinP_switch<=1)  Allocate_Free_Band_Col(1);        
   else if (Solver==3 && SpinP_switch==3)  Allocate_Free_Band_NonCol(1);        
-  else if (Solver==4 && SpinP_switch==3)  Allocate_Free_NEGF_NonCol(1);        
+  else if (Solver==4 && SpinP_switch==3)  Allocate_Free_NEGF_NonCol(1);
+  else if (Solver==12 && SpinP_switch<=1) Allocate_Free_Cluster_Col_LNO(1);
 
   Allocate_Free_GridData(1);
   if (Cnt_switch==1) Allocate_Free_OrbOpt(1);
@@ -382,6 +383,7 @@ double DFT(int MD_iter, int Cnt_Now)
         /* Calling RestartFileDFT overwrites HNL.
         Thus, we call Set_Nonlocal again, since HNL depends on basis functions. */
         if (core_hole_state_flag==1) time2 = Set_Nonlocal(HNL,DS_NL);
+        if (xmcd_calc==1) time2 += Set_XMCD_penalty(0,pre_spin_moment,SCF_iter); // S. An
 
         time13 += etime;
         MPI_Barrier(mpi_comm_level1);
@@ -396,7 +398,7 @@ double DFT(int MD_iter, int Cnt_Now)
             printf("<Restart>  Could not find restart files\n"); fflush(stdout);
 	  }
 	}
-
+	
         /***********************************************************************
          If reading the restart files is terminated, the densities on grid are 
          partially overwritten. So, Set_Aden_Grid() is called once more.  
@@ -413,6 +415,8 @@ double DFT(int MD_iter, int Cnt_Now)
 	  }
         } 
       }
+
+      if (xmcd_calc==1) time2 += Set_XMCD_penalty(0,pre_spin_moment,SCF_iter); // S. An
 
       /*****************************************************
        FFT of the initial density for k-space charge mixing 
@@ -463,11 +467,22 @@ double DFT(int MD_iter, int Cnt_Now)
 
       if (SucceedReadingDMfile && Cnt_switch==0) {
 
-        if (core_hole_state_flag && Solver!=4 && ESM_switch==0) time4 += Poisson(2,ReVk,ImVk);
-	else if (Solver!=4 && ESM_switch==0)                    time4 += Poisson(1,ReVk,ImVk);
-        else if (Solver!=4 && ESM_switch!=0)                    time4 += Poisson_ESM(1,ReVk,ImVk); /* added by Ohwaki */
-        else                                                    time4 += TRAN_Poisson(ReVk,ImVk,SCF_iter,TRAN_SCF_Iter_Band,SucceedReadingDMfile); 
-
+        if (core_hole_state_flag && Solver!=4 && ESM_switch==0){
+	  time4 += Poisson(2,ReVk,ImVk);
+	}
+        else if (core_hole_state_flag && Solver!=4 && ESM_switch!=0){
+	  time4 += Poisson_ESM(2,ReVk,ImVk); ESM_switch = 0;
+	}
+	else if (Solver!=4 && ESM_switch==0){
+	  time4 += Poisson(1,ReVk,ImVk);
+	}
+        else if (Solver!=4 && ESM_switch!=0){
+	  time4 += Poisson_ESM(1,ReVk,ImVk); /* added by Ohwaki */
+	}
+        else{
+	  time4 += TRAN_Poisson(ReVk,ImVk,SCF_iter,TRAN_SCF_Iter_Band,SucceedReadingDMfile);
+	}
+	
 	/*
 	  Although the matrix of Hamiltonian is read from files, it would be better to 
 	  reconstruct the matrix using charge density read from files in order to avoid 
@@ -475,7 +490,7 @@ double DFT(int MD_iter, int Cnt_Now)
 	  Also, if (Correct_Position_flag), then the reconstruction has to be done 
 	  regardless of the above reason.
 	*/
-
+	
         if (Correct_Position_flag || Use_of_Collinear_Restart==1 || 
               (SO_switch==0 && Hub_U_switch==0 && Constraint_NCS_switch==0 
                && Zeeman_NCS_switch==0 && Zeeman_NCO_switch==0) /* non-spin-orbit coupling and non-LDA+U */
@@ -489,12 +504,21 @@ double DFT(int MD_iter, int Cnt_Now)
                                     SucceedReadingDMfile,Cnt_kind,H0,HNL,DM[0],H);
 
 	}
-      }
+	
+      } // end of if (Scf_RestartFromFile==1 && ((Cnt_switch==1 && Cnt_Now!=1) || Cnt_switch==0 ) )
 
       /* failure of reading restart files */
       else{
 
-	if (Solver==4) time4 += TRAN_Poisson(ReVk,ImVk,SCF_iter,TRAN_SCF_Iter_Band,SucceedReadingDMfile); 
+	if (Solver!=4 && ESM_switch==0){
+	  time4 += Poisson(1,ReVk,ImVk);
+	}
+        else if (Solver!=4 && ESM_switch!=0){
+	  time4 += Poisson_ESM(1,ReVk,ImVk); /* added by Ohwaki */
+	}
+	else if (Solver==4){
+	  time4 += TRAN_Poisson(ReVk,ImVk,SCF_iter,TRAN_SCF_Iter_Band,SucceedReadingDMfile);
+	}
 
 	time3 += Set_Hamiltonian("nostdout",
                                   MD_iter,
@@ -517,6 +541,17 @@ double DFT(int MD_iter, int Cnt_Now)
         Use_of_Collinear_Restart = 0;
       }
 
+      /* for the contracted diagonalization */
+
+      if (Solver==12){
+        if   (SucceedReadingDMfile==1){
+	  if (SCF_iter==1) LNO("scf",SCF_iter,OLP[0],H,DM[0]);
+	}
+	else{
+	  if (SCF_iter==1) LNO("guess",SCF_iter,OLP[0],H,DM[0]);
+	}
+      }
+
     } /* end of if (SCF_iter==1) */
 
     /****************************************************
@@ -529,12 +564,20 @@ double DFT(int MD_iter, int Cnt_Now)
       else if (Cnt_switch==1)                             Cnt_kind = 1;
       else                                                Cnt_kind = 0;
 
-      if (Solver!=4 && ESM_switch==0)             time4 += Poisson(fft_charge_flag,ReVk,ImVk);
-      else if (Solver!=4 && ESM_switch!=0)        time4 += Poisson_ESM(fft_charge_flag,ReVk,ImVk); /* added by Ohwaki */
-      else                                        time4 += TRAN_Poisson(ReVk,ImVk,SCF_iter,TRAN_SCF_Iter_Band,SucceedReadingDMfile); 
+      if (Solver!=4 && ESM_switch==0){
+	time4 += Poisson(fft_charge_flag,ReVk,ImVk);
+      }
+      else if (Solver!=4 && ESM_switch!=0){
+        time4 += Poisson_ESM(fft_charge_flag,ReVk,ImVk); /* added by Ohwaki */
+      }
+      else{
+	time4 += TRAN_Poisson(ReVk,ImVk,SCF_iter,TRAN_SCF_Iter_Band,SucceedReadingDMfile);
+      }
 
       /* construct matrix elements for LDA+U or Zeeman term, added by MJ */
       Eff_Hub_Pot(SCF_iter, OLP[0]) ; 
+
+      if (xmcd_calc == 1) time4 += Set_XMCD_penalty(1,pre_spin_moment,SCF_iter); // S. An
 
       time3 += Set_Hamiltonian("stdout",
                                 MD_iter,
@@ -578,7 +621,7 @@ double DFT(int MD_iter, int Cnt_Now)
     s_vec[0]="Recursion";     s_vec[1]="Cluster";  s_vec[2]="Band";
     s_vec[3]="NEGF";          s_vec[4]="DC";       s_vec[5]="GDC";
     s_vec[6]="Cluster-DIIS";  s_vec[7]="Krylov";   s_vec[8]="Cluster2";
-    s_vec[9]="EGAC";          s_vec[10]="DC-LNO";    s_vec[11]="Cluster-LNO";
+    s_vec[9]="EGAC";          s_vec[10]="DC-LNO";  s_vec[11]="Cluster-LNO";
 
     if (MYID_MPI_COMM_WORLD==Host_ID && 0<level_stdout){
       printf("<%s>  Solving the eigenvalue problem...\n",s_vec[Solver-1]);fflush(stdout);
@@ -648,6 +691,7 @@ double DFT(int MD_iter, int Cnt_Now)
 				Comm_World2,
 				Comm_World_StartID2,
 				MPI_CommWD2);
+
 	}
 	else{
 
@@ -710,6 +754,7 @@ double DFT(int MD_iter, int Cnt_Now)
 
       case 5:    
 	time5 += Divide_Conquer("scf",LSCF_iter,H,iHNL,OLP[0],DM[0],EDM,Eele0,Eele1);
+
 	break;
 
       case 6:    
@@ -736,10 +781,24 @@ double DFT(int MD_iter, int Cnt_Now)
 	time5 += Divide_Conquer_LNO("scf",MD_iter,LSCF_iter,SucceedReadingDMfile,H,iHNL,OLP[0],DM[0],EDM,Eele0,Eele1);
 	break;
 
-      case 12:    
-        time5 += Cluster_DFT_LNO("scf",LSCF_iter,SpinP_switch,
-		                 Cluster_ReCoes,ko_col, H,iHNL,OLP[0],DM[0],EDM,
-		                 NULL,NULL,NULL,Eele0,Eele1);
+      case 12:
+	if (SpinP_switch<=1){
+
+	  time5 += Cluster_DFT_Col_LNO( "scf",LSCF_iter,SpinP_switch,
+					n, TNum_LNOs,
+					ko_col,H,OLP[0],DM[0],EDM,
+					Eele0,Eele1,
+					myworld1,NPROCS_ID1,Comm_World1,NPROCS_WD1,
+					Comm_World_StartID1,MPI_CommWD1,MP,is2,ie2,
+					Ss_LNO_Re,Cs_Re,Hs_Re,
+					CDM1,EDM1,PDM1,size_H1,SP_NZeros,SP_Atoms,EVec1_Re,Work1 );
+
+	}
+
+	else if (SpinP_switch==3){
+            
+	}
+	
 	break;
 
       }
@@ -800,7 +859,7 @@ double DFT(int MD_iter, int Cnt_Now)
 				Comm_World2,
 				Comm_World_StartID2,
 				MPI_CommWD2);
- 
+
 	}
 
 	else{ 
@@ -973,7 +1032,7 @@ double DFT(int MD_iter, int Cnt_Now)
       }
 
       /* save the information at iteration */
-      outputfile1(3,MD_iter,orbitalOpt_iter,0,SCF_iter,file_OrbOpt,ChemP_e0); 
+      outputfile1(4,MD_iter,orbitalOpt_iter,0,SCF_iter,file_OrbOpt,ChemP_e0); 
 
       orbitalOpt_iter++;
       LSCF_iter = 0;
@@ -1280,7 +1339,39 @@ double DFT(int MD_iter, int Cnt_Now)
     ************************************************************************/
 
   } while (po==0 && SCF_iter<SCF_MAX);  if (po==0) scf_convergence_flag = 0; else scf_convergence_flag = 1;
- 
+
+  /*********************************************************************
+   After achieving the SCF, the diagonalization with PAOs is performed
+   in case of the contracted diagonalization with LNOs.
+  *********************************************************************/
+
+  if (Solver==12){
+
+    if (SpinP_switch<=1){
+      
+      Allocate_Free_Cluster_Col_LNO(2);
+      Allocate_Free_Cluster_Col(1);
+      
+      time5 += Cluster_DFT_Col("scf",1,SpinP_switch,
+			       ko_col,H,OLP[0],DM[0],EDM,
+			       Eele0,Eele1,
+			       myworld1,NPROCS_ID1,Comm_World1,NPROCS_WD1,
+			       Comm_World_StartID1,MPI_CommWD1,MP,is2,ie2,
+			       Ss_Re,Cs_Re,Hs_Re,
+			       CDM1,EDM1,PDM1,size_H1,SP_NZeros,SP_Atoms,EVec1_Re,Work1);
+      
+      Uele_OS0 = Eele0[0];
+      Uele_OS1 = Eele0[1];
+      Uele_IS0 = Eele1[0];
+      Uele_IS1 = Eele1[1];
+      Uele = Uele_IS0 + Uele_IS1;
+      
+    }  
+    else if (SpinP_switch==3){
+      //Allocate_Free_Cluster_NonCol(2);
+    }
+  } 
+
   /*******************************************************************
     if Solver==2 (Cluster) && SpinP_switch==3, calculate EDM and PDM.
   *******************************************************************/
@@ -1331,6 +1422,123 @@ double DFT(int MD_iter, int Cnt_Now)
 	     Ss_Re,Cs_Re,Hs_Re,Ss_Cx,Cs_Cx,Hs_Cx );
 
   }
+
+  /*******************************************************************
+                 calculations of LNAO and LNBO
+  *******************************************************************/
+
+  if (LNAO_calc_flag==1){
+    Calc_LNAO(OLP[0],H,DM[0]);  
+  }
+
+  if (LNBO_calc_flag==1){
+    Calc_LNBO(OLP[0],H,DM[0]);  
+  }
+
+  /*******************************************************************
+                          calculations of CWF
+  *******************************************************************/
+
+  if (CWF_Calc==1){
+
+    /* cluster and collinear calculation */    
+
+    if ( Solver==2 && SpinP_switch<=1 ){
+
+      time5 += Cluster_DFT_Col_CWF( LSCF_iter,SpinP_switch,
+				    ko_col,H,OLP[0],DM[0],EDM,
+				    Eele0,Eele1,
+				    myworld1,NPROCS_ID1,Comm_World1,NPROCS_WD1,
+				    Comm_World_StartID1,MPI_CommWD1,MP,is2,ie2,
+				    Ss_Re,Cs_Re,Hs_Re,
+				    CDM1,EDM1,PDM1,size_H1,SP_NZeros,SP_Atoms,EVec1_Re,Work1 );
+
+    }
+
+    /* band and collinear calculation */ 
+
+    else if ( Solver==3 && SpinP_switch<=1 ){
+
+      time5 += Band_DFT_Col_CWF( LSCF_iter,
+  				 CWF_Kgrid1,CWF_Kgrid2,CWF_Kgrid3,
+				 SpinP_switch,H,iHNL,OLP[0],DM[0],EDM,Eele0,Eele1, 
+				 MP,order_GA,ko,koS,
+				 H1,S1,
+				 CDM1,EDM1,
+				 EVec1_Cx,
+				 Ss_Cx,
+				 Cs_Cx, 
+				 Hs_Cx,
+				 myworld1,
+				 NPROCS_ID1,
+				 Comm_World1,
+				 NPROCS_WD1,
+				 Comm_World_StartID1,
+				 MPI_CommWD1,
+				 myworld2,
+				 NPROCS_ID2,
+				 NPROCS_WD2,
+				 Comm_World2,
+				 Comm_World_StartID2,
+				 MPI_CommWD2,
+				 Band_Nkpath, Band_N_perpath,
+				 Band_kpath, Band_kname );
+    }
+
+    /* cluster and non-collinear calculation */    
+
+    else if ( Solver==2 && SpinP_switch==3 ){
+
+      time5 += Cluster_DFT_NonCol_CWF( LSCF_iter,SpinP_switch,
+				       ko_noncol,H,iHNL,OLP[0],DM[0],EDM,
+				       Eele0,Eele1,
+				       MP,is2,ie2,
+				       Ss_Re,Cs_Re,
+				       rHs11_Re,rHs12_Re,rHs22_Re,iHs11_Re,iHs12_Re,iHs22_Re,
+				       Ss2_Cx,Hs2_Cx,Cs2_Cx,
+				       CDM1,size_H1,EVec1_NonCol,Work1);
+
+    }
+
+    /* band and non-collinear calculation */    
+
+    else if ( Solver==3 && SpinP_switch==3 ){
+
+      time5 += Band_DFT_NonCol_CWF( LSCF_iter,
+				    Kspace_grid1,Kspace_grid2,Kspace_grid3,
+				    SpinP_switch,H,iHNL,OLP[0],DM[0],EDM,Eele0,Eele1, 
+				    MP,order_GA,ko_noncol,koS,EIGEN_Band,
+				    H1,S1,
+				    rHs11_Cx,rHs22_Cx,rHs12_Cx,iHs11_Cx,iHs22_Cx,iHs12_Cx,
+				    EVec1_Cx,
+				    Ss_Cx,Cs_Cx,Hs_Cx,
+				    Ss2_Cx,Cs2_Cx,Hs2_Cx,
+				    k_op,T_k_op,T_k_ID,
+				    T_KGrids1,T_KGrids2,T_KGrids3,
+				    myworld1,
+				    NPROCS_ID1,
+				    Comm_World1,
+				    NPROCS_WD1,
+				    Comm_World_StartID1,
+				    MPI_CommWD1,
+				    myworld2,
+				    NPROCS_ID2,
+				    NPROCS_WD2,
+				    Comm_World2,
+				    Comm_World_StartID2,
+				    MPI_CommWD2,
+				    Band_Nkpath, Band_N_perpath,
+				    Band_kpath, Band_kname );
+
+    }
+  
+  } /* end of if (CWF_Calc==1) */
+
+  /*******************************************************************
+                   calculation of the polarization
+  *******************************************************************/
+
+  //time5 += Calc_polarization();
 
   /*******************************************************************
    if (Solver==10), recalculate the self-energy and 
@@ -1472,7 +1680,7 @@ double DFT(int MD_iter, int Cnt_Now)
 
   /* For the conventional method */
 
-  else if ( Band_disp_switch==1 && Band_Nkpath>0 ){
+  if ( Band_disp_switch==1 && Band_Nkpath>0 ){
     if (Cnt_switch==0){
 
       Band_DFT_kpath( Band_Nkpath, Band_N_perpath,
@@ -1493,7 +1701,8 @@ double DFT(int MD_iter, int Cnt_Now)
 
   if ( Dos_fileout || DosGauss_fileout) {
 
-    if ( Solver==2 ){  /* cluster */
+    /* cluster */
+    if ( Solver==2 && (Dos_Kgrid[0]==1 && Dos_Kgrid[1]==1 && Dos_Kgrid[2]==1) ){  
 
       if ( Cnt_switch==0 ){
 
@@ -1537,7 +1746,9 @@ double DFT(int MD_iter, int Cnt_Now)
       }
     }
 
-    else if ( Solver==3 ){  /* band */
+    /* band */
+    else if (    Solver==3
+             || (Solver==2 && !(Dos_Kgrid[0]==1 && Dos_Kgrid[1]==1 && Dos_Kgrid[2]==1)) ){  
 
       if (Cnt_switch==0){
 
@@ -1593,6 +1804,7 @@ double DFT(int MD_iter, int Cnt_Now)
   *****************************************************/
 
   if (SpinP_switch!=3){
+
     RestartFileDFT("write",MD_iter,&Uele,H,CntH,&etime);
     time13 += etime;
     MPI_Barrier(mpi_comm_level1);
@@ -1609,7 +1821,7 @@ double DFT(int MD_iter, int Cnt_Now)
   }
 
   if (Cnt_switch==1 && Cnt_Now==1) time10 += Set_Orbitals_Grid(1);
-  time11 += Set_Density_Grid(1, 0, DM[0], Density_Grid_B);
+  if (Solver!=12) time11 += Set_Density_Grid(1, 0, DM[0], Density_Grid_B);
 
   if (Solver==4) {
     TRAN_Add_Density_Lead(mpi_comm_level1,
@@ -1695,7 +1907,7 @@ double DFT(int MD_iter, int Cnt_Now)
   ****************************************************/
 
   if (!orbitalOpt_Force_Skip) time7 += Force(H0,DS_NL,OLP,DM[0],EDM);
-
+  
   if (scf_stress_flag){
     Stress(H0,DS_NL,OLP,DM[0],EDM); 
   }
@@ -1750,18 +1962,27 @@ double DFT(int MD_iter, int Cnt_Now)
   Uef    = ECE[12];
   UvdW   = ECE[13];
   Uch    = ECE[14];
+  UH_dc  = ECE[15];
+  Uxc0_dc= ECE[16];
+  Uxc1_dc= ECE[17];
 
-  Utot  = Ucore + UH0 + Ukin + Una + Unl + UH1
-         + Uxc0 + Uxc1 + Uhub + Ucs + Uzs + Uzo + Uef + UvdW + Uch; 
-
+  if ( Solver!=12 ){
+    Utot = Ucore + UH0 + Ukin + Una + Unl + UH1 + Uxc0 + Uxc1 + Uhub + Ucs + Uzs + Uzo + Uef + UvdW + Uch;
+    outputfile1(2,MD_iter,0,0,SCF_iter,file_DFTSCF,ChemP_e0);
+  }
+  else if ( Solver==12 ){
+    Utot = Uele + UH1 + UH_dc + Uxc0 + Uxc1 + Uxc0_dc + Uxc1_dc + Ucore + UH0;
+    outputfile1(3,MD_iter,0,0,SCF_iter,file_DFTSCF,ChemP_e0);
+  }
+  
   /* elapsed time */
   dtime(&TEtime);
   time0 = TEtime - TStime;
 
-  if (MYID_MPI_COMM_WORLD==Host_ID && 0<level_stdout){
+  if ( Solver!=12 && MYID_MPI_COMM_WORLD==Host_ID && 0<level_stdout ){
 
     printf("\n*******************************************************\n"); 
-    printf("                Total Energy (Hartree) at MD =%2d        \n",MD_iter);
+    printf("             Total Energy (Hartree) at MD =%2d           \n",MD_iter);
     printf("*******************************************************\n\n"); 
 
     printf("  Uele  = %20.12f\n\n",Uele);
@@ -1805,6 +2026,45 @@ double DFT(int MD_iter, int Cnt_Now)
     printf("  Enpy:   Enthalpy = Utot + UpV\n"); 
     printf("  (see also PRB 72, 045121(2005) for the energy contributions)\n\n");
 
+  }
+
+  else if ( Solver==12 && MYID_MPI_COMM_WORLD==Host_ID && 0<level_stdout ){
+
+    printf("\n*******************************************************\n"); 
+    printf("             Total Energy (Hartree) at MD =%2d           \n",MD_iter);
+    printf("*******************************************************\n\n"); 
+
+    printf("  Uele    = %20.12f\n\n",Uele);
+    printf("  UH0     = %20.12f\n",UH0);
+    printf("  UH1     = %20.12f\n",UH1);
+    printf("  Uxc0    = %20.12f\n",Uxc0);
+    printf("  Uxc1    = %20.12f\n",Uxc1);
+    printf("  UH_dc   = %20.12f\n",UH_dc);
+    printf("  Uxc0_dc = %20.12f\n",Uxc0_dc);
+    printf("  Uxc1_dc = %20.12f\n",Uxc1_dc);
+    printf("  Ucore   = %20.12f\n",Ucore);
+    printf("  UvdW    = %20.12f\n",UvdW);
+    printf("  Utot    = %20.12f\n\n",Utot);
+    printf("  UpV     = %20.12f\n",UpV);
+    printf("  Enpy    = %20.12f\n",Utot+UpV);
+
+    printf("  Note:\n\n");
+    printf("  Uele:    band energy\n");
+    printf("  UH0:     electric part of screened Coulomb energy\n");
+    printf("  UH1:     difference electron-electron Coulomb energy\n");
+    printf("  Uxc0:    exchange-correlation energy for alpha spin\n");
+    printf("  Uxc1:    exchange-correlation energy for beta spin\n");
+    printf("  UH_dc:   double counting term related to UH0+UH1\n");
+    printf("  Uxc0_dc: double counting term related to Uxc0\n");
+    printf("  Uxc1_dc: double counting term related to Uxc0\n");
+    printf("  Ucore:   core-core Coulomb energy\n");
+    printf("  UvdW:    semi-empirical vdW energy \n"); /* okuno */
+    printf("  UpV:     pressure times volume\n"); 
+    printf("  Enpy:    Enthalpy = Utot + UpV\n\n"); 
+  }    
+
+  if ( MYID_MPI_COMM_WORLD==Host_ID && 0<level_stdout ){
+  
     printf("\n*******************************************************\n"); 
     printf("           Computational times (s) at MD =%2d            \n",MD_iter);
     printf("*******************************************************\n\n"); 
@@ -1826,9 +2086,7 @@ double DFT(int MD_iter, int Cnt_Now)
     printf("  Mulliken_Charge   = %10.5f\n",time14);
     printf("  FFT(2D)_Density   = %10.5f\n",time15);
   }
-
-  outputfile1(2,MD_iter,0,0,SCF_iter,file_DFTSCF,ChemP_e0);
-
+  
   /*****************************************************
          Calc. of Bloch waves at given k-points
   *****************************************************/
@@ -2088,18 +2346,17 @@ double DFT(int MD_iter, int Cnt_Now)
   /* End addition by M.FUKUDA for flpq */
 
   MPI_Barrier(mpi_comm_level1);
-
   /* added by Chi-Cheng for unfolding */
   /*****************************************************
          Calc. of unfolded weight at given k-points
   *****************************************************/
 
-  if (unfold_electronic_band==1 && unfold_Nkpoint>0 && (Solver==2 || Solver==3) ) {
+  if (unfold_electronic_band==1 && ((UnfoldBand_Nkpath>0) || (unfold_Nkpoint>0)) && (Solver==2 || Solver==3) ){ 
     if (Cnt_switch==0){
-      Unfolding_Bands(unfold_Nkpoint, unfold_kpoint, SpinP_switch, H, iHNL, OLP[0]);
+      Unfolding_Bands(SpinP_switch, H, iHNL, OLP[0]);
     }
     else {
-      Unfolding_Bands(unfold_Nkpoint, unfold_kpoint, SpinP_switch, CntH, iCntHNL, CntOLP[0]);
+      Unfolding_Bands(SpinP_switch, CntH, iCntHNL, CntOLP[0]);
     }
   }
   /* end for unfolding */
@@ -2114,7 +2371,9 @@ double DFT(int MD_iter, int Cnt_Now)
   else if (Solver==2 && SpinP_switch==3)  Allocate_Free_Cluster_NonCol(2);        
   else if (Solver==3 && SpinP_switch<=1)  Allocate_Free_Band_Col(2);        
   else if (Solver==3 && SpinP_switch==3)  Allocate_Free_Band_NonCol(2);        
-  else if (Solver==4 && SpinP_switch==3)  Allocate_Free_NEGF_NonCol(2);        
+  else if (Solver==4 && SpinP_switch==3)  Allocate_Free_NEGF_NonCol(2);
+  else if (Solver==12 && SpinP_switch<=1) Allocate_Free_Cluster_Col(2);
+  else if (Solver==12 && SpinP_switch==3) Allocate_Free_Cluster_NonCol(2);
 
   /*********************************************************
                      XANES calculation
@@ -2547,7 +2806,7 @@ void Allocate_Free_Band_Col(int todo_flag)
 {
   static int firsttime=1;
   int ZERO=0, ONE=1,info,myid0,numprocs0,myid1,numprocs1,myid2,numprocs2;;
-  int spinmax,i,j,k,ii,ij,ik,nblk_m,nblk_m2,wanA,spin,size_EVec1_Cx;
+  int spinmax,i,j,k,ii,ij,ik,nblk_m,nblk_m2,wanA,spin,size_EVec1_Cx=0;
   double tmp,tmp1;
 
   MPI_Barrier(mpi_comm_level1);
@@ -2607,26 +2866,70 @@ void Allocate_Free_Band_Col(int todo_flag)
       }
     }
 
-    for (i=0; i<Kspace_grid1; i++) {
-      for (j=0; j<Kspace_grid2; j++) {
-	for (k=0; k<Kspace_grid3; k++) {
+    /* Added by N. Yamaguchi ***/
+    
+    if (way_of_kpoint==1){
+      /* ***/
 
-	  if ( k_op[i][j][k]==-999 ) {
+      for (i=0; i<Kspace_grid1; i++) {
+	for (j=0; j<Kspace_grid2; j++) {
+	  for (k=0; k<Kspace_grid3; k++) {
 
-	    k_inversion(i,j,k,Kspace_grid1,Kspace_grid2,Kspace_grid3,&ii,&ij,&ik);
+	    if ( k_op[i][j][k]==-999 ) {
 
-	    if ( i==ii && j==ij && k==ik ) {
-	      k_op[i][j][k]    = 1;
+	      k_inversion(i,j,k,Kspace_grid1,Kspace_grid2,Kspace_grid3,&ii,&ij,&ik);
+
+	      if ( i==ii && j==ij && k==ik ) {
+		k_op[i][j][k]    = 1;
+	      }
+	      else {
+		k_op[i][j][k]    = 2;
+		k_op[ii][ij][ik] = 0;
+	      }
 	    }
-	    else {
-	      k_op[i][j][k]    = 2;
-	      k_op[ii][ij][ik] = 0;
-	    }
-	  }
-	} /* k */
-      } /* j */
-    } /* i */
+	  } /* k */
+	} /* j */
+      } /* i */
 
+    } // end of if (way_of_kpoint==1)
+
+    /* Added by N. Yamaguchi ***/
+    
+    else if (way_of_kpoint==3){
+      
+      for (i=0; i<Kspace_grid1; i++) {
+        for (j=0; j<Kspace_grid2; j++) {
+          for (k=0; k<Kspace_grid3; k++) {
+
+            if ( k_op[i][j][k]==-999 ) {
+              if (i==0 || 2*i==Kspace_grid1){
+                ii=i;
+              } else {
+                ii=Kspace_grid1-i;
+              }
+              if (j==0 || 2*j==Kspace_grid2){
+                ij=j;
+              } else {
+                ij=Kspace_grid2-j;
+              }
+              if (k==0 || 2*k==Kspace_grid3){
+                ik=k;
+              } else {
+                ik=Kspace_grid3-k;
+              }
+              if ((i==0 || 2*i==Kspace_grid1) && (j==0 || 2*j==Kspace_grid2) && (k==0 || 2*k==Kspace_grid3)){
+                k_op[i][j][k]    = 1;
+              } else {
+                k_op[i][j][k]    = 2;
+                k_op[ii][ij][ik] = 0;
+              }
+            }
+          } /* k */
+        } /* j */
+      } /* i */
+    }
+    /* ***/
+    
     /* find T_knum */
 
     T_knum = 0;
@@ -2746,6 +3049,7 @@ void Allocate_Free_Band_Col(int todo_flag)
     my_pcol = myid2%np_cols;
 
     na_rows = numroc_(&n, &nblk, &my_prow, &ZERO, &np_rows);
+
     na_cols = numroc_(&n, &nblk, &my_pcol, &ZERO, &np_cols );
 
     bhandle2 = Csys2blacs_handle(MPI_CommWD2[myworld2]);
@@ -2919,7 +3223,6 @@ void Allocate_Free_Band_Col(int todo_flag)
 
     Cfree_blacs_system_handle(bhandle2);
     Cblacs_gridexit(ictxt2);
-
   }
 
 }
@@ -2930,7 +3233,7 @@ void Allocate_Free_Band_NonCol(int todo_flag)
 {
   static int firsttime=1;
   int ZERO=0, ONE=1,info,myid0,numprocs0,myid1,numprocs1,myid2,numprocs2;;
-  int spinmax,i,j,k,ii,ij,ik,nblk_m,nblk_m2,wanA,spin,size_EVec1_Cx;
+  int spinmax,i,j,k,ii,ij,ik,nblk_m,nblk_m2,wanA,spin,size_EVec1_Cx=0;
   double tmp,tmp1;
 
   MPI_Barrier(mpi_comm_level1);
@@ -3106,9 +3409,9 @@ void Allocate_Free_Band_NonCol(int todo_flag)
     }
     size_EVec1_Cx = spinmax*k*n3; 
 
-    /* ***************************************************
+    /****************************************************
           setting for BLACS in the matrix size of n
-    *************************************************** */
+    ****************************************************/
 
     np_cols = (int)(sqrt((float)numprocs2));
     do{
@@ -3153,9 +3456,9 @@ void Allocate_Free_Band_NonCol(int todo_flag)
     descinit_(descH, &n, &n, &nblk, &nblk, &ZERO, &ZERO, &ictxt2, &na_rows, &info);
     descinit_(descC, &n, &n, &nblk, &nblk, &ZERO, &ZERO, &ictxt2, &na_rows, &info);
 
-    /* ***************************************************
+    /****************************************************
           setting for BLACS in the matrix size of n2
-    *************************************************** */
+    ****************************************************/
 
     int nblk_m2;
 
@@ -3209,6 +3512,7 @@ void Allocate_Free_Band_NonCol(int todo_flag)
         SL_Band[i] = (dcomplex*)malloc(sizeof(dcomplex)*(n+1));
       }
     }
+    
     /* -------------------------------------- */
 
     /* PrintMemory */
@@ -3355,7 +3659,7 @@ void Allocate_Free_Band_NonCol(int todo_flag)
     free(Ss2_Cx);
     free(Cs2_Cx);
 
-    Cfree_blacs_system_handle(bhandle1_2);
+    if (bhandle2 != bhandle1_2) Cfree_blacs_system_handle(bhandle1_2);
     Cblacs_gridexit(ictxt1_2);
 
     /***********************************************
@@ -3415,7 +3719,7 @@ void Allocate_Free_Cluster_Col(int todo_flag)
 {
   static int firsttime=1;
   int ZERO=0, ONE=1,info,myid0,numprocs0,myid1,numprocs1;
-  int i,k,nblk_m,nblk_m2,wanA,spin,size_EVec1;
+  int i,k,nblk_m,nblk_m2,wanA,spin,size_EVec1=0;
   double tmp,tmp1;
 
   MPI_Barrier(mpi_comm_level1);
@@ -3637,7 +3941,7 @@ void Allocate_Free_Cluster_Col(int todo_flag)
 void Allocate_Free_Cluster_NonCol(int todo_flag)
 {
   static int firsttime=1;
-  int ZERO=0, ONE=1,info,size_EVec1;
+  int ZERO=0, ONE=1,info,size_EVec1=0;
   int i,k,nblk_m,nblk_m2,wanA,myid0,numprocs0,numprocs1;
   double tmp,tmp1;
 
@@ -3684,9 +3988,9 @@ void Allocate_Free_Cluster_NonCol(int todo_flag)
     EVec1_NonCol = (dcomplex*)malloc(sizeof(dcomplex)*k*n*2);
     size_EVec1 = k*n*2;
 
-    /* ***************************************************
-       setting for BLACS in the matrix size of n
-       *************************************************** */
+    /****************************************************
+          setting for BLACS in the matrix size of n
+    ****************************************************/
 
     np_cols = (int)(sqrt((float)numprocs0));
     do{
@@ -3729,9 +4033,9 @@ void Allocate_Free_Cluster_NonCol(int todo_flag)
     descinit_(descH, &n,  &n,  &nblk,  &nblk,  &ZERO, &ZERO, &ictxt1, &na_rows,  &info);
     descinit_(descC, &n,  &n,  &nblk,  &nblk,  &ZERO, &ZERO, &ictxt1, &na_rows,  &info);
 
-    /* ***************************************************
+    /*****************************************************
        setting for BLACS in the matrix size of n2
-       *************************************************** */
+    *****************************************************/
 
     np_cols2 = (int)(sqrt((float)numprocs0));
     do{
@@ -3841,10 +4145,256 @@ void Allocate_Free_Cluster_NonCol(int todo_flag)
     free(Ss2_Cx);
     free(Cs2_Cx);
 
-    Cfree_blacs_system_handle(bhandle1_2);
+    if (bhandle1 != bhandle1_2) Cfree_blacs_system_handle(bhandle1_2);
     Cblacs_gridexit(ictxt1_2);
   }
 }
+
+
+
+
+void Allocate_Free_Cluster_Col_LNO(int todo_flag)
+{
+  static int firsttime=1;
+  int ZERO=0, ONE=1,info,myid0,numprocs0,myid1,numprocs1;
+  int i,k,nblk_m,nblk_m2,wanA,spin,size_EVec1=0;
+  double tmp,tmp1;
+
+  MPI_Barrier(mpi_comm_level1);
+  MPI_Comm_size(mpi_comm_level1,&numprocs0);
+  MPI_Comm_rank(mpi_comm_level1,&myid0);
+
+  /********************************************
+              allocation of arrays 
+  ********************************************/
+
+  if (todo_flag==1){
+
+    /* find the number of basis functions */
+    
+    n = 0;
+    for (i=1; i<=atomnum; i++){
+      wanA  = WhatSpecies[i];
+      n += Spe_Total_CNO[wanA];
+    }
+    n2 = n*2;
+
+    /* find the number of LNOs */
+
+    TNum_LNOs = 0;
+    for (i=1; i<=atomnum; i++){
+      wanA  = WhatSpecies[i];
+      TNum_LNOs += LNOs_Num_predefined[wanA];
+    }
+
+    /* allocation of arrays */
+    
+    MP = (int*)malloc(sizeof(int)*List_YOUSO[1]);
+    order_GA = (int*)malloc(sizeof(int)*(List_YOUSO[1]+1));
+    My_NZeros = (int*)malloc(sizeof(int)*numprocs0);
+    SP_NZeros = (int*)malloc(sizeof(int)*numprocs0);
+    SP_Atoms = (int*)malloc(sizeof(int)*numprocs0);
+
+    size_H1 = Get_OneD_HS_Col(0, H[0], &tmp, MP, order_GA, My_NZeros, SP_NZeros, SP_Atoms);
+
+    CDM1 = (double*)malloc(sizeof(double)*size_H1);
+    Work1 = (double*)malloc(sizeof(double)*size_H1);
+    EDM1 = (double*)malloc(sizeof(double)*size_H1);
+
+    if (cal_partial_charge){
+      PDM1 = (double*)malloc(sizeof(double)*size_H1);
+    }
+
+    ko_col = (double**)malloc(sizeof(double*)*List_YOUSO[23]);
+    for (i=0; i<List_YOUSO[23]; i++){
+      ko_col[i] = (double*)malloc(sizeof(double)*(TNum_LNOs+2));
+    }
+
+    /***********************************************
+        allocation of arrays for the first world 
+    ***********************************************/
+
+    Num_Comm_World1 = SpinP_switch + 1; 
+
+    NPROCS_ID1 = (int*)malloc(sizeof(int)*numprocs0); 
+    Comm_World1 = (int*)malloc(sizeof(int)*numprocs0); 
+    NPROCS_WD1 = (int*)malloc(sizeof(int)*Num_Comm_World1); 
+    Comm_World_StartID1 = (int*)malloc(sizeof(int)*Num_Comm_World1); 
+    MPI_CommWD1 = (MPI_Comm*)malloc(sizeof(MPI_Comm)*Num_Comm_World1);
+
+    /*********************************************** 
+             make the first level worlds 
+    ***********************************************/
+
+    Make_Comm_Worlds(mpi_comm_level1, myid0, numprocs0, Num_Comm_World1, 
+		     &myworld1, MPI_CommWD1, NPROCS_ID1, Comm_World1, 
+		     NPROCS_WD1, Comm_World_StartID1);
+
+    /*********************************************** 
+         for pallalel calculations in myworld1
+    ***********************************************/
+    
+    MPI_Comm_size(MPI_CommWD1[myworld1],&numprocs1);
+    MPI_Comm_rank(MPI_CommWD1[myworld1],&myid1);
+    
+    double av_num;
+    int ke,ks;  
+    av_num = (double)TNum_LNOs/(double)numprocs1;
+    ke = (int)(av_num*(double)(myid1+1));
+    ks = (int)(av_num*(double)myid1) + 1;
+    if (myid1==0)             ks = 1;
+    if (myid1==(numprocs1-1)) ke = TNum_LNOs;
+    k = ke - ks + 2;
+
+    EVec1_Re = (double**)malloc(sizeof(double*)*(SpinP_switch+1));
+    for (spin=0; spin<(SpinP_switch+1); spin++){
+      EVec1_Re[spin] = (double*)malloc(sizeof(double)*k*TNum_LNOs);
+    }
+    size_EVec1 = (SpinP_switch+1)*k*TNum_LNOs; 
+
+    is2 = (int*)malloc(sizeof(int)*numprocs1);
+    ie2 = (int*)malloc(sizeof(int)*numprocs1);
+
+    /* setting for BLACS */
+
+    np_cols = (int)(sqrt((float)numprocs1));
+    do{
+      if((numprocs1%np_cols)==0) break;
+      np_cols--;
+    } while (np_cols>=2);
+    np_rows = numprocs1/np_cols;
+
+    nblk_m = NBLK;
+    while((nblk_m*np_rows>TNum_LNOs || nblk_m*np_cols>TNum_LNOs) && (nblk_m > 1)){
+      nblk_m /= 2;
+    }
+    if(nblk_m<1) nblk_m = 1;
+
+    MPI_Allreduce(&nblk_m,&nblk,1,MPI_INT,MPI_MIN,mpi_comm_level1);
+
+    my_prow = myid1/np_cols;
+    my_pcol = myid1%np_cols;
+    
+    na_rows = numroc_(&TNum_LNOs, &nblk, &my_prow, &ZERO, &np_rows);
+    na_cols = numroc_(&TNum_LNOs, &nblk, &my_pcol, &ZERO, &np_cols );
+
+    bhandle1 = Csys2blacs_handle(MPI_CommWD1[myworld1]);
+    ictxt1 = bhandle1;
+
+    Cblacs_gridinit(&ictxt1, "Row", np_rows, np_cols);
+    
+    Ss_LNO_Re = (double**)malloc(sizeof(double*)*(SpinP_switch+1));
+    for (spin=0; spin<(SpinP_switch+1); spin++){
+      Ss_LNO_Re[spin] = (double*)malloc(sizeof(double)*na_rows*na_cols);
+    }
+      
+    Hs_Re = (double*)malloc(sizeof(double)*na_rows*na_cols);
+
+    MPI_Allreduce(&na_rows,&na_rows_max,1,MPI_INT,MPI_MAX,MPI_CommWD1[myworld1]);
+    MPI_Allreduce(&na_cols,&na_cols_max,1,MPI_INT,MPI_MAX,MPI_CommWD1[myworld1]);
+    Cs_Re = (double*)malloc(sizeof(double)*na_rows_max*na_cols_max);
+
+    descinit_(descS, &TNum_LNOs,   &TNum_LNOs,   &nblk,  &nblk,  &ZERO, &ZERO, &ictxt1, &na_rows,  &info);
+    descinit_(descH, &TNum_LNOs,   &TNum_LNOs,   &nblk,  &nblk,  &ZERO, &ZERO, &ictxt1, &na_rows,  &info);
+    descinit_(descC, &TNum_LNOs,   &TNum_LNOs,   &nblk,  &nblk,  &ZERO, &ZERO, &ictxt1, &na_rows,  &info);
+
+    /* PrintMemory */
+
+    if (firsttime && memoryusage_fileout) {
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: MP",sizeof(int)*List_YOUSO[1],NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: order_GA",sizeof(int)*(List_YOUSO[1]+1),NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: My_NZeros",sizeof(int)*numprocs0,NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: SP_NZeros",sizeof(int)*numprocs0,NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: SP_Atoms",sizeof(int)*numprocs0,NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: CDM1",sizeof(double)*size_H1,NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: Work1",sizeof(double)*size_H1,NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: EDM1",sizeof(double)*size_H1,NULL);
+      if (cal_partial_charge){
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: PDM1",sizeof(double)*size_H1,NULL);
+      }
+
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: ko_col",sizeof(double)*List_YOUSO[23]*(n+2),NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: NPROCS_ID1",sizeof(int)*numprocs0,NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: Comm_World1",sizeof(int)*numprocs0,NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: NPROCS_WD1",sizeof(int)*Num_Comm_World1,NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: Comm_World_StartID1",sizeof(int)*Num_Comm_World1,NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: MPI_CommWD1",sizeof(MPI_Comm)*Num_Comm_World1,NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: EVec1_Re",sizeof(dcomplex)*size_EVec1,NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: is2",sizeof(int)*numprocs1,NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: ie2",sizeof(int)*numprocs1,NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: Ss_Re",sizeof(double)*na_rows*na_cols,NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: Hs_Re",sizeof(double)*na_rows*na_cols,NULL);
+      PrintMemory("Allocate_Free_Cluster_Col_LNO: Cs_Re",sizeof(double)*na_rows_max*na_cols_max,NULL);
+    }
+
+    firsttime = 0;
+
+  } /* end of if (todo_flag==1) */
+
+  /********************************************
+               freeing of arrays 
+  ********************************************/
+
+  if (todo_flag==2){
+
+    /* setting for BLACS */
+
+    Cfree_blacs_system_handle(bhandle1);
+    Cblacs_gridexit(ictxt1);
+
+    free(Cs_Re);
+    free(Hs_Re);
+
+    for (spin=0; spin<(SpinP_switch+1); spin++){
+      free(Ss_LNO_Re[spin]);
+    }
+    free(Ss_LNO_Re);
+    
+    /*********************************************** 
+         for pallalel calculations in myworld1
+    ***********************************************/
+
+    free(ie2);
+    free(is2);
+    
+    for (spin=0; spin<(SpinP_switch+1); spin++){
+      free(EVec1_Re[spin]);
+    }
+    free(EVec1_Re);
+
+    /***********************************************
+       freeing of arrays for the first world 
+    ***********************************************/
+
+    if ( Num_Comm_World1<=numprocs0 ) MPI_Comm_free(&MPI_CommWD1[myworld1]);
+
+    free(MPI_CommWD1);
+    free(Comm_World_StartID1);
+    free(NPROCS_WD1);
+    free(Comm_World1);
+    free(NPROCS_ID1);
+
+    for (i=0; i<List_YOUSO[23]; i++){
+      free(ko_col[i]);
+    }
+    free(ko_col);
+
+    if (cal_partial_charge){
+      free(PDM1);
+    }
+
+    free(EDM1);
+    free(Work1);
+    free(CDM1);
+
+    free(SP_Atoms);
+    free(SP_NZeros);
+    free(My_NZeros);
+    free(order_GA);
+    free(MP);
+  }
+}
+
 
 
 

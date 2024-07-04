@@ -1,5 +1,4 @@
 # About
-** UNDER CONSTRUCTION **
 
 This is a modified OpenMX code for flpq calculations.  
 This code can export density matrix including imagnary part  
@@ -19,6 +18,10 @@ The following additional options are available.
   - `DM.energy.range  -2.0  0.0`  # default -10  10 in eV
   - `DM.energy.broadening.upper   0.001`  # default 300K in eV
   - `DM.energy.broadening.lower   0.001`  # default 300K in eV
+
+## Output files
+- OpenMX_LPQ.bin : A binary input file for post process FLPQ calculation 
+- OpenMX_LPQ_DM : A directory of density matrix data for post process FLPQ calculation
 
 # List of modified codes from original OpenMX
 

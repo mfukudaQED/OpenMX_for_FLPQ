@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include "mpi.h"
 #include "Inputtools.h"
 #include "lapack_prototypes.h"
 #include "f77func.h"
@@ -497,7 +498,7 @@ void calc_esp()
       A[k][atomnum+1] = 1.0;
     }
     A[atomnum+1][atomnum+1] = 0.0;
-    B[atomnum] = 1.0;
+    B[atomnum] = 0.0;
 
     /* A to A2 */
 

@@ -95,7 +95,7 @@ void TRAN_Set_Electrode_Grid(MPI_Comm comm1,
   fftw_complex *in, *out;
   fftw_plan p;
    
-  MPI_Comm_rank(comm1, &myid);
+  MPI_Comm_rank(MPI_COMM_WORLD, &myid);
 
   /* for passing TRAN_Poisson_flag to "DFT" */
   *TRAN_Poisson_flag2 = TRAN_Poisson_flag;
@@ -114,26 +114,73 @@ void TRAN_Set_Electrode_Grid(MPI_Comm comm1,
   out = fftw_malloc(sizeof(fftw_complex)*List_YOUSO[17]); 
 
   /* allocation of arrays */
+
   if (print_stdout){
     printf("%d %d %d %d %d\n",Ngrid1,Ngrid2,Ngrid3,TRAN_grid_bound[0], TRAN_grid_bound[1]);
   }
 
+  ElectrodeDensity_Grid = (double***)malloc(sizeof(double**)*2);
+  for (side=0; side<2; side++) {
+    ElectrodeDensity_Grid[side] = (double**)malloc(sizeof(double*)*(SpinP_switch_e[side]+1));
+    if (side==0){ l1[0]=0; l1[1]=TRAN_grid_bound[0]; } else { l1[0]=TRAN_grid_bound[1]; l1[1]=Ngrid1-1; }
+    for (spin=0; spin<=SpinP_switch_e[side]; spin++) {
+      ElectrodeDensity_Grid[side][spin] = (double*)malloc(sizeof(double)*Ngrid3*Ngrid2*(l1[1]-l1[0]+1));
+    }
+  }
+
+  ElectrodeADensity_Grid = (double**)malloc(sizeof(double)*2);
+  for (side=0; side<2; side++) {
+    if (side==0){ l1[0]=0; l1[1]=TRAN_grid_bound[0]; } else { l1[0]=TRAN_grid_bound[1]; l1[1]=Ngrid1-1; }
+    ElectrodeADensity_Grid[side] = (double*)malloc(sizeof(double)*Ngrid3*Ngrid2*(l1[1]-l1[0]+1));
+  }
+
+  ElectrodedVHart_Grid = (double**)malloc(sizeof(double)*2);
+  for (side=0; side<2; side++) {
+    if (side==0){ l1[0]=0; l1[1]=TRAN_grid_bound[0]; } else { l1[0]=TRAN_grid_bound[1]; l1[1]=Ngrid1-1; }
+    ElectrodedVHart_Grid[side] = (double*)malloc(sizeof(double)*Ngrid3*Ngrid2*(l1[1]-l1[0]+1));
+  }
+
+  side = 0;  
+  printf("ABC-1 myid=%2d side=%2d Ngrid1_e=%2d Ngrid2=%2d Ngrid3=%2d\n",myid,side,Ngrid1_e[side],Ngrid2,Ngrid3);
+    
+  VHart_Boundary = (dcomplex****)malloc(sizeof(dcomplex***)*2);
+  for (side=0; side<2; side++) {
+
+    printf("ABC0 myid=%2d side=%2d Ngrid1_e=%2d Ngrid2=%2d Ngrid3=%2d\n",myid,side,Ngrid1_e[side],Ngrid2,Ngrid3);
+
+    VHart_Boundary[side] = (dcomplex***)malloc(sizeof(dcomplex**)*Ngrid1_e[side]);
+    for (n1=0; n1<Ngrid1_e[side]; n1++){
+      VHart_Boundary[side][n1] = (dcomplex**)malloc(sizeof(dcomplex*)*Ngrid2);
+      for (n2=0; n2<Ngrid2; n2++){
+        VHart_Boundary[side][n1][n2] = (dcomplex*)malloc(sizeof(dcomplex)*Ngrid3);
+      }
+    }
+  }
+
+
+
+  /*
   for (side=0; side<2; side++) {
     ElectrodeDensity_Grid[side] = (double**)malloc(sizeof(double*)*(SpinP_switch_e[side]+1));
   }
+  */
 
   /* left lead */
 
-  side  = 0;
-  l1[0] = 0;
-  l1[1] = TRAN_grid_bound[0];
+  //side  = 0;
+  //l1[0] = 0;
+  //l1[1] = TRAN_grid_bound[0];
+
+  /*
   for (spin=0; spin<=SpinP_switch_e[side]; spin++) {
     ElectrodeDensity_Grid[side][spin] = (double*)malloc(sizeof(double)*Ngrid3*Ngrid2*(l1[1]-l1[0]+1));
   }
+  */
 
-  ElectrodeADensity_Grid[side] = (double*)malloc(sizeof(double)*Ngrid3*Ngrid2*(l1[1]-l1[0]+1));
-  ElectrodedVHart_Grid[side] = (double*)malloc(sizeof(double)*Ngrid3*Ngrid2*(l1[1]-l1[0]+1));
+  //ElectrodeADensity_Grid[side] = (double*)malloc(sizeof(double)*Ngrid3*Ngrid2*(l1[1]-l1[0]+1));
+  //ElectrodedVHart_Grid[side] = (double*)malloc(sizeof(double)*Ngrid3*Ngrid2*(l1[1]-l1[0]+1));
 
+  /*
   VHart_Boundary[side] = (dcomplex***)malloc(sizeof(dcomplex**)*Ngrid1_e[side]);
   for (n1=0; n1<Ngrid1_e[side]; n1++){
     VHart_Boundary[side][n1] = (dcomplex**)malloc(sizeof(dcomplex*)*Ngrid2);
@@ -141,19 +188,24 @@ void TRAN_Set_Electrode_Grid(MPI_Comm comm1,
       VHart_Boundary[side][n1][n2] = (dcomplex*)malloc(sizeof(dcomplex)*Ngrid3);
     }
   }
+  */
 
   /* right lead */
 
-  side  = 1;
-  l1[0] = TRAN_grid_bound[1];
-  l1[1] = Ngrid1 - 1;
+  //side  = 1;
+  //l1[0] = TRAN_grid_bound[1];
+  //l1[1] = Ngrid1 - 1;
+
+  /*
   for (spin=0; spin<=SpinP_switch_e[side]; spin++) {
     ElectrodeDensity_Grid[side][spin] = (double*)malloc(sizeof(double)*Ngrid3*Ngrid2*(l1[1]-l1[0]+1));
   }
+  */
 
-  ElectrodeADensity_Grid[side] = (double*)malloc(sizeof(double)*Ngrid3*Ngrid2*(l1[1]-l1[0]+1));
-  ElectrodedVHart_Grid[side] = (double*)malloc(sizeof(double)*Ngrid3*Ngrid2*(l1[1]-l1[0]+1));
+  //ElectrodeADensity_Grid[side] = (double*)malloc(sizeof(double)*Ngrid3*Ngrid2*(l1[1]-l1[0]+1));
+  //ElectrodedVHart_Grid[side] = (double*)malloc(sizeof(double)*Ngrid3*Ngrid2*(l1[1]-l1[0]+1));
 
+  /*
   VHart_Boundary[side] = (dcomplex***)malloc(sizeof(dcomplex**)*Ngrid1_e[side]);
   for (n1=0; n1<Ngrid1_e[side]; n1++){
     VHart_Boundary[side][n1] = (dcomplex**)malloc(sizeof(dcomplex*)*Ngrid2);
@@ -161,6 +213,7 @@ void TRAN_Set_Electrode_Grid(MPI_Comm comm1,
       VHart_Boundary[side][n1][n2] = (dcomplex*)malloc(sizeof(dcomplex)*Ngrid3);
     }
   }
+  */
 
   /*******************************************************
    charge density contributed by the left and right sides 
@@ -437,17 +490,21 @@ void TRAN_Set_Electrode_Grid(MPI_Comm comm1,
     else if (1.0<fabs(tv[1][2])) ip = 2;
     else if (1.0<fabs(tv[1][3])) ip = 3;
 
-    side = 0;
-    IntNgrid1_e[side] = (int)(fabs((double)TRAN_FFTE_CpyNum*tv_e[side][1][ip]+1.0e-8)/length_gtv[1]);
+    //printf("ABC0 myid=%2d side=%2d ip=%2d IntNgrid1_e=%2d Ngrid2=%2d Ngrid3=%2d\n",myid,side,ip,IntNgrid1_e[side],Ngrid2,Ngrid3);  
 
-    dDen_IntBoundary[side] = (dcomplex***)malloc(sizeof(dcomplex**)*IntNgrid1_e[side]);
-    for (n1=0; n1<IntNgrid1_e[side]; n1++){
-      dDen_IntBoundary[side][n1] = (dcomplex**)malloc(sizeof(dcomplex*)*Ngrid2);
-      for (n2=0; n2<Ngrid2; n2++){
-	dDen_IntBoundary[side][n1][n2] = (dcomplex*)malloc(sizeof(dcomplex)*Ngrid3);
+    dDen_IntBoundary = (dcomplex****)malloc(sizeof(dcomplex***)*2);
+    for (side=0; side<2; side++) {
+      IntNgrid1_e[side] = (int)(fabs((double)TRAN_FFTE_CpyNum*tv_e[side][1][ip]+1.0e-8)/length_gtv[1]);
+      dDen_IntBoundary[side] = (dcomplex***)malloc(sizeof(dcomplex**)*IntNgrid1_e[side]);
+      for (n1=0; n1<IntNgrid1_e[side]; n1++){
+	dDen_IntBoundary[side][n1] = (dcomplex**)malloc(sizeof(dcomplex*)*Ngrid2);
+	for (n2=0; n2<Ngrid2; n2++){
+	  dDen_IntBoundary[side][n1][n2] = (dcomplex*)malloc(sizeof(dcomplex)*Ngrid3);
+	}
       }
     }
 
+    /*
     side = 1;
     IntNgrid1_e[side] = (int)(fabs((double)TRAN_FFTE_CpyNum*tv_e[side][1][ip]+1.0e-8)/length_gtv[1]);
 
@@ -458,6 +515,7 @@ void TRAN_Set_Electrode_Grid(MPI_Comm comm1,
 	dDen_IntBoundary[side][n1][n2] = (dcomplex*)malloc(sizeof(dcomplex)*Ngrid3);
       }
     }
+    */
 
     for (side=0; side<=1; side++){
 

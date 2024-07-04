@@ -25,6 +25,14 @@
 
 #define  measure_time  0
  
+ 
+void solve_evp_complex_( int *n1, int *n2, dcomplex *Cs, int *na_rows1, double *ko, dcomplex *Ss, 
+                         int *na_rows2, int *nblk, int *mpi_comm_rows_int, int *mpi_comm_cols_int );
+
+void elpa_solve_evp_complex_2stage_double_impl_
+      ( int *n, int *MaxN, dcomplex *Hs, int *na_rows1, double *ko, dcomplex *Cs, 
+        int *na_rows2, int *nblk, int *na_cols1,
+        int *mpi_comm_rows_int, int *mpi_comm_cols_int, int *mpiworld );
 
 double Band_DFT_Col_DMmu(
                     int SCF_iter,

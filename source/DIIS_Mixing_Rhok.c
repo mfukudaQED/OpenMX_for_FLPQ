@@ -14,11 +14,11 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include "mpi.h"
 #include "openmx_common.h"
 #include "tran_prototypes.h"
 #include "tran_variables.h"
 #include "lapack_prototypes.h"
-#include "mpi.h"
 #include <omp.h>
 
 

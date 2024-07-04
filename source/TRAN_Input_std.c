@@ -196,24 +196,28 @@ void TRAN_Input_std(
   input_logical("NEGF.tran.analysis",&TRAN_analysis,1);
 
   /* S MitsuakiKAWAMURA*/
-  input_logical("NEGF.tran.channel", &TRAN_Analysis_Dummy, 1);
+
+  input_logical("NEGF.tran.channel", &TRAN_Analysis_Dummy, 0);
   if (TRAN_Analysis_Dummy == 1 && TRAN_analysis != 1){
     TRAN_analysis = 1;
     if (myid == Host_ID)
       printf("Since NEGF.tran.channel is on, NEGF.tran.analysis is automatically set to on.\n");
   }
-  input_logical("NEGF.tran.CurrentDensity", &TRAN_Analysis_Dummy, 1);
+
+  input_logical("NEGF.tran.CurrentDensity", &TRAN_Analysis_Dummy, 0);
   if (TRAN_Analysis_Dummy == 1 && TRAN_analysis != 1){
     TRAN_analysis = 1;
     if (myid == Host_ID)
       printf("Since NEGF.tran.CurrentDensity is on, NEGF.tran.analysis is automatically set to on.\n");
   }
+
   input_logical("NEGF.OffDiagonalCurrent", &TRAN_Analysis_Dummy, 0);
   if (TRAN_Analysis_Dummy == 1 && TRAN_analysis != 1) {
     TRAN_analysis = 1;
     if (myid == Host_ID)
       printf("Since NEGF.OffDiagonalCurrent is on, NEGF.tran.analysis is automatically set to on.\n");
   }
+
   /* E MitsuakiKAWAMURA*/
 
   /* check whether the SCF calcultion is skipped or not */

@@ -16,6 +16,9 @@
 #include "openmx_common.h"
 #include "mpi.h"
 
+double *Hex;
+
+
 void Hamiltonian_Cluster_Hs(double ****RH, double *Hs, int *MP, int spin, int myworld1)
 {
   int i,j,k;
@@ -27,11 +30,8 @@ void Hamiltonian_Cluster_Hs(double ****RH, double *Hs, int *MP, int spin, int my
   int *is1,*ie1,*is2;
   int *My_Matomnum,*order_GA;
   double *H1,sum;
-
   MPI_Status stat;
   MPI_Request request;
-
-
   int ig,jg,il,jl,prow,pcol,brow,bcol;
 
   /* MPI */
@@ -146,7 +146,6 @@ void Hamiltonian_Cluster_Hs(double ****RH, double *Hs, int *MP, int spin, int my
 
   /* H1 -> H */
 
-  
   if (spin==myworld1){
 
     for(i=0;i<na_rows*na_cols;i++){
@@ -193,7 +192,7 @@ void Hamiltonian_Cluster_Hs(double ****RH, double *Hs, int *MP, int spin, int my
 		}
 		jl = jl-nblk;
 	      }
-	      Hs[(jl-1)*na_rows+il-1] += H1[k];
+	      Hs[(jl-1)*na_rows+il-1] += H1[k]; 
 	    }
 	    
 	    k++;
@@ -202,8 +201,26 @@ void Hamiltonian_Cluster_Hs(double ****RH, double *Hs, int *MP, int spin, int my
       }
     }
 
+    /*
+    for (i=0; i<na_rows; i++){
+      for (j=0; j<na_rows; j++){
+	Hs[i*na_rows+j] += 0.25*Hex[i*na_rows+j];
+      }
+    }
+    */
 
-  }
+
+    /*
+    printf("WWW1\n");
+    for (i=0; i<na_rows; i++){
+      for (j=0; j<na_rows; j++){
+        printf("%7.4f ", Hs[i*na_rows+j]);
+      }
+      printf("\n");
+    }
+    */
+     
+  } // if (spin==myworld1)
 
   /* freeing of arrays */
 

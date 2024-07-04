@@ -399,7 +399,7 @@ double Mulliken_Charge( char *mode )
         Total_Mul_up += InitN_USpin[Gc_AN];
         Total_Mul_dn += InitN_USpin[Gc_AN];
 
-        if (Gc_AN<=20 && 1<=level_stdout){
+        if (MYID_MPI_COMM_WORLD==Host_ID && Gc_AN<=20 && 1<=level_stdout){
           printf(" %4d %4s  MulP %8.4f%8.4f sum %8.4f\n",
                   Gc_AN,SpeName[wan1],
                   InitN_USpin[Gc_AN],InitN_USpin[Gc_AN],
@@ -411,7 +411,7 @@ double Mulliken_Charge( char *mode )
         Total_Mul_up += InitN_USpin[Gc_AN];
         Total_Mul_dn += InitN_DSpin[Gc_AN];
 
-        if (Gc_AN<=20 && level_stdout<=1){
+        if (MYID_MPI_COMM_WORLD==Host_ID && Gc_AN<=20 && level_stdout<=1){
           printf(" %4d %4s  MulP %8.4f %8.4f sum %8.4f diff %8.4f\n",
                     Gc_AN,SpeName[wan1],
                     InitN_USpin[Gc_AN],InitN_DSpin[Gc_AN],
@@ -440,7 +440,7 @@ double Mulliken_Charge( char *mode )
         Total_Mul_up += InitN_USpin[Gc_AN];
         Total_Mul_dn += InitN_DSpin[Gc_AN];
 
-        if (Gc_AN<=20 && level_stdout<=1){
+        if (MYID_MPI_COMM_WORLD==Host_ID && Gc_AN<=20 && level_stdout<=1){
           printf(" %4d %4s  MulP%5.2f%5.2f sum %5.2f diff %5.2f (%6.2f %6.2f)  Ml %4.2f (%6.2f %6.2f)  Ml+s %4.2f (%6.2f %6.2f)\n",
                  Gc_AN,SpeName[wan1],
                  InitN_USpin[Gc_AN],InitN_DSpin[Gc_AN],
@@ -460,12 +460,12 @@ double Mulliken_Charge( char *mode )
 
     } /* Gc_AN */
 
-    if (20<atomnum && level_stdout<=1){
+    if (MYID_MPI_COMM_WORLD==Host_ID && 20<atomnum && level_stdout<=1){
       printf("     ..........\n");
       printf("     ......\n\n");
     }
 
-    if (0<level_stdout){
+    if (MYID_MPI_COMM_WORLD==Host_ID && 0<level_stdout){
 
       printf(" Sum of MulP: up   =%12.5f down          =%12.5f\n",
                Total_Mul_up,Total_Mul_dn);
@@ -476,7 +476,29 @@ double Mulliken_Charge( char *mode )
     Total_Mul = Total_Mul_up + Total_Mul_dn;
   }
 
+  MPI_Bcast(&Total_Mul_up, 1, MPI_DOUBLE, Host_ID, mpi_comm_level1);
+  MPI_Bcast(&Total_Mul_dn, 1, MPI_DOUBLE, Host_ID, mpi_comm_level1);
   MPI_Bcast(&Total_Mul, 1, MPI_DOUBLE, Host_ID, mpi_comm_level1);
+
+  /* find Cluster_HOMO */
+
+  double geta=1.0e-3;
+
+  if ( 0.05<(Total_Mul_up-(int)(Total_Mul_up+geta)) ){
+    Cluster_HOMO[0] = (int)(Total_Mul_up+geta) + 1;
+  }
+  else{
+    Cluster_HOMO[0] = (int)(Total_Mul_up+geta);
+  } 
+
+  if ( 0.05<(Total_Mul_dn-(int)(Total_Mul_dn+geta)) ){
+    Cluster_HOMO[1] = (int)(Total_Mul_dn+geta) + 1;
+  }
+  else{
+    Cluster_HOMO[1] = (int)(Total_Mul_dn+geta);
+  } 
+
+  //printf("Total_Mul_up=%18.15f Total_Mul_dn=%18.15f  Cluster_HOMO %2d %2d\n",Total_Mul_up,Total_Mul_dn,Cluster_HOMO[0],Cluster_HOMO[1]);
 
   /********************************************************
     check the stability of the eigenvalue solver 
@@ -512,7 +534,7 @@ double Mulliken_Charge( char *mode )
          the overlap matrix will be rediagonalized.
       ****************************************************/  
 
-      if (myid==Host_ID && 1<level_stdout){
+      if (MYID_MPI_COMM_WORLD==Host_ID && myid==Host_ID && 1<level_stdout){
         printf("Eigensolver changed Dnum=%18.15f dste_flag=%2d rediagonalize_flag_overlap_matrix_ELPA1=%2d\n",
                 Dnum,dste_flag,rediagonalize_flag_overlap_matrix_ELPA1);
       }

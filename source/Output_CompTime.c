@@ -16,7 +16,7 @@
 #include "openmx_common.h"
 #include "mpi.h"
 
-#define Num_CompTime 21
+#define Num_CompTime 22
 
 void Output_CompTime()
 {
@@ -130,6 +130,10 @@ void Output_CompTime()
               MinID[4],MinCompTime[4],MaxID[4],MaxCompTime[4]);
       fprintf(fp,"   OutData                  = %5d %12.3f      %5d %12.3f\n",
               MinID[20],MinCompTime[20],MaxID[20],MaxCompTime[20]);
+      /* Added by N. Yamaguchi ***/
+      fprintf(fp,"   HWF                      = %5d %12.3f      %5d %12.3f\n",
+              MinID[21],MinCompTime[21],MaxID[21],MaxCompTime[21]);
+      /* ***/
       fprintf(fp,"   DFT                      = %5d %12.3f      %5d %12.3f\n",
               MinID[3],MinCompTime[3],MaxID[3],MaxCompTime[3]);
       fprintf(fp,"\n");
@@ -190,6 +194,10 @@ void Output_CompTime()
 	       MinID[4],MinCompTime[4],MaxID[4],MaxCompTime[4]);
         printf("   OutData                  = %5d %12.3f      %5d %12.3f\n",
               MinID[20],MinCompTime[20],MaxID[20],MaxCompTime[20]);
+	/* Added by N. Yamaguchi ***/
+	printf("   HWF                      = %5d %12.3f      %5d %12.3f\n",
+	      MinID[21],MinCompTime[21],MaxID[21],MaxCompTime[21]);
+	/* ***/
 	printf("   DFT                      = %5d %12.3f      %5d %12.3f\n",
 	       MinID[3],MinCompTime[3],MaxID[3],MaxCompTime[3]);
 	printf("\n");

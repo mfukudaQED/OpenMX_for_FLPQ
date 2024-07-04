@@ -60,10 +60,10 @@ void Set_Vpot(int MD_iter,
   if (XC_switch==6){
 
     Set_XC_NL1_Grid(SCF_iter,XC_P_switch,XC_switch,
-		    Density_Grid_D[0],Density_Grid_D[1],
-		    Density_Grid_D[2],Density_Grid_D[3],
-		    Vxc_Grid_D[0], Vxc_Grid_D[1],
-		    Vxc_Grid_D[2], Vxc_Grid_D[3],
+		    Density_Grid_B[0],Density_Grid_B[1],
+		    Density_Grid_B[2],Density_Grid_B[3],
+		    Vxc_Grid_B[0], Vxc_Grid_B[1],
+		    Vxc_Grid_B[2], Vxc_Grid_B[3],
 		    NULL,NULL);
   }
 
@@ -75,27 +75,25 @@ void Set_Vpot(int MD_iter,
 		Vxc_Grid_D[0], Vxc_Grid_D[1],
 		Vxc_Grid_D[2], Vxc_Grid_D[3],
 		NULL,NULL);
-  }
 
-  /****************************************************
-             copy Vxc_Grid_D to Vxc_Grid_B
-  ****************************************************/
+    /* copy Vxc_Grid_D to Vxc_Grid_B */
 
-  Ng1 = Max_Grid_Index_D[1] - Min_Grid_Index_D[1] + 1;
-  Ng2 = Max_Grid_Index_D[2] - Min_Grid_Index_D[2] + 1;
-  Ng3 = Max_Grid_Index_D[3] - Min_Grid_Index_D[3] + 1;
+    Ng1 = Max_Grid_Index_D[1] - Min_Grid_Index_D[1] + 1;
+    Ng2 = Max_Grid_Index_D[2] - Min_Grid_Index_D[2] + 1;
+    Ng3 = Max_Grid_Index_D[3] - Min_Grid_Index_D[3] + 1;
 
-  for (n=0; n<Num_Rcv_Grid_B2D[myid]; n++){
-    DN = Index_Rcv_Grid_B2D[myid][n];
-    BN = Index_Snd_Grid_B2D[myid][n];
+    for (n=0; n<Num_Rcv_Grid_B2D[myid]; n++){
+      DN = Index_Rcv_Grid_B2D[myid][n];
+      BN = Index_Snd_Grid_B2D[myid][n];
 
-    i = DN/(Ng2*Ng3);
-    j = (DN-i*Ng2*Ng3)/Ng3;
-    k = DN - i*Ng2*Ng3 - j*Ng3; 
+      i = DN/(Ng2*Ng3);
+      j = (DN-i*Ng2*Ng3)/Ng3;
+      k = DN - i*Ng2*Ng3 - j*Ng3; 
 
-    if ( !(i<=1 || (Ng1-2)<=i || j<=1 || (Ng2-2)<=j || k<=1 || (Ng3-2)<=k)){
-      for (spin=0; spin<=SpinP_switch; spin++){
-        Vxc_Grid_B[spin][BN] = Vxc_Grid_D[spin][DN];
+      if ( !(i<=1 || (Ng1-2)<=i || j<=1 || (Ng2-2)<=j || k<=1 || (Ng3-2)<=k)){
+	for (spin=0; spin<=SpinP_switch; spin++){
+	  Vxc_Grid_B[spin][BN] = Vxc_Grid_D[spin][DN];
+	}
       }
     }
   }
@@ -259,7 +257,6 @@ void Set_Vpot(int MD_iter,
 
     }
     else{  
-     
       if (ProExpn_VNA==0){
         for (spin=0; spin<=SpinP_switch; spin++){
           for (MN=0; MN<My_NumGridB_AB; MN++){

@@ -20,6 +20,13 @@
 
 #define  measure_time   0
 
+void solve_evp_complex_( int *n2, int *MaxN, dcomplex *Hs2, int *na_rows2_1, double *a, dcomplex *Cs2, int *na_rows2_2, 
+                         int *nblk2, int *mpi_comm_rows_int, int *mpi_comm_cols_int );
+
+void elpa_solve_evp_complex_2stage_double_impl_( int *n2, int *MaxN, dcomplex *Hs2, int *na_rows2_1, double *a, dcomplex *Cs2, 
+                                                 int *na_rows2_2, int *nblk2, int *na_cols2, 
+                                                 int *mpi_comm_rows_int, int *mpi_comm_cols_int, int *mpiworld );
+
 
 static void Eigen_Original_PHH(MPI_Comm MPI_Current_Comm_WD,
 			       dcomplex **ac, double *ko, int n, int EVmax, int bcast_flag);
@@ -46,7 +53,8 @@ void Eigen_PHH(MPI_Comm MPI_Current_Comm_WD,
   else if (scf_eigen_lib_flag==0 || n<100)
     Eigen_Improved_PHH(MPI_Current_Comm_WD, ac, ko, n, EVmax, bcast_flag);
 
-  else if (scf_eigen_lib_flag==1)
+  /* ELPA1 is used in case of numprocs=1 since ELPA2 seems to be unstable when numprocs=1. */
+  else if (scf_eigen_lib_flag==1 || numprocs==1)
     Eigen_ELPA1_Co(MPI_Current_Comm_WD, ac, ko, n, EVmax, bcast_flag);
 
 #ifndef kcomp

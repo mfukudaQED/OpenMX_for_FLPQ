@@ -40,7 +40,7 @@ typedef struct {
  
 
 void Runtest(char *mode, int argc, char *argv[]) 
-{
+{ 
   FILE *fp,*fp0,*fp1,*fp2,*fp3;
   int Num_DatFiles,i,j,k,fp_OK;
   int Num_Atoms;
@@ -49,6 +49,7 @@ void Runtest(char *mode, int argc, char *argv[])
   double Utot1,Utot2,dU,dF;
   double Spread1,Spread2;
   double Omega1,Omega2;
+  double DM_func1,DM_func2;
   /*S Mitsuaki Kawamura*/
   double AveCurrent1, AveCurrent2, EigenChannel1, EigenChannel2;
   /*E Mitsuaki Kawamura*/
@@ -110,6 +111,10 @@ void Runtest(char *mode, int argc, char *argv[])
     input_dir = "cellopt_example";
     output_file = "runtestC.result";
   }
+  else if (strcasecmp(mode,"CWF")==0){  
+    input_dir = "cwf_example";
+    output_file = "runtestCWF.result";
+  }
   else if (strcasecmp(mode,"WF")==0){  
     input_dir = "wf_example";
     output_file = "runtestWF.result";
@@ -142,7 +147,7 @@ void Runtest(char *mode, int argc, char *argv[])
     printf("\n*******************************************************\n");  fflush(stdout);
     printf("*******************************************************\n");    fflush(stdout);
     printf(" Welcome to OpenMX   Ver. %s                           \n",Version_OpenMX); fflush(stdout);
-    printf(" Copyright (C), 2002-2019, T.Ozaki                     \n");    fflush(stdout);
+    printf(" Copyright (C), 2002-2019, T. Ozaki                    \n");    fflush(stdout);
     printf(" OpenMX comes with ABSOLUTELY NO WARRANTY.             \n");    fflush(stdout);
     printf(" This is free software, and you are welcome to         \n");    fflush(stdout);
     printf(" redistribute it under the constitution of the GNU-GPL.\n");    fflush(stdout);
@@ -263,8 +268,11 @@ void Runtest(char *mode, int argc, char *argv[])
 	input_open(fname_out1);
 	input_double("Utot.",&Utot1,(double)0.0);
 
+	/* for closest Wannier functions */
+	if (strcasecmp(mode,"CWF")==0){  
+	  input_double("DM_func.",&DM_func1,(double)0.0);
+	}
 	/* for Wannier functions */
-
 	if (strcasecmp(mode,"WF")==0){  
 	  input_double("Sum.of.Spreads.",&Spread1,(double)0.0);
 	  input_double("Total.Omega.=",&Omega1,(double)0.0);
@@ -284,7 +292,7 @@ void Runtest(char *mode, int argc, char *argv[])
 
 	TotalTime += time1;
 
-	if (fp3=input_find("<coordinates.forces")) {
+	if ( (fp3=input_find("<coordinates.forces")) != NULL ) {
           
 	  fscanf(fp3,"%d",&Num_Atoms);
 
@@ -313,9 +321,12 @@ void Runtest(char *mode, int argc, char *argv[])
 
 	input_double("Utot.",&Utot2,(double)0.0);
 
+	/* for closest Wannier functions */
+	if (strcasecmp(mode,"CWF")==0){  
+	  input_double("DM_func.",&DM_func2,(double)0.0);
+	}
 	/* for Wannier functions */
-
-	if (strcasecmp(mode,"WF")==0){  
+	else if (strcasecmp(mode,"WF")==0){  
 	  input_double("Sum.of.Spreads.",&Spread2,(double)0.0);
 	  input_double("Total.Omega.=",&Omega2,(double)0.0);
 	}
@@ -334,7 +345,7 @@ void Runtest(char *mode, int argc, char *argv[])
 
 	/* coordinates and forces */
 
-	if (fp3=input_find("<coordinates.forces")) {
+	if ( (fp3=input_find("<coordinates.forces")) != NULL ) {
           
 	  fscanf(fp3,"%d",&Num_Atoms);
 
@@ -371,8 +382,13 @@ void Runtest(char *mode, int argc, char *argv[])
 	      fprintf(fp2,"  You may use a different radix for FFT.\n");
 	    }
 
-	  if (strcasecmp(mode,"WF")==0){  
-
+          /* CWF */
+	  if (strcasecmp(mode,"CWF")==0){  
+	    fprintf(fp2,"%4d  %-32.30s Elapsed time(s)=%8.2f  diff DM_func=%15.12f\n",
+		    i+1,fname_dat,time1,fabs(DM_func1-DM_func2));
+	  }
+          /* WF */
+	  else if (strcasecmp(mode,"WF")==0){  
 	    fprintf(fp2,"%4d  %-32.30s Elapsed time(s)=%8.2f  diff spread=%15.12f  diff Omega=%15.12f\n",
 		    i+1,fname_dat,time1,fabs(Spread1-Spread2),fabs(Omega1-Omega2));
 	  }
@@ -564,6 +580,9 @@ void Runtest(char *mode, int argc, char *argv[])
     free(fndat);
   }
 
+#ifdef LEAK_DETECT
+  leak_detect_check();
+#endif
 
   MPI_Barrier(mpi_comm_level1);
   MPI_Finalize();
@@ -594,6 +613,10 @@ int run_main(int argc, char *argv[], int numprocs0, int myid0)
   int complete;
   MPI_Request request;
   MPI_Status  status;
+
+#ifdef LEAK_DETECT
+  leak_detect_init();
+#endif
 
   /* for measuring elapsed time */
 
@@ -759,34 +782,14 @@ int run_main(int argc, char *argv[], int numprocs0, int myid0)
 
   PrintMemory("total",0,"sum");
 
-  /****************************************************
-         reconstruct the original MPI group
-  ****************************************************/
-
-  if (0){
-    int *new_ranks; 
-    MPI_Group  new_group,old_group; 
-
-    new_ranks = (int*)malloc(sizeof(int)*numprocs0);
-    for (i=0; i<numprocs0; i++) {
-      new_ranks[i]=i; /* a new group is made of original rank=0:Pnum[k]-1 */
-    }
-
-    MPI_Comm_group(mpi_comm_level1, &old_group);
-
-    /* define a new group */
-    MPI_Group_incl(old_group,numprocs0,new_ranks,&new_group);
-    MPI_Comm_create(mpi_comm_level1,new_group,&mpi_comm_level1);
-
-    MPI_Group_free(&new_group);
-
-    free(new_ranks); /* never forget cleaning! */
-  }
-
   MPI_Barrier(mpi_comm_level1);
   if (myid0==Host_ID){
     printf("\nThe calculation was normally finished.\n");
   }
+
+#ifdef LEAK_DETECT
+  leak_detect_check();
+#endif
 
   return 0;
 }

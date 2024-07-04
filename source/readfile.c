@@ -1,7 +1,7 @@
 /**********************************************************************
   readfile.c:
 
-     readfile.c is a subrutine to read a input file or restart file.
+     readfile.c is a subrutine to read an input file or restart file.
 
   Log of readfile.c:
 

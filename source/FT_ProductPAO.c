@@ -6,7 +6,7 @@
 
   Log of FT_ProductPAO.c:
 
-     18/May/2004  Released by T.Ozaki
+     18/May/2004  Released by T. Ozaki
 
 ***********************************************************************/
 
@@ -234,7 +234,6 @@ void FT_ProductPAO()
 
 		      SumTmp = 0.0;
 		      for (i=0; i<GL_Mesh; i++){
-			r = RGL[i];
 			sj = SphB[l][i];
 			SumTmp += Tmp_RGL[i]*sj*GL_PAO[GL1][Mul1][i]*GL_PAO[GL2][Mul2][i];
 		      }
@@ -365,7 +364,7 @@ void FT_ProductPAO()
   dtime(&TEtime);
 
   /*
-  printf("myid=%2d Elapsed Time (s) = %15.12f\n",myid,TEtime-TStime);
+  printf("FT_ProductPAO: myid=%2d Elapsed Time (s) = %15.12f\n",myid,TEtime-TStime);
   MPI_Finalize();
   exit(0);
   */

@@ -73,6 +73,10 @@ void Maketest(char *mode, int argc, char *argv[])
     dir = "cellopt_example";
     sprintf(namemode,"runtestC");
   }
+  else if (strcasecmp(mode,"CWF")==0){  
+    dir = "cwf_example";
+    sprintf(namemode,"runtestCWF");
+  }
   else if (strcasecmp(mode,"WF")==0){  
     dir = "wf_example";
     sprintf(namemode,"runtestWF");

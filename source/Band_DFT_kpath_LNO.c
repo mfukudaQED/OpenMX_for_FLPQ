@@ -111,7 +111,7 @@ void Band_DFT_kpath_Col( int nkpath, int *n_perk,
 
   /*d*/
   if (myid==Host_ID && 0<level_stdout){
-    printf("Band_DFT_kpath start\n");fflush(stdout);
+    printf("Band_DFT_kpath_LNO start\n");fflush(stdout);
   }  
 
   dtime(&TStime);
@@ -605,7 +605,7 @@ void Band_DFT_kpath_Col( int nkpath, int *n_perk,
 
   if (myid==Host_ID) {
 
-    strcpy(file_Band,".Band");
+    strcpy(file_Band,".LNO.Band");
     fnjoint(filepath,filename,file_Band);  
 
     if ((fp_Band = fopen(file_Band,"w"))==NULL) {
@@ -1224,7 +1224,7 @@ void Band_DFT_kpath_NonCol( int nkpath, int *n_perk,
 
   if (myid==Host_ID) {
 
-    strcpy(file_Band,".Band");
+    strcpy(file_Band,".LNO.Band");
     fnjoint(filepath,filename,file_Band);  
 
     if ((fp_Band = fopen(file_Band,"w"))==NULL) {

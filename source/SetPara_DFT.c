@@ -14,6 +14,7 @@
 #include <stdlib.h> 
 #include <math.h>
 #include <string.h>
+#include <complex.h>
 #include "openmx_common.h"
 #include "Inputtools.h"
 #include "mpi.h"
@@ -32,6 +33,23 @@ static double Int_phi0_phi1( double *phi0, double *phi1,
                              double *MXV, double *MRV, int Grid_Num );
 static void Inverse(int n, double **a, double **ia);
 static void output_structures();
+
+/*******************************************************
+ double complex ******CWF_Coef_NC;
+  LNO_WF coefficients w.r.t. PAOs within the NC-DFT
+  for generation of cube files 
+  size: CWF_Coef_NC
+                 [CWF_fileout_Num]
+                 [CWF_Num_predefined[wan1]]
+                 [2*CWF_Plot_SuperCells[0]+1]
+                 [2*CWF_Plot_SuperCells[1]+1]
+                 [2*CWF_Plot_SuperCells[2]+1]
+                 [n2] 
+  allocation: SetPara_DFT.c
+  free:       Free_Arrays(0) in openmx.c
+*******************************************************/
+double complex ******CWF_Coef_NC;
+
 
 void SetPara_DFT()
 {
@@ -203,12 +221,6 @@ void SetPara_DFT()
    are allocated as global arrays.
   ***************************************************/
 
-  j = 0;
-  for (i=1; i<=atomnum; i++){
-    wanA  = WhatSpecies[i];
-    j  = j + Spe_Total_CNO[wanA];
-  }
-
   if (Solver==2){
 
     j = 0;
@@ -222,6 +234,96 @@ void SetPara_DFT()
     IEV_S = (double*)malloc(sizeof(double)*(Size_Total_Matrix+1));
 
     alloc_first[9] = 0;
+  }
+
+  /***************************************************
+        allocation of CWF_Coef or CWF_Coef_NC
+  ***************************************************/
+
+  if (CWF_Calc==1 && CWF_fileout_flag==1){
+
+    if ( SpinP_switch==0 || SpinP_switch==1 ){
+
+      int Gc_AN,wan1,p,spin,l1,l2,l3,pnum,gidx;
+
+      j = 0;
+      for (i=1; i<=atomnum; i++){
+	wanA  = WhatSpecies[i];
+	j += Spe_Total_CNO[wanA];
+      }
+
+      CWF_Coef = (double*******)malloc(sizeof(double******)*(SpinP_switch+1));
+      for (spin=0; spin<(SpinP_switch+1); spin++){
+	CWF_Coef[spin] = (double******)malloc(sizeof(double*****)*CWF_fileout_Num);
+	for (k=0; k<CWF_fileout_Num; k++){
+
+	  if (CWF_Guiding_Orbital==1 || CWF_Guiding_Orbital==2){
+	    Gc_AN = CWF_file_Atoms[k];
+	    wan1 = WhatSpecies[Gc_AN];
+	    pnum = CWF_Num_predefined[wan1];
+	  }
+	  else if (CWF_Guiding_Orbital==3){
+	    gidx = CWF_file_MOs[k];
+	    pnum = Num_CWF_MOs_Group[gidx];
+	  }
+
+	  CWF_Coef[spin][k] = (double*****)malloc(sizeof(double****)*pnum);
+	  for (p=0; p<pnum; p++){
+	    CWF_Coef[spin][k][p] = (double****)malloc(sizeof(double***)*(2*CWF_Plot_SuperCells[0]+1));
+	    for (l1=0; l1<(2*CWF_Plot_SuperCells[0]+1); l1++){
+	      CWF_Coef[spin][k][p][l1] = (double***)malloc(sizeof(double**)*(2*CWF_Plot_SuperCells[1]+1));
+	      for (l2=0; l2<(2*CWF_Plot_SuperCells[1]+1); l2++){
+		CWF_Coef[spin][k][p][l1][l2] = (double**)malloc(sizeof(double*)*(2*CWF_Plot_SuperCells[2]+1));
+		for (l3=0; l3<(2*CWF_Plot_SuperCells[2]+1); l3++){
+		  CWF_Coef[spin][k][p][l1][l2][l3] = (double*)malloc(sizeof(double)*j);
+		  for (i=0; i<j; i++) CWF_Coef[spin][k][p][l1][l2][l3][i] = 0.0;
+		}
+	      }
+	    }
+	  }
+	}
+      }
+    }
+
+    else if ( SpinP_switch==3 ){
+
+      int Gc_AN,wan1,p,spin,l1,l2,l3,pnum,gidx;
+
+      j = 0;
+      for (i=1; i<=atomnum; i++){
+	wanA  = WhatSpecies[i];
+	j += Spe_Total_CNO[wanA];
+      }
+
+      CWF_Coef_NC = (double complex******)malloc(sizeof(double complex*****)*CWF_fileout_Num);
+      for (k=0; k<CWF_fileout_Num; k++){
+
+	if (CWF_Guiding_Orbital==1 || CWF_Guiding_Orbital==2){
+	  Gc_AN = CWF_file_Atoms[k];
+	  wan1 = WhatSpecies[Gc_AN];
+	  pnum = 2*CWF_Num_predefined[wan1];
+	}
+	else if (CWF_Guiding_Orbital==3){
+	  gidx = CWF_file_MOs[k];
+	  pnum = Num_CWF_MOs_Group[gidx];
+	}
+
+	CWF_Coef_NC[k] = (double complex*****)malloc(sizeof(double complex****)*pnum);
+	for (p=0; p<pnum; p++){
+	  CWF_Coef_NC[k][p] = (double complex****)malloc(sizeof(double complex***)*(2*CWF_Plot_SuperCells[0]+1));
+	  for (l1=0; l1<(2*CWF_Plot_SuperCells[0]+1); l1++){
+	    CWF_Coef_NC[k][p][l1] = (double complex***)malloc(sizeof(double complex**)*(2*CWF_Plot_SuperCells[1]+1));
+	    for (l2=0; l2<(2*CWF_Plot_SuperCells[1]+1); l2++){
+	      CWF_Coef_NC[k][p][l1][l2] = (double complex**)malloc(sizeof(double complex*)*(2*CWF_Plot_SuperCells[2]+1));
+	      for (l3=0; l3<(2*CWF_Plot_SuperCells[2]+1); l3++){
+		CWF_Coef_NC[k][p][l1][l2][l3] = (double complex*)malloc(sizeof(double complex)*2*j);
+		for (i=0; i<2*j; i++) CWF_Coef_NC[k][p][l1][l2][l3][i] = 0.0 + 0.0*I;
+	      }
+	    }
+	  }
+	}
+      }
+    }
   }
 
   /***************************************************
@@ -538,6 +640,28 @@ void ReadPara_DFT()
     }
   }
 
+
+  /*
+  {
+    double r,sum=0.0,dx;
+    dx = Spe_VPS_XV[0][1] - Spe_VPS_XV[0][0];
+    for (i=0; i<Spe_Num_Mesh_VPS[0]; i++){
+      r = Spe_VPS_RV[0][i];
+      printf("%15.12f %15.12f %15.12f %15.12f\n",
+         Spe_VPS_RV[0][i],Nonlocal_RadialF(0,0,0,r),Spe_VNL[0][0][0][i],RadialF(0,0,0,r));
+
+      sum += Spe_VNL[0][0][0][i]*RadialF(0,0,0,r)*r*r*r*dx;
+
+      //sum += RadialF(0,0,0,r)*RadialF(0,0,0,r)*r*r*r*dx;
+
+    }
+    printf("sum=%15.12f\n",sum);  
+  }
+  
+  MPI_Finalize();
+  exit(0);
+  */
+
 }
 
 void Read_PAO(int spe, char *file)
@@ -580,7 +704,7 @@ void Read_PAO(int spe, char *file)
   /* density */
 
   if (remake_headfile==0){
-    if (fp=input_find("<valence.charge.density")) {
+    if ( (fp=input_find("<valence.charge.density")) != NULL ) {
       for (i=0; i<Spe_Num_Mesh_PAO[spe]; i++){
 	for (j=0; j<=2; j++){
 	  if (fscanf(fp,"%lf",&dum)==EOF){
@@ -631,7 +755,7 @@ void Read_PAO(int spe, char *file)
     for (L=0; L<=Spe_PAO_LMAX[spe]; L++){
       sprintf(file1,"<pseudo.atomic.orbitals.L=%i",L);
       sprintf(file2,"pseudo.atomic.orbitals.L=%i>",L);
-      if (fp=input_find(file1)) {
+      if ( (fp=input_find(file1)) != NULL ) {
 	for (i=0; i<Spe_Num_Mesh_PAO[spe]; i++){
 	  for (j=0; j<=(Spe_PAO_Mul[spe]+1); j++){
 	    if (fscanf(fp,"%lf",&dum)==EOF){
@@ -653,6 +777,32 @@ void Read_PAO(int spe, char *file)
 	/* format error */
 	printf("Format error in pseudo.atomic.orbitals.L=%i\n",L);
 	exit(0);
+      }
+    }
+  }
+
+  /* if (core_hole_state_flag==1) find 'core_hole_state_ev'. */
+
+  if (core_hole_state_flag==1 && spe==WhatSpecies[Core_Hole_Atom]){
+
+    char char1[10],char2[10];
+    double val;
+    int L,l,mu,i,j;
+
+    if      (strcmp(Core_Hole_Orbital,"s")==0) L = 0;   
+    else if (strcmp(Core_Hole_Orbital,"p")==0) L = 1;   
+    else if (strcmp(Core_Hole_Orbital,"d")==0) L = 2;   
+    else if (strcmp(Core_Hole_Orbital,"f")==0) L = 3;   
+
+    if ( (fp=input_find("Lmax=")) != NULL ) {
+
+      for (l=0; l<=Spe_PAO_LMAX[spe]; l++){
+	for (mu=0; mu<Spe_PAO_Mul[spe]; mu++){
+	  fscanf(fp,"%s %s %d %d %lf",char1,char2,&i,&j,&val);
+          if (i==L && j==0){
+            core_hole_state_ev = val;            
+	  }
+	}
       }
     }
   }
@@ -769,7 +919,7 @@ void Read_VPS(int spe, char *file)
        a new format from adpack1.2 and abred1.3
   **************************************************/
  
-  if (fp=input_find("<project.energies")){
+  if ( (fp=input_find("<project.energies")) != NULL ){
 
     if (2<=level_stdout){
       printf("<Read_VPS>  VPS of %s was a format of ADPACK1.7\n",SpeVPS[spe]);
@@ -856,7 +1006,7 @@ void Read_VPS(int spe, char *file)
     /* Pseudopotentials */
 
     if (remake_headfile==0){
-      if (fp=input_find("<Pseudo.Potentials")){
+      if ( (fp=input_find("<Pseudo.Potentials")) != NULL ){
         for (i=0; i<Spe_Num_Mesh_VPS[spe]; i++){
 
 	  for (j=0; j<=( (VPS_j_dependency[spe]+1)*Spe_Num_RVPS[spe]+2 ); j++){
@@ -957,7 +1107,7 @@ void Read_VPS(int spe, char *file)
       printf("<Read_VPS>  spe=%2d  local_part_vps=%2d\n",spe,local_part_vps);
     }
 
-    if (fp=input_find("<pseudo.NandL")) {
+    if ( (fp=input_find("<pseudo.NandL")) != NULL ) {
       k = 0;
       t = 0;
       maxL = 0;
@@ -1022,7 +1172,7 @@ void Read_VPS(int spe, char *file)
 
     if (remake_headfile==0){
       if (0<Spe_Num_RVPS[spe]){
-        if (fp=input_find("<projection.energies")) {
+        if ( (fp=input_find("<projection.energies")) != NULL ) {
 	  for (i=0; i<Spe_Num_RVPS[spe]; i++){
 
 	    fscanf(fp,"%d %lf",&j,&Spe_VNLE[0][spe][i]);
@@ -1042,7 +1192,7 @@ void Read_VPS(int spe, char *file)
     /* Pseudo_Potentials */
 
     if (remake_headfile==0){
-      if (fp=input_find("<Pseudo.Potentials")){
+      if ( (fp=input_find("<Pseudo.Potentials")) != NULL ){
         for (i=0; i<Spe_Num_Mesh_VPS[spe]; i++){
   	  for (j=0; j<=(Spe_Num_RVPS[spe]+2); j++){
 	    if (fscanf(fp,"%lf",&dum)==EOF){
@@ -2139,15 +2289,17 @@ void Check_InitDensity()
     cwan = WhatSpecies[ct_AN];
     charge = Spe_Core_Charge[cwan] - (InitN_USpin[ct_AN] + InitN_DSpin[ct_AN]);
 
+    /*
     if (10e-14<fabs(charge) && Number_of_Electrons_Species_flag==0){
 
       if (myid==Host_ID){
         printf("Invalid values for the initial densities of atom %i (valid sum: %6.3f)\n",
 	       ct_AN,Spe_Core_Charge[cwan]);
       }
-
       po++;
     }
+    */
+
   }
 
   if (po!=0){

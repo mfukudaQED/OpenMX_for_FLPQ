@@ -13,6 +13,8 @@ xx/Xxx/2015  Released by M. Kawamura
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <unistd.h>
+#include <string.h>
 #include <mpi.h>
 #include "openmx_common.h"
 

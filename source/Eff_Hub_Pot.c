@@ -686,8 +686,9 @@ void H_U_dual(int SCF_iter, double ****OLP0)
 	      Imsum00 += NC_v_eff[0][0][Mj_AN][k][n].i * OLP0[Mc_AN][j][m][k];
 	      Imsum11 += NC_v_eff[1][1][Mj_AN][k][n].i * OLP0[Mc_AN][j][m][k];
 	      Imsum01 += NC_v_eff[0][1][Mj_AN][k][n].i * OLP0[Mc_AN][j][m][k];
-	    }
 
+	    }
+            
             /* real part */
 
 	    H_Hub[0][Mc_AN][j][m][n] = 0.5*Resum00;
@@ -699,6 +700,7 @@ void H_U_dual(int SCF_iter, double ****OLP0)
             iHNL[0][Mc_AN][j][m][n] = iHNL0[0][Mc_AN][j][m][n] + 0.5*F_U_flag*Imsum00;
             iHNL[1][Mc_AN][j][m][n] = iHNL0[1][Mc_AN][j][m][n] + 0.5*F_U_flag*Imsum11;
             iHNL[2][Mc_AN][j][m][n] = iHNL0[2][Mc_AN][j][m][n] + 0.5*F_U_flag*Imsum01;
+
 	  }
 	}
       }

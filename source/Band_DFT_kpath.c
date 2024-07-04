@@ -105,7 +105,7 @@ void Band_DFT_kpath_Col( int nkpath, int *n_perk,
   
   /* d */
   if (myid==Host_ID && 0<level_stdout){
-    printf("Band_DFT_kpath start\n");fflush(stdout);
+    printf("Band_DFT_kpath starts.\n");fflush(stdout);
   }  
   
   dtime(&TStime);

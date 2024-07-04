@@ -245,6 +245,9 @@ static double Band_DFT_DosoutGauss_Col(
 	  tno0 = Spe_Total_NO[Cwan];  
 	}    
 
+        /* Though PDM has been allocated as global array, 
+           the following allocates locally, which requires a care  */
+
 	PDM[k][Gc_AN] = (double***)malloc(sizeof(double**)*(FNAN[Gc_AN]+1));
 	for (h_AN=0; h_AN<=FNAN[Gc_AN]; h_AN++){
 
@@ -2790,7 +2793,7 @@ static double Band_DFT_Dosout_Col(
                            double *****ImNL,
                            double ****CntOLP)
 {
-  int i,j,k,spin,l,i1,j1,n1;
+  int i,j,k,spin,l,i1,j1,n1,i3;
   int n, wanA;
   int *MP;
   int MA_AN, GA_AN, tnoA,Anum, LB_AN;
@@ -2801,6 +2804,7 @@ static double Band_DFT_Dosout_Col(
   int MaxL,e1,s1;  
   int h_AN,tno0,tno1,Gh_AN,Hwan,Gc_AN,Cwan;
   int i_vec[10];
+  double *d_vec;;
   double sum,sumi,u2,v2,uv,vu,tmp;
   double FermiF1,FermiF2,x1,x2,diffF;
   double x_cut=50.0;
@@ -2816,7 +2820,10 @@ static double Band_DFT_Dosout_Col(
   double *M1,***EIGEN, ****PROJ;
   dcomplex **C;  int N_C,  i_C[10];
   double *KGrids1, *KGrids2, *KGrids3;
-  float *SD; int N_SD, i_SD[10];
+  float *SD;
+  double ***COHP,****H_COHP;
+  double ***COOP,****S_COOP;
+  int N_SD, i_SD[10];
   dcomplex ***H2;
   double *T_KGrids1,*T_KGrids2,*T_KGrids3;
   int *Ti_KGrids1,*Tj_KGrids2,*Tk_KGrids3,*arpo;
@@ -2827,7 +2834,8 @@ static double Band_DFT_Dosout_Col(
   double k1,k2,k3;
   char file_ev[YOUSO10],file_eig[YOUSO10];
   char file_ev0[YOUSO10];
-  FILE *fp_ev0,*fp_ev,*fp_eig;
+  char file_cohp[YOUSO10],file_cohp0[YOUSO10];
+  FILE *fp_ev0,*fp_ev,*fp_eig,*fp_cohp,*fp_cohp0;
   char buf1[fp_bsize];          /* setvbuf */
   char buf2[fp_bsize];          /* setvbuf */
   int numprocs,myid,ID,ID1,ID2,tag;
@@ -2856,7 +2864,7 @@ static double Band_DFT_Dosout_Col(
   n = 0;
   for (i=1; i<=atomnum; i++){
     wanA  = WhatSpecies[i];
-    n  += Spe_Total_CNO[wanA];
+    n += Spe_Total_CNO[wanA];
   }
 
   /****************************************************
@@ -2885,7 +2893,101 @@ static double Band_DFT_Dosout_Col(
   KGrids2 = (double*)malloc(sizeof(double)*knum_j);
   KGrids3 = (double*)malloc(sizeof(double)*knum_k);
 
-  SD=(float*)malloc(sizeof(float)*(atomnum+1)*List_YOUSO[7]);
+  SD = (float*)malloc(sizeof(float)*(n+1));
+  d_vec = (double*)malloc(sizeof(double)*List_YOUSO[7]*List_YOUSO[7]*2);
+
+  if (COHP_calc_flag==1){
+
+    COHP = (double***)malloc(sizeof(double**)*COHP_num_pairs);
+    for (i=0; i<COHP_num_pairs; i++){
+      COHP[i] = (double**)malloc(sizeof(double*)*List_YOUSO[7]);
+      for (j=0; j<List_YOUSO[7]; j++){
+        COHP[i][j] = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+      }    
+    }
+
+    H_COHP = (double****)malloc(sizeof(double***)*COHP_num_pairs);
+    for (i=0; i<COHP_num_pairs; i++){
+      H_COHP[i] = (double***)malloc(sizeof(double**)*2);
+      for (spin=0; spin<2; spin++){ 
+        H_COHP[i][spin] = (double**)malloc(sizeof(double*)*List_YOUSO[7]);
+	for (j=0; j<List_YOUSO[7]; j++){
+          H_COHP[i][spin][j] = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+  	  for (k=0; k<List_YOUSO[7]; k++){
+            H_COHP[i][spin][j][k] = 0.0;
+	  }
+	}
+      }
+    }
+
+    COOP = (double***)malloc(sizeof(double**)*COHP_num_pairs);
+    for (i=0; i<COHP_num_pairs; i++){
+      COOP[i] = (double**)malloc(sizeof(double*)*List_YOUSO[7]);
+      for (j=0; j<List_YOUSO[7]; j++){
+        COOP[i][j] = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+      }    
+    }
+
+    S_COOP = (double****)malloc(sizeof(double***)*COHP_num_pairs);
+    for (i=0; i<COHP_num_pairs; i++){
+      S_COOP[i] = (double***)malloc(sizeof(double**)*2);
+      for (spin=0; spin<2; spin++){ 
+        S_COOP[i][spin] = (double**)malloc(sizeof(double*)*List_YOUSO[7]);
+	for (j=0; j<List_YOUSO[7]; j++){
+          S_COOP[i][spin][j] = (double*)malloc(sizeof(double)*List_YOUSO[7]);
+  	  for (k=0; k<List_YOUSO[7]; k++){
+            S_COOP[i][spin][j][k] = 0.0;
+	  }
+	}
+      }
+    }
+
+    /* MPI: H_COHP and S_COOP */
+
+    for (k=0; k<COHP_num_pairs; k++){
+
+      for (MA_AN=1; MA_AN<=Matomnum; MA_AN++){
+        GA_AN = M2G[MA_AN];
+        wanA = WhatSpecies[GA_AN];
+        tnoA = Spe_Total_CNO[wanA];
+
+	for (LB_AN=0; LB_AN<=FNAN[GA_AN]; LB_AN++){
+
+	  GB_AN = natn[GA_AN][LB_AN];
+          Rn = ncn[GA_AN][LB_AN];
+	  wanB = WhatSpecies[GB_AN];
+	  tnoB = Spe_Total_CNO[wanB];
+	  l1 = atv_ijk[Rn][1];
+	  l2 = atv_ijk[Rn][2];
+	  l3 = atv_ijk[Rn][3];
+
+	  if (  GA_AN==COHP_AtomA[k]
+		&& GB_AN==COHP_AtomB[k]
+		&& l1==COHP_CellB1[k]
+		&& l2==COHP_CellB2[k]
+		&& l3==COHP_CellB3[k] ){
+
+	    for (spin=0; spin<=SpinP_switch; spin++){
+	      for (i=0; i<tnoA; i++){
+		for (j=0; j<tnoB; j++){
+		  H_COHP[k][spin][i][j] = nh[spin][MA_AN][LB_AN][i][j]; 
+		  S_COOP[k][spin][i][j] = CntOLP[MA_AN][LB_AN][i][j]; 
+		}
+	      }
+	    }
+	  }
+          
+	} // LB_AN
+      } // MA_AN            
+
+      for (spin=0; spin<=SpinP_switch; spin++){
+	for (i=0; i<List_YOUSO[7]; i++){
+          MPI_Allreduce(MPI_IN_PLACE, &H_COHP[k][spin][i][0], List_YOUSO[7], MPI_DOUBLE, MPI_SUM, mpi_comm_level1);
+          MPI_Allreduce(MPI_IN_PLACE, &S_COOP[k][spin][i][0], List_YOUSO[7], MPI_DOUBLE, MPI_SUM, mpi_comm_level1);
+	}
+      }
+    } // k
+  }
 
   H2 = (dcomplex***)malloc(sizeof(dcomplex**)*List_YOUSO[23]);
   for (i=0; i<List_YOUSO[23]; i++){
@@ -3016,15 +3118,7 @@ static double Band_DFT_Dosout_Col(
        one-dimentionalize for MPI
   ************************************/
 
-  T_knum = 0;
-  for (i=0; i<=(knum_i-1); i++){
-    for (j=0; j<=(knum_j-1); j++){
-      for (k=0; k<=(knum_k-1); k++){
-        T_knum++;
-      }
-    }
-  }
-
+  T_knum = knum_i*knum_j*knum_k;
   T_KGrids1 = (double*)malloc(sizeof(double)*T_knum);
   T_KGrids2 = (double*)malloc(sizeof(double)*T_knum);
   T_KGrids3 = (double*)malloc(sizeof(double)*T_knum);
@@ -3260,6 +3354,8 @@ static double Band_DFT_Dosout_Col(
                      eigenvalues and eigenvectors
    ****************************************************************/
 
+  /* open file pointers */
+
   if (myid==Host_ID){
 
     sprintf(file_eig,"%s%s.Dos.val",filepath,filename);
@@ -3283,6 +3379,14 @@ static double Band_DFT_Dosout_Col(
   }
   if ( fp_ev==NULL ) {
     goto Finishing;
+  }
+
+  if (COHP_calc_flag==1){
+
+    sprintf(file_cohp,"%s%s.cohp%d",filepath,filename,myid);
+    if ( (fp_cohp=fopen(file_cohp,"w"))==NULL ) {
+      printf("cannot open a file %s\n",file_cohp);
+    }
   }
 
   if (myid==Host_ID){
@@ -3333,6 +3437,22 @@ static double Band_DFT_Dosout_Col(
     }
   }
 
+  /* COHP */  
+
+  if (myid==Host_ID && COHP_calc_flag==1){
+
+    fwrite(&Solver,sizeof(int),1,fp_cohp);
+    fwrite(&SpinP_switch,sizeof(int),1,fp_cohp);
+    fwrite(&knum_i,sizeof(int),1,fp_cohp);
+    fwrite(&knum_j,sizeof(int),1,fp_cohp);
+    fwrite(&knum_k,sizeof(int),1,fp_cohp);
+
+    i = iemax - iemin + 1;
+    fwrite(&i,sizeof(int),1,fp_cohp);
+    fwrite(&COHP_num_pairs,sizeof(int),1,fp_cohp);
+    fwrite(&ChemP,sizeof(double),1,fp_cohp);
+  }
+
   /* for kloop */
 
   for (kloop0=0; kloop0<num_kloop0; kloop0++){
@@ -3357,8 +3477,7 @@ static double Band_DFT_Dosout_Col(
         k3 = T_KGrids3[kloop];
       
         Overlap_Band(ID,CntOLP,C,MP,k1,k2,k3);
-        n = C[0][0].r;
-      
+
         if (myid==ID){
 	  for (i1=1; i1<=n; i1++){
 	    for (j1=1; j1<=n; j1++){
@@ -3590,7 +3709,7 @@ static double Band_DFT_Dosout_Col(
     } /* spin */
 
     /****************************************************
-        store LDOS
+      calculate LDOS and store them to the Dos.vec file
     ****************************************************/
 
     /* set S */
@@ -3606,7 +3725,6 @@ static double Band_DFT_Dosout_Col(
         k3 = T_KGrids3[kloop];
       
         Overlap_Band(ID,CntOLP,C,MP,k1,k2,k3);
-        n = C[0][0].r;
       
         if (myid==ID){
 	  for (i1=1; i1<=n; i1++){
@@ -3615,7 +3733,7 @@ static double Band_DFT_Dosout_Col(
 	      S[i1][j1].i = C[i1][j1].i;
 	    } 
 	  } 
-        } 
+        }
       }
     }
 
@@ -3635,7 +3753,7 @@ static double Band_DFT_Dosout_Col(
 
 	  /* initialize */
 
-	  for (i1=0; i1<(atomnum+1)*List_YOUSO[7]; i1++){
+	  for (i1=0; i1<(n+1); i1++){
 	    SD[i1] = 0.0;
 	  }
 
@@ -3692,14 +3810,6 @@ static double Band_DFT_Dosout_Col(
 	  fwrite(i_vec,sizeof(int),3,fp_ev);
 	  fwrite(&SD[1],sizeof(float),n,fp_ev);
 
-
-
-
-
-	  /*
-          if ( fabs(ko[0][l]-ChemP)<0.01 && 0.01<fabs(SD[499]) ){
-	  */
-
 	  /*
           if ( fabs(ko[0][l]-ChemP)<0.05 ){
 
@@ -3708,11 +3818,131 @@ static double Band_DFT_Dosout_Col(
 	  }
 	  */
 
-
-
 	} /* l */
       } /* spin */
     } /* if (0<=kloop) */ 
+
+    /****************************************************
+                    calculation of COHP
+    ****************************************************/
+
+    if (COHP_calc_flag==1){
+
+      /* set kloop */
+
+      kloop = arpo[myid];
+
+      if (0<=kloop){
+
+	for (spin=0; spin<=SpinP_switch; spin++){
+
+	  k1 = T_KGrids1[kloop];
+	  k2 = T_KGrids2[kloop];
+	  k3 = T_KGrids3[kloop];
+
+	  for (l=iemin; l<=iemax; l++){
+
+	    /* initialize COHP and COOP */
+
+	    for (i=0; i<COHP_num_pairs; i++){
+	      for (j=0; j<List_YOUSO[7]; j++){
+		for (k=0; k<List_YOUSO[7]; k++){
+		  COHP[i][j][k] = 0.0;
+		  COOP[i][j][k] = 0.0;
+		}
+	      }    
+	    }
+
+	    /* calculate COHP and COOP */
+
+	    for (GA_AN=1; GA_AN<=atomnum; GA_AN++){
+
+	      wanA = WhatSpecies[GA_AN];
+	      tnoA = Spe_Total_CNO[wanA];
+	      Anum = MP[GA_AN];
+
+	      for (i1=0; i1<tnoA; i1++){
+
+   	        for (LB_AN=0; LB_AN<=FNAN[GA_AN]; LB_AN++){
+
+		  GB_AN = natn[GA_AN][LB_AN];
+		  Rn = ncn[GA_AN][LB_AN];
+		  wanB = WhatSpecies[GB_AN];
+		  tnoB = Spe_Total_CNO[wanB];
+		  Bnum = MP[GB_AN];
+
+		  l1 = atv_ijk[Rn][1];
+		  l2 = atv_ijk[Rn][2];
+		  l3 = atv_ijk[Rn][3];
+
+		  kRn = k1*(double)l1 + k2*(double)l2 + k3*(double)l3;
+		  si = sin(2.0*PI*kRn);
+		  co = cos(2.0*PI*kRn);
+
+		  for ( i3=0; i3<COHP_num_pairs; i3++ ){
+
+		    if (  GA_AN==COHP_AtomA[i3]
+			  && GB_AN==COHP_AtomB[i3]
+			  && l1==COHP_CellB1[i3]
+			  && l2==COHP_CellB2[i3]
+			  && l3==COHP_CellB3[i3] ){
+
+		      for (j1=0; j1<tnoB; j1++){
+
+			u2 = H2[spin][l][Anum+i1].r*H2[spin][l][Bnum+j1].r;
+			v2 = H2[spin][l][Anum+i1].i*H2[spin][l][Bnum+j1].i;
+			uv = H2[spin][l][Anum+i1].r*H2[spin][l][Bnum+j1].i;
+			vu = H2[spin][l][Anum+i1].i*H2[spin][l][Bnum+j1].r;
+
+			COHP[i3][i1][j1] = (co*(u2+v2) - si*(uv-vu))*H_COHP[i3][spin][i1][j1];
+			COOP[i3][i1][j1] = (co*(u2+v2) - si*(uv-vu))*S_COOP[i3][spin][i1][j1];
+
+		      } // j1
+
+		    } // end of if 
+		  } // i3
+		} // LB_AN
+
+	      } /* i1 */
+	    } /* GA_AN */
+
+	    /*********************************************
+                   writing a binary file 
+	    *********************************************/
+
+	    fwrite(&spin,sizeof(int),1,fp_cohp);
+	    i_vec[0] = Ti_KGrids1[kloop];
+	    i_vec[1] = Tj_KGrids2[kloop];
+	    i_vec[2] = Tk_KGrids3[kloop];
+	    fwrite(i_vec,sizeof(int),3,fp_cohp);
+	    fwrite(&ko[spin][l],sizeof(double),1,fp_cohp);
+
+	    for (i=0; i<COHP_num_pairs; i++){
+
+                                          i_vec[0] = i;
+	      GA_AN = COHP_AtomA[i];      i_vec[1] = GA_AN;
+	      GB_AN = COHP_AtomB[i];      i_vec[2] = GB_AN; 
+	      wanA = WhatSpecies[GA_AN];  
+	      wanB = WhatSpecies[GB_AN];  
+	      tnoA = Spe_Total_CNO[wanA]; i_vec[3] = tnoA;
+	      tnoB = Spe_Total_CNO[wanB]; i_vec[4] = tnoB;
+	      l1 = COHP_CellB1[i];        i_vec[5] = l1;
+	      l2 = COHP_CellB2[i];        i_vec[6] = l2;
+	      l3 = COHP_CellB3[i];        i_vec[7] = l3;
+
+	      fwrite(i_vec,sizeof(int),8,fp_cohp);
+            
+	      for (j=0; j<tnoA; j++){
+		fwrite(&COHP[i][j][0],sizeof(double),tnoB,fp_cohp);
+		fwrite(&COOP[i][j][0],sizeof(double),tnoB,fp_cohp);
+	      }
+	    }
+
+	  } /* l */
+	} /* spin */
+      } /* if (0<=kloop) */ 
+
+    } /* end of if (COHP_calc_flag==1) */ 
 
     /*********************************************
         calculation of partial density matrix
@@ -3796,26 +4026,6 @@ static double Band_DFT_Dosout_Col(
     }
 
   } /* kloop0        */
-
-  /*
-  for (kloop=0; kloop<T_knum; kloop++){
-
-    int po;
-
-    po = 0; 
-    for (i=1; i<=n; i++){
-      if ( fabs(EIGEN[0][kloop][i]-ChemP)<0.002 ) po = 1; 
-    }
-
-    if (myid==Host_ID && po==1){
-      printf("ABC1 kloop=%2d  %15.12f %15.12f %15.12f\n",kloop,T_KGrids1[kloop],T_KGrids2[kloop],T_KGrids3[kloop]);
-    }
-    
-  }
-
-  MPI_Finalize();
-  exit(0);
-  */
 
   /****************************************************
      MPI: PDM
@@ -3937,9 +4147,9 @@ Finishing:
       iemin_fs[spin] = i1;
     }
   }
-  /*
-  Atomic Projection for FermiSurfer
-  */
+
+  /* Atomic Projection for FermiSurfer */
+
   if (fermisurfer_output) {
 
     PROJ = (double****)malloc(sizeof(double***) * List_YOUSO[23]);
@@ -3964,8 +4174,12 @@ Finishing:
     fclose(fp_ev);
   }
 
+  if (COHP_calc_flag==1){
+    fclose(fp_cohp);
+  }
+
   /****************************************************
-     merge *.Dos.vec#
+                    merge *.Dos.vec#
   ****************************************************/
 
   MPI_Barrier(mpi_comm_level1);
@@ -3991,6 +4205,7 @@ Finishing:
         for (k=0; k<num_allocated_k[ID]; k++){
 	  for (spin=0; spin<=SpinP_switch; spin++){
    	    for (l=iemin; l<=iemax; l++){
+
 	      fread( i_vec,  sizeof(int),  3,fp_ev);
 	      fwrite(i_vec,  sizeof(int),  3,fp_ev0);
 	      fread( &SD[1], sizeof(float),n,fp_ev);
@@ -4012,7 +4227,6 @@ Finishing:
 		  }/*for (GA_AN = 1; GA_AN <= atomnum; GA_AN++)*/
 		}
 	      }
-
 	    }
 	  }
           kloop += 1;
@@ -4032,6 +4246,81 @@ Finishing:
     for (ID=0; ID<numprocs; ID++){
       sprintf(file_ev,"%s%s.Dos.vec%d",filepath,filename,ID);
       remove(file_ev);
+    }  
+  }
+
+  /****************************************************
+     merge *.cohp#
+  ****************************************************/
+
+  /*
+  printf("ABC2 myid=%2d\n",myid);fflush(stdout);
+  MPI_Finalize(); 
+  exit(0);
+  */
+
+  if (COHP_calc_flag==1 && myid==Host_ID){
+
+    sprintf(file_cohp0,"%s%s.cohp",filepath,filename);
+    if ( (fp_cohp0=fopen(file_cohp0,"w"))==NULL ) {
+      printf("cannot open a file %s\n",file_cohp0);
+    }
+
+    kloop = 0;
+    for (ID=0; ID<numprocs; ID++){
+
+      sprintf(file_cohp,"%s%s.cohp%d",filepath,filename,ID);
+
+      if ( 1<=num_allocated_k[ID] ){ 
+
+	if ( (fp_cohp=fopen(file_cohp,"r"))==NULL ) {
+	  printf("cannot open a file %s\n",file_cohp);
+	}
+
+        if (ID==Host_ID){
+	  fread(i_vec,  sizeof(int),7,fp_cohp);
+          fwrite(i_vec, sizeof(int),7,fp_cohp0);
+	  fread(d_vec,  sizeof(double),1,fp_cohp);
+          fwrite(d_vec, sizeof(double),1,fp_cohp0);
+	}          
+
+	for (k=0; k<num_allocated_k[ID]; k++){
+	  for (spin=0; spin<=SpinP_switch; spin++){
+	    for (l=iemin; l<=iemax; l++){
+
+	      fread( i_vec,  sizeof(int),  4, fp_cohp);
+	      fwrite(i_vec,  sizeof(int),  4, fp_cohp0);
+	      fread( d_vec, sizeof(double),1, fp_cohp);
+	      fwrite(d_vec, sizeof(double),1, fp_cohp0);
+
+  	      for (i=0; i<COHP_num_pairs; i++){
+	        fread( i_vec,  sizeof(int), 8, fp_cohp);
+	        fwrite(i_vec,  sizeof(int), 8, fp_cohp0);
+
+                tnoA = i_vec[3];
+                tnoB = i_vec[4];
+	        fread( d_vec, sizeof(double),tnoA*tnoB*2, fp_cohp);
+	        fwrite(d_vec, sizeof(double),tnoA*tnoB*2, fp_cohp0);
+	      }
+	    }
+	  }
+	  kloop += 1;
+	}
+
+	fclose(fp_cohp); 
+      }
+    }
+
+    fclose(fp_cohp0); 
+  }
+
+  MPI_Barrier(mpi_comm_level1);
+
+  /* delete files */
+  if (myid==Host_ID){
+    for (ID=0; ID<numprocs; ID++){
+      sprintf(file_cohp,"%s%s.cohp%d",filepath,filename,ID);
+      remove(file_cohp);
     }  
   }
 
@@ -4165,7 +4454,7 @@ Finishing:
     free(TD2OD);
 
   } /* if (myid==Host_ID) */
-  
+
   /****************************************************
                        free arrays
   ****************************************************/
@@ -4194,8 +4483,9 @@ Finishing:
   free(C);
 
   free(KGrids1); free(KGrids2);free(KGrids3);
-  
+
   free(SD);
+  free(d_vec);
 
   for (i=0; i<List_YOUSO[23]; i++){
     for (j=0; j<n+1; j++){
@@ -4321,6 +4611,46 @@ Finishing:
       free(PROJ[i]);
     }
     free(PROJ);
+  }
+
+  if (COHP_calc_flag==1){
+    for (i=0; i<COHP_num_pairs; i++){
+      for (j=0; j<List_YOUSO[7]; j++){
+        free(COHP[i][j]);
+      }    
+      free(COHP[i]);
+    }
+    free(COHP);
+
+    for (i=0; i<COHP_num_pairs; i++){
+      for (spin=0; spin<2; spin++){ 
+	for (j=0; j<List_YOUSO[7]; j++){
+          free(H_COHP[i][spin][j]);
+	}    
+        free(H_COHP[i][spin]);
+      }
+      free(H_COHP[i]);
+    }
+    free(H_COHP);
+
+    for (i=0; i<COHP_num_pairs; i++){
+      for (j=0; j<List_YOUSO[7]; j++){
+        free(COOP[i][j]);
+      }    
+      free(COOP[i]);
+    }
+    free(COOP);
+
+    for (i=0; i<COHP_num_pairs; i++){
+      for (spin=0; spin<2; spin++){ 
+	for (j=0; j<List_YOUSO[7]; j++){
+          free(S_COOP[i][spin][j]);
+	}    
+        free(S_COOP[i][spin]);
+      }
+      free(S_COOP[i]);
+    }
+    free(S_COOP);
   }
 
   /* for elapsed time */

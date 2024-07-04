@@ -15,12 +15,12 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-#include "openmx_common.h"
 #include "mpi.h"
+#include "openmx_common.h"
+#include "lapack_prototypes.h"
 #include <omp.h>
 
 #define  measure_time   0
-
 
 
 static double DC_Col(char *mode,
@@ -1181,7 +1181,7 @@ static double DC_Col(char *mode,
       Dnum = (TZ - Num_State) - system_charge;
       if (0.0<=Dnum) ChemP_MIN = ChemP;
       else           ChemP_MAX = ChemP;
-      if (fabs(Dnum)<1.0e-13) po = 1;
+      if (fabs(Dnum)<1.0e-11) po = 1;
 
 
       if (myid==Host_ID && 2<=level_stdout){
@@ -2777,8 +2777,8 @@ static double DC_NonCol(char *mode,
     po = 0;
     loopN = 0;
 
-    ChemP_MAX = 15.0;  
-    ChemP_MIN =-15.0;
+    ChemP_MAX = 25.0;  
+    ChemP_MIN =-25.0;
 
     do {
       ChemP = 0.50*(ChemP_MAX + ChemP_MIN);
@@ -2871,6 +2871,7 @@ static double DC_NonCol(char *mode,
 
     /* MPI, My_Eele0 */
 
+    Eele0[0] = 0.0; Eele0[1] = 0.0;
     MPI_Barrier(mpi_comm_level1);
     MPI_Allreduce(&My_Eele0[0], &Eele0[0], 1, MPI_DOUBLE, MPI_SUM, mpi_comm_level1);
     MPI_Allreduce(&My_Eele0[1], &Eele0[1], 1, MPI_DOUBLE, MPI_SUM, mpi_comm_level1);
@@ -3043,6 +3044,8 @@ static double DC_NonCol(char *mode,
     }
 
     /* MPI, My_Eele1 */
+
+    Eele1[0] = 0.0; Eele1[1] = 0.0;
     MPI_Barrier(mpi_comm_level1);
     MPI_Allreduce(&My_Eele1[0], &Eele1[0], 1, MPI_DOUBLE, MPI_SUM, mpi_comm_level1);
 
