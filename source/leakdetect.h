@@ -14,6 +14,7 @@ void leak_detect_init(void);
 void *leak_detect_malloc(size_t, const char*, unsigned int);
 void leak_detect_free(void*);
 void leak_detect_check(void);
+void leak_detect_finalize(void);
 
 #ifdef __cplusplus
 }

@@ -834,6 +834,10 @@ int main(int argc, char *argv[])
   leak_detect_check();
 #endif
 
+#ifdef LEAK_DETECT
+  leak_detect_finalize();
+#endif
+
   /* print memory */
 
   PrintMemory("total",0,"sum");
