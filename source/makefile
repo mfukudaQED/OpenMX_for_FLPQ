@@ -5,15 +5,23 @@
 #                                                                 #
 ###################################################################
  
+### ohtaka, Intel compiler + Intel MKL + Intel MPI
+### used module ###
+#module load oneapi_compiler/2023.0.0 oneapi_mkl/2023.0.0 oneapi_mpi/2023.0.0
+CC = mpiicc -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -I${MKLROOT}/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3
+FC = mpiifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3
+LIB= -L${MKLROOT}/lib/intel64 -qmkl=parallel -lmkl_scalapack_lp64 -lmkl_blacs_intelmpi_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lifcore -lpthread -lm -ldl
+CXX = mpiicpc -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -std=c++11  -I${MKLROOT}/include/fftw
+
 
 ### ohtaka, Intel compiler + Intel MKL + OpenMPI
 ### used module ###
 #module load oneapi_compiler/2023.0.0 oneapi_mkl/2023.0.0 openmpi/4.1.5-oneapi-2023.0.0-classic
 ### 
-CC = mpicc -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -I${MKLROOT}/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3
-FC = mpifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3
-LIB= -L${MKLROOT}/lib/intel64 -qmkl=parallel -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi  -lifcoremt
-CXX = mpic++ -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -std=c++11  -I${MKLROOT}/include/fftw
+#CC = mpicc -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -I${MKLROOT}/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3
+#FC = mpifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3
+#LIB= -L${MKLROOT}/lib/intel64 -qmkl=parallel -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi  -lifcoremt
+#CXX = mpic++ -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -std=c++11  -I${MKLROOT}/include/fftw
 
 #CC = mpicc -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -I${MKLROOT}/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -qopt-report
 ##CC2 = mpicc -O2 -Wunused -march=core-avx2 -ip -no-prec-div -qopenmp -I${MKLROOT}/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -qopt-report
