@@ -1,5 +1,6 @@
 *.o
 *.mod
+slurm-*
 make.log
 openmx
 source_intelmpi/
