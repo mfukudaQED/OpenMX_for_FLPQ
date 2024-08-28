@@ -19,6 +19,7 @@ double DM_tilde_Beta_upper, DM_tilde_Beta_lower;
 /*** subroutines ***/
 void out_openmx_lpq(int Cnt_kind, int Calc_CntOrbital_ON, double *****CDM, double *****iCDM);
 double Allocate_DM_for_LPQ();
+double Free_Arrays_DM_for_LPQ();
 
 
 double Band_DFT_Col_DMmu(

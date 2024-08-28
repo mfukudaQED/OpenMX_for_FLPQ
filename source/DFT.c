@@ -2124,6 +2124,7 @@ double DFT(int MD_iter, int Cnt_Now)
   CompTime[myid0][18] += time14; /* Mulliken_Charge   */
   CompTime[myid0][19] += time15; /* FFT(2D)_Density   */
  
+  MPI_Barrier(mpi_comm_level1);
 
   /* added by M.FUKUDA for flpq */
   /*****************************************************
@@ -2340,7 +2341,7 @@ double DFT(int MD_iter, int Cnt_Now)
       out_openmx_lpq(Cnt_kind,Calc_CntOrbital_ON,DM[0],iDM[0]);
     }
 
-    
+    Free_Arrays_DM_for_LPQ();
 
   } /* if (flag_export_DM>0) */
   /* End addition by M.FUKUDA for flpq */

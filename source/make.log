@@ -1,4 +1,4 @@
-Tue Jul  9 10:56:06 JST 2024
+Wed Aug 28 09:30:17 JST 2024
 mpiicc -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -I/opt/intel/oneapi/mkl/2023.0.0/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -I./elpa-2018.05.001 -c openmx.c
 mpiicc -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -I/opt/intel/oneapi/mkl/2023.0.0/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -I./elpa-2018.05.001 -c openmx_common.c
 mpiicc -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -I/opt/intel/oneapi/mkl/2023.0.0/include/fftw -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -I./elpa-2018.05.001 -c Input_std.c
@@ -270,11 +270,10 @@ mpiifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-
 mpiifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -I./elpa-2018.05.001 -c ./elpa-2018.05.001/mod_redist_band_complex.F90
 mpiifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -I./elpa-2018.05.001 -c ./elpa-2018.05.001/mod_pack_unpack_cpu_real.F90
 mpiifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -I./elpa-2018.05.001 -c ./elpa-2018.05.001/mod_pack_unpack_cpu_complex.F90
-mpiifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -I./elpa-2018.05.001 -c ./elpa-2018.05.001/real.F90
 mpiifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -I./elpa-2018.05.001 -c solve_evp_real.f90
 mpiifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -I./elpa-2018.05.001 -c solve_evp_complex.f90
 mpiifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -I./elpa-2018.05.001 -c ./elpa-2018.05.001/elpa1_compute_real.F90
-mpiifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -I./elpa-2018.05.001 -c ./elpa-2018.05.001/elpa1_compute_complex.F90
+mpiifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -I./elpa-2018.05.001 -c ./elpa-2018.05.001/real.F90
 mpiifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -I./elpa-2018.05.001 -c ./elpa-2018.05.001/complex.F90
 mpiifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -I./elpa-2018.05.001 -c ./elpa-2018.05.001/mod_single_hh_trafo_real.F90
 mpiifort -O3 -march=core-avx2 -ip -no-prec-div -qopenmp -parallel -par-schedule-auto -static-intel -qopenmp-link=static -qopt-malloc-options=3 -I./elpa-2018.05.001 -c ./elpa-2018.05.001/mod_compute_hh_trafo_real.F90

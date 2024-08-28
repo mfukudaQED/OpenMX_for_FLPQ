@@ -2745,8 +2745,9 @@ void Input_std(char *file)
 
     for (i=1; i<=atomnum; i++){  
 
-      fgets(buf,MAXBUF,fp);
-      sscanf(buf,"%d %d %d %d",
+      //fgets(buf,MAXBUF,fp);
+      //sscanf(buf,"%d %d %d %d",
+      fscanf(fp,"%d %d %d %d",
              &j,&atom_Fixed_XYZ[i][1],&atom_Fixed_XYZ[i][2],&atom_Fixed_XYZ[i][3]);
     }  
 

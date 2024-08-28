@@ -125,3 +125,71 @@ double Allocate_DM_for_LPQ()
   /* PrintMemory */
   //PrintMemory("Allocate_DMmu_for_LPQ: DMmu",     sizeof(double)*size_DMmu,     NULL);
   //PrintMemory("Allocate_DMmu_for_LPQ: iDMmu",     sizeof(double)*size_iDMmu,     NULL);
+
+double Free_Arrays_DM_for_LPQ()
+{ 
+  int size_DMmu,size_iDMmu;
+  int i,j,k,m,h_AN,Gh_AN,Mc_AN,Gc_AN;
+  int tno0,tno1,Cwan,Hwan,N,so,spin;
+
+        
+  //  n = 0;
+  //  for (i=1; i<=atomnum; i++){
+  //    wanA  = WhatSpecies[i];
+  //    n += Spe_Total_CNO[wanA];
+  //  }
+  //  n2 = n + 2;
+
+  /* DMmu */
+
+  for (k=0; k<=SpinP_switch; k++){
+    for (Mc_AN=0; Mc_AN<=Matomnum; Mc_AN++){
+
+      if (Mc_AN==0){
+        Gc_AN = 0;
+        tno0 = 1;
+      }
+      else{
+        Gc_AN = M2G[Mc_AN];
+        Cwan = WhatSpecies[Gc_AN];
+        tno0 = Spe_Total_NO[Cwan];  
+      }    
+
+      for (h_AN=0; h_AN<=FNAN[Gc_AN]; h_AN++){
+        for (i=0; i<tno0; i++){
+          free(DMmu[k][Mc_AN][h_AN][i]); 
+        }
+        free(DMmu[k][Mc_AN][h_AN]); 
+      }
+      free(DMmu[k][Mc_AN]);
+    }
+    free(DMmu[k]); 
+  }
+  free(DMmu); 
+
+  for (k=0; k<=SpinP_switch; k++){
+    for (Mc_AN=0; Mc_AN<=Matomnum; Mc_AN++){
+
+      if (Mc_AN==0){
+        Gc_AN = 0;
+        tno0 = 1;
+      }
+      else{
+        Gc_AN = M2G[Mc_AN];
+        Cwan = WhatSpecies[Gc_AN];
+        tno0 = Spe_Total_NO[Cwan];  
+      }    
+
+      for (h_AN=0; h_AN<=FNAN[Gc_AN]; h_AN++){
+        for (i=0; i<tno0; i++){
+          free(iDMmu[k][Mc_AN][h_AN][i]); 
+        }
+        free(iDMmu[k][Mc_AN][h_AN]); 
+      }
+      free(iDMmu[k][Mc_AN]);
+    }
+    free(iDMmu[k]); 
+  }
+  free(iDMmu); 
+
+}
