@@ -2745,10 +2745,12 @@ void Input_std(char *file)
 
     for (i=1; i<=atomnum; i++){  
 
-      //fgets(buf,MAXBUF,fp);
-      //sscanf(buf,"%d %d %d %d",
-      fscanf(fp,"%d %d %d %d",
+      fgets(buf,MAXBUF,fp);
+      //buf[strcspn(buf, "\n")] = '\0'; 
+      //fscanf(fp,"%d %d %d %d",
+      sscanf(buf,"%d %d %d %d",
              &j,&atom_Fixed_XYZ[i][1],&atom_Fixed_XYZ[i][2],&atom_Fixed_XYZ[i][3]);
+        printf("myid=%d,%d, %d, %d, %d, %d\n",myid,i,j,atom_Fixed_XYZ[i][1],atom_Fixed_XYZ[i][2],atom_Fixed_XYZ[i][3]);
     }  
 
     if ( ! input_last("MD.Fixed.XYZ>") ) {
@@ -3703,6 +3705,7 @@ void Input_std(char *file)
       }
     }
 
+    flag_unfold_origin = 0;
     unfold_origin=(double*)malloc(sizeof(double)*3);
     if ( (fp=input_find("<Unfolding.Referenceorigin")) != NULL ) {
         fscanf(fp,"%lf %lf %lf",&unfold_origin[0],&unfold_origin[1],&unfold_origin[2]);
@@ -3715,6 +3718,7 @@ void Input_std(char *file)
       if (unitvector_unit==0) {
         for (i=0; i<3; i++) unfold_origin[i] = unfold_origin[i]/BohrR;
       }
+      flag_unfold_origin = 1;
     }
     else {
       /* default value will be calculated later on */
@@ -3895,20 +3899,20 @@ void Input_std(char *file)
   i_vec[0]=0    ; i_vec[1]=1   ; i_vec[2]=2;    i_vec[3]=3;
   input_string2int("DM.export", &flag_export_DM, 4, s_vec,i_vec);
   //input_logical("DM.export",&flag_export_DM,0);
-  input_logical("DM.specify.kpoints",&way_of_kpoint_DM,0);
-  input_int("DM.num.kpoints",&num_kpt_DM,0);
+  //input_logical("DM.specify.kpoints",&way_of_kpoint_DM,0);
+  //input_int("DM.num.kpoints",&num_kpt_DM,0);
 
-  if (fp=input_find("<DM.kpoints")) {
+  //if (fp=input_find("<DM.kpoints")) {
 
-    for (i=0; i<num_kpt_DM; i++){
-      fscanf(fp,"%lf %lf %lf",&DM_KGrids1[i],&DM_KGrids2[i],&DM_KGrids3[i]);
-    }
-    if ( ! input_last("DM.kpoints>") ) {
-      /* format error */
-      printf("Format error for DM.kpoints\n");
-      po++;
-    }
-  }
+  //  for (i=0; i<num_kpt_DM; i++){
+  //    fscanf(fp,"%lf %lf %lf",&DM_KGrids1[i],&DM_KGrids2[i],&DM_KGrids3[i]);
+  //  }
+  //  if ( ! input_last("DM.kpoints>") ) {
+  //    /* format error */
+  //    printf("Format error for DM.kpoints\n");
+  //    po++;
+  //  }
+  //}
   /***********************************************
             energy range for DMmu
   ***********************************************/

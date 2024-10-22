@@ -167,7 +167,7 @@ double Free_Arrays_DM_for_LPQ()
   }
   free(DMmu); 
 
-  for (k=0; k<=SpinP_switch; k++){
+  for (k=0; k<2; k++){
     for (Mc_AN=0; Mc_AN<=Matomnum; Mc_AN++){
 
       if (Mc_AN==0){

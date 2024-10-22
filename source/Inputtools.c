@@ -529,7 +529,8 @@ int input_last(const char *key)
   keylen=strlen_trim(key);
 
   fgets(buf,size,fp); 
-  fgets(buf,size,fp); 
+  if(strlen(buf)<3) fgets(buf,size,fp); 
+
   sscanf(buf,"%s",key_inbuf);
   buflen=strlen_trim(key_inbuf);
   /*  printf("last=<%s>\n",buf); */

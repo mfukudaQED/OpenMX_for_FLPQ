@@ -2336,12 +2336,12 @@ double DFT(int MD_iter, int Cnt_Now)
 
     if(flag_energy_range_DM>0){
       out_openmx_lpq(Cnt_kind,Calc_CntOrbital_ON,DMmu,iDMmu);
+      Free_Arrays_DM_for_LPQ();
     }
     else{
       out_openmx_lpq(Cnt_kind,Calc_CntOrbital_ON,DM[0],iDM[0]);
     }
 
-    Free_Arrays_DM_for_LPQ();
 
   } /* if (flag_export_DM>0) */
   /* End addition by M.FUKUDA for flpq */

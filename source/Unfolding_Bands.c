@@ -2820,38 +2820,53 @@ void set_atv_for_conceptual_cell(double** lattice, double* origin, int* mapN2n) 
 
   //printf("CpyCell, TCpyCell = %d %d\n",CpyCell, TCpyCell);
 
-  flag_shift_lattice = set_tabr4RN(tabr4RN, auto_origin, mergin);
-  //MPI_Barrier(mpi_comm_level1);
-  //MPI_Finalize();
-  //exit(0);
 
-  //if (myid==Host_ID){
-  //  for (GA_AN=1; GA_AN<=atomnum; GA_AN++) {
-  //    for (Rn=0; Rn<(TCpyCell+1); Rn++) {
-  //        printf("GA_AN, Rn, i, j, k = %d %d %d %d %d \n",GA_AN, Rn, tabr4RN[GA_AN-1][Rn][0], tabr4RN[GA_AN-1][Rn][1], tabr4RN[GA_AN-1][Rn][2]);
-  //    }
-  //  }
-  //}
-
-  /* shift origin again to avoid atoms on lattice vector */
-  if(flag_shift_lattice==1){
-    for (i=1; i<=3; i++){
-      auto_origin[i] = auto_origin[i] - disp_origin[i];
+  if(flag_unfold_origin==1){
+    for (i=0; i<3; i++){
+      auto_origin[i+1] = origin[i];
     }
-  }
-
-  if(flag_shift_lattice==1){
     flag_shift_lattice = set_tabr4RN(tabr4RN, auto_origin, mergin);
   }
-  //MPI_Barrier(mpi_comm_level1);
-  //MPI_Finalize();
-  //exit(0);
+  else{
+    flag_shift_lattice = set_tabr4RN(tabr4RN, auto_origin, mergin);
+    //MPI_Barrier(mpi_comm_level1);
+    //MPI_Finalize();
+    //exit(0);
+
+    //if (myid==Host_ID){
+    //  for (GA_AN=1; GA_AN<=atomnum; GA_AN++) {
+    //    for (Rn=0; Rn<(TCpyCell+1); Rn++) {
+    //        printf("GA_AN, Rn, i, j, k = %d %d %d %d %d \n",GA_AN, Rn, tabr4RN[GA_AN-1][Rn][0], tabr4RN[GA_AN-1][Rn][1], tabr4RN[GA_AN-1][Rn][2]);
+    //    }
+    //  }
+    //}
+
+    /* shift origin again to avoid atoms on lattice vector */
+    if(flag_shift_lattice==1){
+      for (i=1; i<=3; i++){
+        auto_origin[i] = auto_origin[i] - disp_origin[i];
+      }
+    }
+
+    if(flag_shift_lattice==1){
+      flag_shift_lattice = set_tabr4RN(tabr4RN, auto_origin, mergin);
+    }
+    //MPI_Barrier(mpi_comm_level1);
+    //MPI_Finalize();
+    //exit(0);
+  }
 
   if(flag_shift_lattice==1){
     if (myid==Host_ID){
       printf("Failed in set auto_origin.\n");
       printf("Cannot assign atoms in the reference cell properly! Could be due to more than one same atom in the reference cell!\n");
       printf("Check the input file, maybe the structure is highly disordered or you need to set the reference origin by yourself!\n\n");
+      if(flag_unfold_origin==1){
+        printf("unfold_origin = %d %d %d \n",origin[0],origin[1],origin[2]);
+      }
+      else{
+        printf("auto_origin = %d %d %d \n",auto_origin[1],auto_origin[2],auto_origin[3]);
+      }
     }
   }
 

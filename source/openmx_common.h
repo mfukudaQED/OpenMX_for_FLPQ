@@ -4749,6 +4749,7 @@ int UnfoldBand_Nkpath;/* added by Fukuda 20231230 */
 int *UnfoldBand_N_perpath;/* added by Fukuda 20231230 */
 double ***UnfoldBand_kpath;/* added by Fukuda 20231230 */
 char ***UnfoldBand_kname; /* added by Fukuda 20231230 */
+int flag_unfold_origin;
 /* end unfolding */
 
 /* scalapack */
