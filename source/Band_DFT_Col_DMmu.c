@@ -173,6 +173,7 @@ double Band_DFT_Col_DMmu(
   time85 = 0.0;
   time51 = 0.0;
 
+
   /* MPI */
   MPI_Comm_size(mpi_comm_level1,&numprocs0);
   MPI_Comm_rank(mpi_comm_level1,&myid0);
@@ -355,6 +356,136 @@ double Band_DFT_Col_DMmu(
       T_KGrids2[k] = NE_KGrids2[k];
       T_KGrids3[k] = NE_KGrids3[k];
       T_k_op[k]    = NE_T_k_op[k];
+    }
+  }
+
+  /***********************************************
+     k-points by a Gamma-centered mesh                                                                
+
+     k_op[i][j][k]: weight of DOS 
+                 =0   no calc.
+                 =1   time reversal invariant momentum (TRIM)
+                 =2   which has k<->-k point
+        Now, only the relation, E(k)=E(-k), is used. 
+
+  ***********************************************/
+  
+  else if (way_of_kpoint==3){
+
+    for (i=0;i<knum_i;i++) {
+      for (j=0;j<knum_j;j++) {
+        for (k=0;k<knum_k;k++) {
+          k_op[i][j][k]=-999;
+        }
+      }
+    }
+
+    for (i=0;i<knum_i;i++) {
+      for (j=0;j<knum_j;j++) {
+        for (k=0;k<knum_k;k++) {
+          if ( k_op[i][j][k]==-999 ) {
+
+            if (i==0 || 2*i==knum_i){
+              ii=i;
+            } else {
+              ii=knum_i-i;
+            }
+
+            if (j==0 || 2*j==knum_j){
+              ij=j;
+            } else {
+              ij=knum_j-j;
+            }
+
+            if (k==0 || 2*k==knum_k){
+              ik=k;
+            } else {
+              ik=knum_k-k;
+            }
+
+            if ((i==0 || 2*i==knum_i) && (j==0 || 2*j==knum_j) && (k==0 || 2*k==knum_k)){
+              k_op[i][j][k]    = 1;
+            } else {
+              k_op[i][j][k]    = 2;
+              k_op[ii][ij][ik] = 0;
+            }
+          }
+
+        } /* k */
+      } /* j */
+    } /* i */
+
+    /***********************************
+       one-dimentionalize for MPI
+    ************************************/
+
+    T_knum = 0;
+    for (i=0; i<knum_i; i++){
+      for (j=0; j<knum_j; j++){
+        for (k=0; k<knum_k; k++){
+          if (0<k_op[i][j][k]){
+            T_knum++;
+          }
+        }
+      }
+    }
+
+    /* set T_KGrids1,2,3 and T_k_op */
+
+    T_knum = 0;
+    for (i=0; i<knum_i; i++){
+      if (knum_i==1)  k1 = 0.0;
+      else            k1 = ((double)i)/((double)knum_i) + Shift_K_Point;
+
+      for (j=0; j<knum_j; j++){
+
+        if (knum_j==1)  k2 = 0.0;
+        else            k2 = ((double)j)/((double)knum_j) - Shift_K_Point;
+
+        for (k=0; k<knum_k; k++){
+          if (knum_k==1)  k3 = 0.0;
+          else            k3 = ((double)k)/((double)knum_k) + 2.0*Shift_K_Point;
+
+          if (0<k_op[i][j][k]){
+            T_KGrids1[T_knum] = k1;
+            T_KGrids2[T_knum] = k2;
+            T_KGrids3[T_knum] = k3;
+            T_k_op[T_knum]    = k_op[i][j][k];
+
+            //printf("T_knum=%2d k1=%15.12f k2=%15.12f k3=%15.12f k_op[i][j][k]=%2d\n",T_knum,k1,k2,k3,k_op[i][j][k]);
+
+            T_knum++;
+          }
+        }
+      }
+    }
+
+    if (myid0==Host_ID && 0<level_stdout){
+
+      printf(" KGrids1: ");fflush(stdout);
+      for (i=0;i<=knum_i-1;i++){
+        if (knum_i==1)  k1 = 0.0;
+        else            k1 = ((double)i)/((double)knum_i) + Shift_K_Point;
+        printf("%9.5f ",k1);fflush(stdout);
+      }
+
+      printf("\n");fflush(stdout);
+      printf(" KGrids2: ");fflush(stdout);
+      for (i=0;i<=knum_j-1;i++){
+        if (knum_j==1)  k2 = 0.0;
+        else            k2 = ((double)i)/((double)knum_j) - Shift_K_Point;
+        printf("%9.5f ",k2);fflush(stdout);
+      }
+
+      printf("\n");fflush(stdout);
+      printf(" KGrids3: ");fflush(stdout);
+
+      for (i=0;i<=knum_k-1;i++){
+        if (knum_k==1)  k3 = 0.0;
+        else            k3 = ((double)i)/((double)knum_k) + 2.0*Shift_K_Point;
+        printf("%9.5f ",k3);fflush(stdout);
+      }
+      printf("\n");fflush(stdout);
     }
   }
 

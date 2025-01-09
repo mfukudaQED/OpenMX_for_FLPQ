@@ -2750,7 +2750,7 @@ void Input_std(char *file)
       //fscanf(fp,"%d %d %d %d",
       sscanf(buf,"%d %d %d %d",
              &j,&atom_Fixed_XYZ[i][1],&atom_Fixed_XYZ[i][2],&atom_Fixed_XYZ[i][3]);
-        printf("myid=%d,%d, %d, %d, %d, %d\n",myid,i,j,atom_Fixed_XYZ[i][1],atom_Fixed_XYZ[i][2],atom_Fixed_XYZ[i][3]);
+        //printf("myid=%d,%d, %d, %d, %d, %d\n",myid,i,j,atom_Fixed_XYZ[i][1],atom_Fixed_XYZ[i][2],atom_Fixed_XYZ[i][3]);
     }  
 
     if ( ! input_last("MD.Fixed.XYZ>") ) {

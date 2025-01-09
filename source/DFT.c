@@ -2172,9 +2172,6 @@ double DFT(int MD_iter, int Cnt_Now)
           case 3:
 
             if (SpinP_switch<=1){
-              //Band_DFT_Col_DM( Dos_Kgrid[0], Dos_Kgrid[1], Dos_Kgrid[2],
-              //         SpinP_switch, H, iHNL, OLP[0] );
-              //
               Band_DFT_Col_DMmu(LSCF_iter,
                 Kspace_grid1,Kspace_grid2,Kspace_grid3,
                 SpinP_switch,H,iHNL,OLP[0],DMmu,
