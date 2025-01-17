@@ -2332,10 +2332,18 @@ double DFT(int MD_iter, int Cnt_Now)
     }
 
     if(flag_energy_range_DM>0){
+      if (MYID_MPI_COMM_WORLD==Host_ID){
+        printf("\n");
+        printf("Exporting DM in a range between %lf eV and %lf eV ...\n",DM_energy_range[0]*eV2Hartree,DM_energy_range[1]*eV2Hartree);fflush(stdout);
+      }
       out_openmx_lpq(Cnt_kind,Calc_CntOrbital_ON,DMmu,iDMmu);
       Free_Arrays_DM_for_LPQ();
     }
     else{
+      if (MYID_MPI_COMM_WORLD==Host_ID){
+        printf("\n");
+        printf("Exporting DM ...\n");fflush(stdout);
+      }
       out_openmx_lpq(Cnt_kind,Calc_CntOrbital_ON,DM[0],iDM[0]);
     }
 

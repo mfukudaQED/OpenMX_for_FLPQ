@@ -1408,41 +1408,67 @@ diagonalize1:
     /* pre-calculation of the Fermi function */
 
     po = 0;
+    //kmin = 1;
+    //kmax = MaxN;
     kmin = is2[myid2];
     kmax = ie2[myid2];
 
     for (k=is2[myid2]; k<=ie2[myid2]; k++){
+    //for (k=1; k<=MaxN; k++){ // }
 
       eig = EIGEN[spin][kloop][k];
 
-      if (xanes_calc==1) 
-        x = (eig - ChemP_XANES[spin])*Beta;
-      else 
-        x = (eig - ChemP)*Beta;
+      if (flag_export_DM<2){
+        if (xanes_calc==1) 
+          x = (eig - ChemP_XANES[spin])*Beta;
+        else 
+          x = (eig - ChemP)*Beta;
 
-      if (x<=-x_cut) x = -x_cut;
-      if (x_cut<=x)  x = x_cut;
-      FermiF = FermiFunc(x,spin,k,&k,&x);
+        if (x<=-x_cut) x = -x_cut;
+        if (x_cut<=x)  x = x_cut;
+        FermiF = FermiFunc(x,spin,k,&k,&x);
 
-      tmp1 = sqrt(kw*FermiF);
+        tmp1 = sqrt(kw*FermiF);
+      }
 
       /* Cutoff in the specified energy range */
-      //if (flag_energy_range_DM==1){
-      //  if (xanes_calc==1) {
-      //    if ( ((eig - ChemP_XANES[spin]) < DM_energy_range[0]) || (DM_energy_range[1] < (eig - ChemP_XANES[spin])) ){
-      //      tmp1 = 0;
-      //    }
-      //  }
-      //  else{
-      //    if ( (DM_energy_range[0] < (eig - ChemP)) && ((eig - ChemP) < DM_energy_range[1]) ){
-      //      tmp1 = 0;
-      //    }
-      //  }
-      //}
+      if ((flag_export_DM==1) && (flag_energy_range_DM==1)){
+        if (xanes_calc==1) {
+          if ( ((eig - ChemP_XANES[spin]) < DM_energy_range[0]) || (DM_energy_range[1] < (eig - ChemP_XANES[spin])) ){
+            tmp1 = 0;
+          }
+        }
+        else{
+          if ( (DM_energy_range[0] < (eig - ChemP)) && ((eig - ChemP) < DM_energy_range[1]) ){
+            tmp1 = 0;
+          }
+        }
+      }
+      else if (flag_export_DM==2){ /* T-method */
+        if (xanes_calc==1) {
+            x_lower = (eig - (ChemP_XANES[spin] + DM_energy_range[0]))*DM_tilde_Beta_lower;
+            x_upper = (eig - (ChemP_XANES[spin] + DM_energy_range[1]))*DM_tilde_Beta_upper;
+        }
+        else {
+            x_lower = (eig - (ChemP + DM_energy_range[0]))*DM_tilde_Beta_lower;
+            x_upper = (eig - (ChemP + DM_energy_range[1]))*DM_tilde_Beta_upper;
+        }
+
+        if (x_lower<=-x_cut) x_lower = -x_cut;
+        if (x_upper<=-x_cut) x_upper = -x_cut;
+        if (x_cut<=x_lower)  x_lower = x_cut;
+        if (x_cut<=x_upper)  x_upper = x_cut;
+        FermiF_lower = FermiFunc(x_lower,spin,k,&k,&x_lower);
+        FermiF_upper = FermiFunc(x_upper,spin,k,&k,&x_upper);
+        FermiF = FermiF_upper;
+
+        tmp1 = sqrt(kw*(FermiF_upper - FermiF_lower));
+      }
       /* */
 
       for (i1=1; i1<=n; i1++){
         i = (i1-1)*(ie2[myid2]-is2[myid2]+1) + k - is2[myid2];
+        //i = (i1-1)*n + k - 1;
         EVec1[spin][i].r *= tmp1;
         EVec1[spin][i].i *= tmp1;
       }
@@ -1502,11 +1528,15 @@ diagonalize1:
 
             i1 = (Anum + i - 1)*(ie2[myid2]-is2[myid2]+1) - is2[myid2];
             j1 = (Bnum + j - 1)*(ie2[myid2]-is2[myid2]+1) - is2[myid2];
+            //i1 = (Anum + i - 1)*n - 1;
+            //j1 = (Bnum + j - 1)*n - 1;
+
 
             d1 = 0.0;
             d2 = 0.0;
 
             for (k=kmin; k<=kmax; k++){
+            //for (k=1; k<=kmax; k++){ //}
 
               ReA = EVec1[spin][i1+k].r*EVec1[spin][j1+k].r + EVec1[spin][i1+k].i*EVec1[spin][j1+k].i; 
               ImA = EVec1[spin][i1+k].r*EVec1[spin][j1+k].i - EVec1[spin][i1+k].i*EVec1[spin][j1+k].r;
@@ -1743,7 +1773,6 @@ diagonalize1:
     }
 
     /* for kloop */
-
     for (kloop0=0; kloop0<num_kloop0; kloop0++){
 
       kloop = kloop0 + S_knum;
